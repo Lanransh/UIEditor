@@ -7,6 +7,8 @@ const properties = {
   integration: { type: 'string' }, kind: { enum: ['source', 'integration'] },
   dryRun: { type: 'boolean' }, label: { type: 'string' }, relativePath: { type: 'string' }, discardChanges: { type: 'boolean' },
   action: { enum: ['run', 'stop', 'reset'] }, cursor: { type: 'integer', minimum: 0 }, consoleCursor: { type: 'integer', minimum: 0 },
+  query: { type: 'string' }, library: { enum: ['permanent', 'project'] },
+  tags: { type: 'string' }, robloxId: { type: 'string' },
 };
 const fields: Record<string, string[]> = {
   'uie.editor.get_state': ['detail'], 'uie.editor.get_capabilities': [],
@@ -17,6 +19,8 @@ const fields: Record<string, string[]> = {
   'uie.document.open': ['sessionId', 'revision', 'relativePath', 'discardChanges'], 'uie.document.save': ['sessionId', 'revision', 'relativePath'],
   'uie.runtime.control': ['sessionId', 'revision', 'action'], 'uie.runtime.click': ['sessionId', 'revision', 'id'],
   'uie.debug.get_diagnostics': ['cursor', 'consoleCursor'], 'uie.debug.screenshot': [],
+  'uie.assets.search': ['query', 'library', 'offset', 'limit'], 'uie.assets.get': ['id'],
+  'uie.assets.configure': ['sessionId', 'revision', 'id', 'name', 'tags', 'robloxId'],
 };
 const descriptions = [
   'Read active project/session, revision and optionally full design document.',
@@ -32,14 +36,18 @@ const descriptions = [
   'Run, stop or reset preview. Run makes authoring read-only; stop returns to editing.',
   'Simulate button activation using stable ID; hidden/disabled buttons do not dispatch.',
   'Read bounded console/preview diagnostics since cursor; reports truncation.', 'Capture rendered UI canvas as PNG, without selection decorations.',
+  'Search Roblox image assets in permanent/project libraries by name and tags; includes Roblox image ID. Apply using ui.assets.apply(nodeId,assetId) in code.execute.',
+  'Get an image asset with local preview and Roblox ID.',
+  'Save image asset metadata and its single Roblox ID. Omitted fields stay unchanged. Asset catalog changes are saved immediately and are not document undo operations.',
 ];
-export const definitions = toolNames.map((name, index) => ({ name, description: descriptions[index], inputSchema: { type: 'object', properties: Object.fromEntries(fields[name].map(key => [key, properties[key as keyof typeof properties]])), additionalProperties: false, required: fields[name].filter(key => ['sessionId', 'revision'].includes(key) || (name === 'uie.code.execute' && ['language', 'source'].includes(key)) || (name === 'uie.nodes.get' && key === 'id') || (name === 'uie.runtime.click' && key === 'id') || (name === 'uie.runtime.control' && key === 'action') || (name === 'uie.document.open' && key === 'relativePath') || (name === 'uie.document.new' && key === 'name')) } }));
+export const definitions = toolNames.map((name, index) => ({ name, description: descriptions[index], inputSchema: { type: 'object', properties: Object.fromEntries(fields[name].map(key => [key, properties[key as keyof typeof properties]])), additionalProperties: false, required: fields[name].filter(key => ['sessionId', 'revision'].includes(key) || (name === 'uie.code.execute' && ['language', 'source'].includes(key)) || (['uie.nodes.get', 'uie.runtime.click', 'uie.assets.get', 'uie.assets.configure'].includes(name) && key === 'id') || (name === 'uie.runtime.control' && key === 'action') || (name === 'uie.document.open' && key === 'relativePath') || (name === 'uie.document.new' && key === 'name')) } }));
 
 export function validateTool(name: string, args: unknown) {
   const tool = definitions.find(tool => tool.name === name);
   if (!tool) throw new Error('Unknown tool');
   if (!args || typeof args !== 'object' || Array.isArray(args)) throw new Error('工具参数必须是对象。');
   const values = args as Record<string, unknown>;
+  if (['uie.assets.get', 'uie.assets.configure'].includes(name) && typeof values.id !== 'string') throw new Error('缺少参数 id');
   if (name === 'uie.scripts.set' && values.source === undefined && values.integration === undefined) throw new Error('必须提供 source（交互代码）或 integration（接入代码）。');
   for (const key of tool.inputSchema.required) if (values[key] === undefined) throw new Error(`缺少参数 ${key}`);
   for (const [key, value] of Object.entries(values)) {

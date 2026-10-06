@@ -101,7 +101,8 @@ export class RobloxProjectStrategy implements ProjectStrategy {
     let count = 0;
     const check = (value: unknown, depth: number): UINode => {
       if (++count > 5000 || depth > 64) throw new Error('界面最多支持 5000 个节点、64 层。');
-      if (!isRecord(value) || Object.keys(value).some(key => !['id', 'name', 'className', 'properties', 'children', 'previewImage'].includes(key)) || typeof value.id !== 'string' || !value.id.trim() || ids.has(value.id) || typeof value.name !== 'string' || !value.name.trim() || typeof value.className !== 'string' || !Object.hasOwn(this.nodes, value.className) || !Array.isArray(value.children)) throw new Error('节点类型、名称、ID 或层级无效（ID 不可重复）。');
+      if (!isRecord(value) || Object.keys(value).some(key => !['id', 'name', 'className', 'properties', 'children', 'previewImage', 'imageAssetId'].includes(key)) || typeof value.id !== 'string' || !value.id.trim() || ids.has(value.id) || typeof value.name !== 'string' || !value.name.trim() || typeof value.className !== 'string' || !Object.hasOwn(this.nodes, value.className) || !Array.isArray(value.children)) throw new Error('节点类型、名称、ID 或层级无效（ID 不可重复）。');
+      if (Object.hasOwn(value, 'imageAssetId') && (!value.className.startsWith('Image') || typeof value.imageAssetId !== 'string' || !value.imageAssetId.trim() || value.imageAssetId.length > 160)) throw new Error('图片资产引用无效。');
       ids.add(value.id);
       const definition = this.nodes[value.className];
       if (value.className.startsWith('Image') && isRecord(value.properties) && !Object.hasOwn(value.properties, 'TileSize')) value.properties.TileSize = structuredClone(image.TileSize.value);

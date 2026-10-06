@@ -1,6 +1,6 @@
 import { allNodes, findNode, findParent, type UIDocument, type UINode } from './uiDocument';
 
-export const toolNames = ['uie.editor.get_state', 'uie.editor.get_capabilities', 'uie.nodes.get', 'uie.nodes.find', 'uie.code.execute', 'uie.scripts.get', 'uie.scripts.set', 'uie.document.list', 'uie.document.new', 'uie.document.open', 'uie.document.save', 'uie.runtime.control', 'uie.runtime.click', 'uie.debug.get_diagnostics', 'uie.debug.screenshot'] as const;
+export const toolNames = ['uie.editor.get_state', 'uie.editor.get_capabilities', 'uie.nodes.get', 'uie.nodes.find', 'uie.code.execute', 'uie.scripts.get', 'uie.scripts.set', 'uie.document.list', 'uie.document.new', 'uie.document.open', 'uie.document.save', 'uie.runtime.control', 'uie.runtime.click', 'uie.debug.get_diagnostics', 'uie.debug.screenshot', 'uie.assets.search', 'uie.assets.get', 'uie.assets.configure'] as const;
 export type AutomationRequest = { name: string; arguments: Record<string, unknown> };
 export interface AutomationAPI {
   onRequest(handler: (request: AutomationRequest) => Promise<unknown>): () => void;
@@ -22,7 +22,7 @@ export function getNode(document: UIDocument, args: Record<string, unknown>): un
   const node = findNode(document.root, String(args.id));
   if (!node) throw new Error('节点不存在。');
   const depth = integer(args.depth, 0, 0, 64);
-  const visit = (node: UINode, remaining: number): unknown => ({ ...(nodeSummary(document.root, node) as object), properties: node.properties, children: node.children.map(child => remaining ? visit(child, remaining - 1) : nodeSummary(document.root, child)) });
+  const visit = (node: UINode, remaining: number): unknown => ({ ...(nodeSummary(document.root, node) as object), properties: node.properties, ...(node.imageAssetId ? { imageAssetId: node.imageAssetId } : {}), children: node.children.map(child => remaining ? visit(child, remaining - 1) : nodeSummary(document.root, child)) });
   return visit(node, depth);
 }
 export function findNodes(document: UIDocument, args: Record<string, unknown>) {

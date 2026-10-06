@@ -9,6 +9,7 @@ export interface UINode {
   properties: Record<string, PropertyValue>;
   children: UINode[];
   previewImage?: { name: string; dataUrl: string };
+  imageAssetId?: string;
 }
 export interface UIDocument {
   format: 'roblox-ui';

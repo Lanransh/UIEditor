@@ -1,5 +1,5 @@
 -- App-owned authoring host. Shared value constructors are prepended by Electron.
-local document, definitions, ids, ui
+local document, definitions, ids, ui, imageAssets
 local nextId = 0
 local logs, operations = {}, 0
 local function log(kind, ...)
@@ -76,6 +76,7 @@ function nodes.setProperties(id, properties)
             assert(kind == expected, "Wrong value type: " .. key)
         end
         node.properties[key] = clone(encode(item))
+        if key == "Image" then node.imageAssetId = nil end
     end
     changed()
 end
@@ -83,6 +84,7 @@ function nodes.setPreviewImage(id, previewImage)
     local node = required(id)
     assert(node.className == "ImageLabel" or node.className == "ImageButton", "Preview images require an image node")
     node.previewImage = previewImage and clone(previewImage) or nil
+    node.imageAssetId = nil
     changed()
 end
 function nodes.create(className, options)
@@ -135,11 +137,26 @@ function scripts.set(kind, source)
     assert(type(source) == "string" and #source <= 1048576, "Invalid script source")
     document.scripts[kind] = source; changed()
 end
+local assets = {}
+function assets.apply(id, assetId)
+    local node = required(id)
+    assert(node.className == "ImageLabel" or node.className == "ImageButton", "Assets require an image node")
+    local asset = assert(imageAssets[assetId], "Unknown image asset ID")
+    node.imageAssetId = asset.id
+    node.previewImage = nil -- Electron attaches the catalog preview after the transaction.
+    node.properties.Image = asset.robloxId
+    node.properties.BackgroundTransparency = 1
+    node.properties.ScaleType = asset.usage == "tile" and "Tile" or "Fit"
+    if asset.usage == "tile" then node.properties.TileSize = {x={scale=0,offset=27},y={scale=0,offset=27}} end
+    changed()
+end
 local host = {}
 host.print = function(...) log("output", ...) end
 host.warn = function(...) log("warning", ...) end
 function host.initialize(input)
     document, definitions, ids = input.document, input.definitions, input.ids
+    imageAssets = {}
+    for _, asset in ipairs(input.assets or {}) do imageAssets[asset.id] = asset end
     for _, definition in pairs(definitions) do
         for key, property in pairs(definition.properties) do
             if property.kind == "enum" and not Enum[key] then
@@ -149,7 +166,7 @@ function host.initialize(input)
             end
         end
     end
-    ui = table.freeze({ projectType = input.projectType, capabilities = input.capabilities, root = table.freeze({ id = document.root.id }), nodes = table.freeze(nodes), scripts = table.freeze(scripts) })
+    ui = table.freeze({ projectType = input.projectType, capabilities = input.capabilities, root = table.freeze({ id = document.root.id }), nodes = table.freeze(nodes), scripts = table.freeze(scripts), assets = table.freeze(assets) })
     host.globals = { ui = ui, UDim = table.freeze(UDim), UDim2 = table.freeze(UDim2), Vector2 = table.freeze(Vector2), Color3 = table.freeze(Color3), Enum = table.freeze(Enum), typeof = function(item) return valueTypes[item] or type(item) end }
     return true
 end

@@ -5,6 +5,7 @@ import { useDocumentEditor } from './editor/useDocumentEditor';
 import { NodeTree, NodeProperties } from './editor/NodePanels';
 import { DocumentCanvas } from './editor/Canvas';
 import { DocumentAssets } from './editor/DocumentAssets';
+import { ImageAssets, ImageAssetProperties } from './editor/ImageAssets';
 import { ScriptPanel, RuntimeOutput } from './editor/ScriptPanel';
 import { NewInterfaceDialog } from './editor/NewInterfaceDialog';
 import { McpSettings } from './editor/McpSettings';
@@ -109,8 +110,28 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
   const editor = useDocumentEditor(project, onBack);
   const history = editor.history;
   const [creatingInterface, setCreatingInterface] = useState(false);
-  const [assetLibrary, setAssetLibrary] = useState('项目资产');
-  const [bottomTab, setBottomTab] = useState<'assets' | 'output'>('assets');
+  const [uiLibrary, setUiLibrary] = useState('项目UI');
+  const [imageLibrary, setImageLibrary] = useState('永久图片');
+  const [bottomTab, setBottomTab] = useState<'assets' | 'images' | 'output'>('assets');
+  const [selectedAssetId, selectAsset] = useState<string | null>(null);
+  const assetLibrary = bottomTab === 'images' ? imageLibrary : uiLibrary;
+  const inspectedAsset = editor.imageAssets.find(asset => asset.id === editor.inspectedAssetId);
+  function changeBottomTab(tab: typeof bottomTab) { if (tab === bottomTab || editor.clearAssetInspection()) setBottomTab(tab); }
+  function changeAssetLibrary(library: string) {
+    if (library === assetLibrary || editor.clearAssetInspection()) {
+      if (bottomTab === 'images') setImageLibrary(library); else setUiLibrary(library);
+    }
+  }
+  function changeSelectedAsset(id: string) { if (editor.inspectAsset(id)) selectAsset(id); }
+  function configureAsset(id: string) {
+    const asset = editor.imageAssets.find(a => a.id === id);
+    if (asset && editor.inspectAsset(id)) { selectAsset(id); setImageLibrary(asset.library === 'permanent' ? '永久图片' : '项目图片'); setBottomTab('images'); }
+  }
+  useEffect(() => {
+    const listener = (event: Event) => configureAsset((event as CustomEvent<string>).detail);
+    window.addEventListener('uie:configure-asset', listener);
+    return () => window.removeEventListener('uie:configure-asset', listener);
+  });
   const [workspaceTab, setWorkspaceTab] = useState<'design' | 'source' | 'integration'>('design');
   useEffect(() => {
     const show = () => setWorkspaceTab('design'); window.addEventListener('uie:screenshot-start', show);
@@ -230,20 +251,21 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
         </div>
       </section>
       {separator('properties', '调整属性面板宽度')}
-      <aside className="panel properties" aria-label="属性面板"><h2>属性面板</h2><NodeProperties editor={editor} /></aside>
+      <aside className="panel properties" aria-label="属性面板"><h2>属性面板</h2>{inspectedAsset ? <ImageAssetProperties key={inspectedAsset.id} editor={editor} asset={inspectedAsset} /> : <NodeProperties editor={editor} />}</aside>
     </div>
     {separator('assets', '调整资产目录高度')}
     <section className="panel assets" aria-label="底部面板">
       <nav className="bottom-tabs" aria-label="底部页签">
-        <button aria-pressed={bottomTab === 'assets'} onClick={() => setBottomTab('assets')}><FolderOpen size={16} />资产目录</button>
-        <button aria-pressed={bottomTab === 'output'} onClick={() => setBottomTab('output')}>输出</button>
-        <span className="assets-location">{bottomTab === 'assets' ? assetLibrary : editor.runtime.active ? '运行中' : '已停止'}</span>
+        <button aria-pressed={bottomTab === 'assets'} onClick={() => changeBottomTab('assets')}><FolderOpen size={16} />UI 资产</button>
+        <button aria-pressed={bottomTab === 'images'} onClick={() => changeBottomTab('images')}>图片资产</button>
+        <button aria-pressed={bottomTab === 'output'} onClick={() => changeBottomTab('output')}>输出</button>
+        <span className="assets-location">{bottomTab !== 'output' ? assetLibrary : editor.runtime.active ? '运行中' : '已停止'}</span>
       </nav>
-      <div className="assets-body" hidden={bottomTab !== 'assets'}>
+      <div className="assets-body" hidden={bottomTab === 'output'}>
         <nav className="asset-libraries" aria-label="资产库">
-          {['永久资产', '项目资产'].map(library => <button key={library} className={assetLibrary === library ? 'selected' : ''} aria-pressed={assetLibrary === library} title={library === '项目资产' ? project.path : '跨项目复用的资产'} onClick={() => setAssetLibrary(library)}><Folder size={16} />{library}</button>)}
+          {(bottomTab === 'images' ? ['永久图片', '项目图片'] : ['永久UI', '项目UI']).map(library => <button key={library} className={assetLibrary === library ? 'selected' : ''} aria-pressed={assetLibrary === library} title={library.startsWith('项目') ? project.path : '跨项目复用的资产'} onClick={() => changeAssetLibrary(library)}><Folder size={16} />{library}</button>)}
         </nav>
-        <DocumentAssets editor={editor} library={assetLibrary} />
+        {bottomTab === 'images' ? <ImageAssets editor={editor} library={imageLibrary} selectedId={selectedAssetId} select={changeSelectedAsset} /> : <DocumentAssets editor={editor} library={uiLibrary} />}
       </div>
       <div className="bottom-output" hidden={bottomTab !== 'output'}><RuntimeOutput editor={editor} /></div>
     </section>

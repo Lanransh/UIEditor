@@ -97,9 +97,9 @@ function NumberInput({ value, onChange, label, definition, disabled }: { value: 
     setDraft(null);
   }} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} />;
 }
-function StringInput({ value, onChange, label }: { value: string; onChange: (value: string) => void; label: string }) {
+function StringInput({ value, onChange, label, disabled }: { value: string; onChange: (value: string) => void; label: string; disabled?: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
-  return <input aria-label={label} value={draft ?? value} onChange={event => setDraft(event.target.value)} onBlur={event => { onChange(event.target.value); setDraft(null); }} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} />;
+  return <input aria-label={label} disabled={disabled} value={draft ?? value} onChange={event => setDraft(event.target.value)} onBlur={event => { onChange(event.target.value); setDraft(null); }} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} />;
 }
 function PropertyField({ name, definition, value, change, disabled }: { name: string; definition: PropertyDefinition; value: PropertyValue; change: (value: PropertyValue) => void; disabled: boolean }) {
   let input: ReactNode;
@@ -117,7 +117,7 @@ function PropertyField({ name, definition, value, change, disabled }: { name: st
         else change({ ...value as UDim | Vector2, [axis]: next });
       }} /></label>;
     })}</div>;
-  } else input = <StringInput label={name} value={value as string} onChange={change} />;
+  } else input = <StringInput label={name} value={value as string} disabled={disabled} onChange={change} />;
   return <div className="property-field"><span>{name}</span>{input}</div>;
 }
 export function NodeProperties({ editor }: { editor: DocumentEditor }) {
@@ -131,10 +131,13 @@ export function NodeProperties({ editor }: { editor: DocumentEditor }) {
     <p className="property-note">{node.className} · <span title={node.id}>{node.id.slice(0, 8)}</span></p>
     {parent && <div className="property-field"><span>父节点</span><select aria-label="父节点" value={parent.id} onChange={event => editor.reparent(event.target.value)}>{parents.map(value => <option key={value.id} value={value.id}>{value.name} · {value.className}</option>)}</select></div>}
     {layout && editor.strategy.nodes[node.className].category === 'object' && <p className="property-note">位置由 {layout.className} 控制；网格同时控制尺寸。请调整 LayoutOrder 或父容器布局。</p>}
-    {Object.entries(editor.strategy.nodes[node.className].properties).map(([name, definition]) => <PropertyField key={name} name={name} definition={definition} value={node.properties[name]} disabled={!!layout && editor.strategy.nodes[node.className].category === 'object' && (name === 'Position' || name === 'Rotation' || (name === 'Size' && layout.className === 'UIGridLayout'))} change={value => editor.editNode(node.id, current => ({ ...current, properties: { ...current.properties, [name]: value } }))} />)}
+    {Object.entries(editor.strategy.nodes[node.className].properties).map(([name, definition]) => <PropertyField key={name} name={name} definition={definition} value={node.properties[name]} disabled={(name === 'Image' && !!node.imageAssetId) || (!!layout && editor.strategy.nodes[node.className].category === 'object' && (name === 'Position' || name === 'Rotation' || (name === 'Size' && layout.className === 'UIGridLayout')))} change={value => editor.editNode(node.id, current => ({ ...current, properties: { ...current.properties, [name]: value } }))} />)}
+    {node.imageAssetId && <div className="image-preview-tools"><p className="property-note">图片资产：{editor.imageAssets.find(a => a.id === node.imageAssetId)?.name ?? '资产库中缺失，使用已保存预览与 ID'}<br />实际 Roblox ID：{String(node.properties.Image) || '未配置'}</p>
+      <button disabled={!editor.imageAssets.some(a => a.id === node.imageAssetId)} onClick={() => window.dispatchEvent(new CustomEvent('uie:configure-asset', { detail: node.imageAssetId }))}>定位图片资产</button>
+      <button onClick={() => editor.editNode(node.id, current => { const { imageAssetId: _, ...rest } = current; return rest; }, '解除图片资产引用')}>解除资产引用</button></div>}
     {node.className.startsWith('Text') && <p className="property-note">字体使用本机替代字体预览，文字排版需在 Roblox 中确认。</p>}
     {node.className === 'UIGradient' && <p className="property-note">ColorStart/End 与 TransparencyStart/End 表示首尾两个关键点，后续导出对应 Roblox 序列。</p>}
     {node.className === 'CanvasGroup' && <p className="property-note">GroupColor3 使用浏览器颜色混合近似展示，最终颜色需在 Roblox 中确认。</p>}
-    {node.className.startsWith('Image') && <div className="image-preview-tools"><p className="property-note">Image 保存 Roblox 资源 ID；本地图片仅用于预览，不会上传。</p><button onClick={() => void editor.pickImage()}>选择预览图片</button>{node.previewImage ? <><p className="property-note">{node.previewImage.name}</p><button onClick={() => editor.editNode(node.id, current => { const { previewImage: _, ...rest } = current; return rest; }, '清除预览图片')}>清除预览图片</button></> : <p className="property-note">缺少本地预览图片，画布显示占位。</p>}</div>}
+    {node.className.startsWith('Image') && !node.imageAssetId && <div className="image-preview-tools"><p className="property-note">Image 保存 Roblox 资源 ID；本地图片仅用于预览，不会上传。</p><button onClick={() => void editor.pickImage()}>选择预览图片</button>{node.previewImage ? <><p className="property-note">{node.previewImage.name}</p><button onClick={() => editor.editNode(node.id, current => { const { previewImage: _, ...rest } = current; return rest; }, '清除预览图片')}>清除预览图片</button></> : <p className="property-note">缺少本地预览图片，画布显示占位。</p>}</div>}
   </fieldset>;
 }

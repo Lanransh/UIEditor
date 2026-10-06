@@ -4,6 +4,7 @@ import { getNode, findNodes, integer, type AutomationRequest } from '../shared/a
 import { findNode, allNodes, type UIDocument } from '../shared/uiDocument';
 import { getCapabilities } from './automationCapabilities';
 import { documentCommand } from './commands';
+import { resolveImageAssets } from '../shared/imageAssets';
 
 interface Files { reset(document: UIDocument, path: string | null): void; saved(): string; markSaved(document: UIDocument, path: string): void; path(): string | null; busy(value: boolean): void }
 export function useAutomation(editor: DocumentEditor, files: Files) {
@@ -11,28 +12,55 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
   const current = useRef({ editor, files }); current.current = { editor, files };
   const lastError = useRef<string | null>(null);
   const documentId = useRef(editor.document.id);
+  const assetsSignature = useRef('');
   useEffect(() => {
     if (!window.automation) return;
     let alive = true;
     const unsubscribe = window.automation.onRequest(async (request: AutomationRequest) => {
       const { editor: e, files: f } = current.current;
       const a = request.arguments, h = e.history.inspect();
+      const signature = JSON.stringify(e.imageAssets);
+      if (assetsSignature.current !== signature) { assetsSignature.current = signature; sessionId.current = crypto.randomUUID(); }
       if (documentId.current !== h.state.id) { documentId.current = h.state.id; sessionId.current = crypto.randomUUID(); }
       const stamp = () => ({ sessionId: sessionId.current, revision: e.history.inspect().revision });
-      const verify = () => { if (!alive || a.sessionId !== sessionId.current || a.revision !== e.history.inspect().revision) throw new Error('编辑会话或 revision 已变化，请重新读取状态。'); };
+      const verify = () => { if (!alive || a.sessionId !== sessionId.current || a.revision !== e.history.inspect().revision || signature !== JSON.stringify(current.current.editor.imageAssets)) throw new Error('编辑会话、资产配置或 revision 已变化，请重新读取状态。'); };
       const writable = () => { verify(); if (e.runtime.inspect().sessionId || e.runtime.active || e.busy) throw new Error('当前正在运行或处理操作，请停止后编辑。'); };
-      const dirty = () => JSON.stringify(e.history.inspect().state) !== f.saved();
+      const resolved = () => resolveImageAssets(e.history.inspect().state, e.imageAssets);
+      const dirty = () => JSON.stringify(resolved()) !== f.saved();
       const relativePath = () => { const root = e.projectPath.replaceAll('\\', '/') + '/interfaces/', path = f.path()?.replaceAll('\\', '/'); return path?.toLowerCase().startsWith(root.toLowerCase()) ? path.slice(root.length) : null; };
       const state = () => ({ ...stamp(), projectType: e.strategy.mode, state: e.runtime.inspect().sessionId ? 'runtime' : 'edit', dirty: dirty(), relativePath: relativePath() });
       const readDocument = () => {
         if (a.view !== undefined && a.view !== 'design' && a.view !== 'runtime') throw new Error('view 必须是 design 或 runtime。');
         const runtime = e.runtime.inspect();
         if (a.view === 'runtime') { if (!runtime.sessionId || !runtime.frame) throw new Error('没有运行副本。'); return { document: runtime.frame.document, runtimeSessionId: runtime.sessionId, frameSequence: runtime.sequence }; }
-        return { document: h.state };
+        return { document: resolved() };
       };
       try {
         switch (request.name) {
-          case 'uie.editor.get_state': return { ...state(), ...(a.detail === 'full' ? { document: h.state } : { nodeCount: allNodes(h.state.root).length }) };
+          case 'uie.editor.get_state': return { ...state(), ...(a.detail === 'full' ? { document: resolved() } : { nodeCount: allNodes(h.state.root).length }) };
+          case 'uie.assets.search': case 'uie.assets.get': {
+            const assets = await e.refreshImages();
+            if (request.name === 'uie.assets.get') {
+              const asset = assets.find(asset => asset.id === a.id); if (!asset) throw new Error('图片资产不存在。');
+              return { ...stamp(), asset: { ...asset, permission: 'unverified' } };
+            }
+            const query = String(a.query ?? '').toLowerCase();
+            const matches = assets.filter(asset => (a.library === undefined || asset.library === a.library) && `${asset.name} ${asset.tags}`.toLowerCase().includes(query));
+            const offset = integer(a.offset, 0, 0, 10000), limit = integer(a.limit, 50, 1, 200);
+            return { ...stamp(), assets: matches.slice(offset, offset + limit).map(({ previewImage: _, ...asset }) => ({ ...asset })), total: matches.length, nextOffset: offset + limit < matches.length ? offset + limit : null };
+          }
+          case 'uie.assets.configure': {
+            writable(); f.busy(true);
+            try {
+              const assets = await window.imageAssets.list(); if (!assets.ok) throw new Error(assets.error);
+              const asset = assets.value.find(asset => asset.id === a.id); if (!asset) throw new Error('图片资产不存在。');
+              verify();
+              const result = await window.imageAssets.update({ id: asset.id, name: a.name === undefined ? asset.name : String(a.name), tags: a.tags === undefined ? asset.tags : String(a.tags), robloxId: a.robloxId === undefined ? asset.robloxId : String(a.robloxId) });
+              if (!result.ok) throw new Error(result.error);
+              await e.refreshImages();
+              return { ...stamp(), saved: true, asset: result.value.find(asset => asset.id === a.id) };
+            } finally { f.busy(false); }
+          }
           case 'uie.editor.get_capabilities': return { ...stamp(), ...getCapabilities(e.strategy) };
           case 'uie.nodes.get': { const view = readDocument(); return { ...stamp(), ...('runtimeSessionId' in view ? { runtimeSessionId: view.runtimeSessionId, frameSequence: view.frameSequence } : {}), node: getNode(view.document, a) }; }
           case 'uie.nodes.find': { const view = readDocument(); return { ...stamp(), ...('runtimeSessionId' in view ? { runtimeSessionId: view.runtimeSessionId, frameSequence: view.frameSequence } : {}), ...findNodes(view.document, a) }; }
@@ -70,12 +98,12 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
           }
           case 'uie.document.save': {
             writable(); f.busy(true);
-            try { const result = await window.automation.invoke('file:save', { document: h.state, relativePath: a.relativePath }); verify(); f.markSaved(result.document, result.path); return state(); } finally { f.busy(false); }
+            try { const result = await window.automation.invoke('file:save', { document: resolved(), relativePath: a.relativePath }); verify(); f.markSaved(result.document, result.path); return state(); } finally { f.busy(false); }
           }
           case 'uie.runtime.control': {
             verify(); let result;
             if (a.action === 'stop') { result = await e.runtime.stop(); }
-            else if (a.action === 'run') { writable(); result = await e.runtime.start(h.state); }
+            else if (a.action === 'run') { writable(); result = await e.runtime.start(resolved()); }
             else if (a.action === 'reset') { if (!e.runtime.inspect().sessionId) throw new Error('没有运行会话。'); result = await e.runtime.reset(); }
             else throw new Error('不支持的运行操作。');
             return { ...state(), result, runtimeSessionId: e.runtime.inspect().sessionId, frameSequence: e.runtime.inspect().sequence };

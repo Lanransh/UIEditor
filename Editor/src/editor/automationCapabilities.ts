@@ -16,5 +16,5 @@ export const robloxAutomation: AutomationCapabilities = {
   },
 };
 export function getCapabilities(strategy: ProjectStrategy) {
-  return { projectType: strategy.mode, ...strategy.automation, nodes: strategy.nodes, parenting: Object.fromEntries(Object.keys(strategy.nodes).map(parent => [parent, Object.keys(strategy.nodes).filter(child => strategy.canParent(strategy.createNode(parent), strategy.createNode(child)))])) };
+  return { projectType: strategy.mode, ...strategy.automation, imageAssets: { platform: 'roblox', tools: ['uie.assets.search', 'uie.assets.get', 'uie.assets.configure'], apply: 'ui.assets.apply(nodeId,assetId)', resolution: 'asset Roblox ID; missing catalog entry uses document snapshot' }, nodes: strategy.nodes, parenting: Object.fromEntries(Object.keys(strategy.nodes).map(parent => [parent, Object.keys(strategy.nodes).filter(child => strategy.canParent(strategy.createNode(parent), strategy.createNode(child)))])) };
 }

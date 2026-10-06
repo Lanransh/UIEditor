@@ -41,7 +41,7 @@ export function DocumentAssets({ editor, library }: { editor: DocumentEditor; li
     };
   }, [menu]);
 
-  if (library !== '项目资产') return <div className="assets-empty" role="status">暂无{library}</div>;
+  if (library !== '项目UI') return <div className="assets-empty" role="status">暂无{library}</div>;
   const entries = editor.path ? assets : [{ name: editor.document.name, path: null }, ...assets];
   return <div className="document-assets" aria-label="UI 界面资产" aria-busy={loading || editor.busy}>
     {error && <div className="asset-error" role="alert">{error}<button disabled={editor.busy} onClick={() => refresh(value => value + 1)}>重试</button></div>}
@@ -60,7 +60,7 @@ export function DocumentAssets({ editor, library }: { editor: DocumentEditor; li
       </button>)}
     </div>
     {loading && <p role="status">正在加载界面资产…</p>}
-    {!loading && !error && entries.length === 0 && <div className="assets-empty" role="status">暂无项目资产</div>}
+    {!loading && !error && entries.length === 0 && <div className="assets-empty" role="status">暂无项目UI</div>}
     {menu && <div ref={menuElement} className="asset-context-menu" role="menu" aria-label="界面资产操作" style={{ left: menu.x, top: menu.y }}
       onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setMenu(null); } }}
       onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setMenu(null); }}>

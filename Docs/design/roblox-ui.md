@@ -68,8 +68,8 @@ UIGradient 首版使用 ColorStart/ColorEnd 和 TransparencyStart/TransparencyEn
 进入工程先显示名为 `Untitled` 的空 ScreenGui 文档。“新建界面”先输入名称，实时显示交互类与接入类名称；取消或未保存提示被取消时保留当前文档。名称按脚本标识符校验，规则见 [交互脚本与接入运行时](ui-runtime.md)。一个工程可保存多个界面。
 默认保存位置为 `UIEditorWorkspace/interfaces/<自定义名称>.rbxui.json`，首次保存和
 另存为使用原生文件对话框，允许选择其他位置。打开界面使用原生文件选择器，或在
-项目资产卡片上右键选择“打开”；卡片名称来自文件名。工程外保存的文件可通过原生
-选择器打开，但不列入项目资产。新建界面显示未保存卡片，保存到工程目录后成为文件资产。
+项目UI卡片上右键选择“打开”；卡片名称来自文件名。工程外保存的文件可通过原生
+选择器打开，但不列入项目UI。新建界面显示未保存卡片，保存到工程目录后成为文件资产。
 工程的 project.json 仍只描述工程元数据。
 
 文档保存 format=`roblox-ui`、version=3、稳定文档 ID、名称、固定 canvas、root 和 scripts。加载 version=2 时转换脚本结构，不提供 version=1 迁移。
@@ -93,6 +93,7 @@ scripts 只保存交互和测试接入两份类源码，配置和状态由接入
 Image 保存 Roblox 资源标识；节点的 previewImage 分别保存本地文件名和图片 Data URL。
 预览图嵌入文档，移动工程不依赖原图片路径；支持 PNG/JPEG/WebP/GIF，单张最多 10 MiB。
 图片可通过主进程选择并读取，或通过制作 API 附加已经取得的图片 Data URL，不自动上传或访问远程资源。缺失预览图显示占位提示。
+图片还可从永久与项目库引用，节点附加 imageAssetId 并保留预览和 Image 快照；单一 Roblox ID、属性入口与 MCP 见 [图片资产](image-assets.md)。引用节点的 Image 由资产解析，解除引用后恢复手动编辑。
 
 编辑模式的按钮和输入框只用于选择；运行模式的 TextButton、ImageButton 支持 Activated，输入框仍不提供运行交互。字体使用本机替代字体，TextScaled
 使用静态估算，GroupColor3 使用浏览器混合近似展示。ImageColor3 只乘入实际图片

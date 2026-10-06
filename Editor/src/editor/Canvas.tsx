@@ -8,6 +8,8 @@ import { channels, gradientStyle, imageGradient, rgba, scrollGeometry } from './
 import scrollTop from '../assets/roblox-scrollbars/scroll-top.png';
 import scrollMiddle from '../assets/roblox-scrollbars/scroll-middle.png';
 import scrollBottom from '../assets/roblox-scrollbars/scroll-bottom.png';
+import { applyImageAsset } from '../shared/imageAssets';
+import { insertNode } from './commands';
 
 interface Gesture {
   pointerId: number; x: number; y: number; kind: 'pan' | 'move' | 'resize';
@@ -45,7 +47,7 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
   function start(event: PointerEvent, kind: Gesture['kind'], node?: UINode) {
     if ((editor.busy && !editor.runtime.active) || (editor.runtime.active && kind !== 'pan') || gesture.current || ![0, 1].includes(event.button)) return;
     event.preventDefault(); event.stopPropagation();
-    if (node) editor.select(node.id);
+    if (node && editor.select(node.id) === false) return;
     const layout = node && layoutComponent(findParent(shown.root, node.id)!);
     if (layout && (kind === 'move' || (kind === 'resize' && layout.className === 'UIGridLayout'))) return;
     let scale = zoom, rotation = 0;
@@ -167,7 +169,15 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
   const rectangles = editor.strategy.layout(shown.root, 1280, 720);
   return <section className="canvas" aria-label="Roblox 画布">
     <div className="canvas-heading"><span>1280 × 720 · {editor.document.name}</span><div className="canvas-tools"><button disabled={editor.busy && !editor.runtime.active} onClick={fit}>适应窗口</button><select aria-label="画布缩放" disabled={editor.busy && !editor.runtime.active} value={zoom} onChange={event => setZoom(Number(event.target.value))}><option value={zoom}>{Math.round(zoom * 100)}%</option>{[.25, .5, .75, 1, 1.5, 2].filter(value => value !== zoom).map(value => <option key={value} value={value}>{value * 100}%</option>)}</select></div></div>
-    <div ref={viewport} data-zoom={zoom} className={`canvas-viewport${space ? ' panning' : ''}`} onPointerDown={event => { if (event.button === 0 && !space) editor.select(shown.root.id); start(event, 'pan'); }} onPointerMove={move} onPointerUp={event => finish(event)} onPointerCancel={event => finish(event, true)} onLostPointerCapture={event => finish(event, true)} onWheel={event => {
+    <div ref={viewport} data-zoom={zoom} className={`canvas-viewport${space ? ' panning' : ''}`} onDragOver={event => { if (!editor.busy && event.dataTransfer.types.includes('application/x-uie-image-asset')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }} onDrop={event => {
+      if (editor.busy) return;
+      const asset = editor.imageAssets.find(asset => asset.id === event.dataTransfer.getData('application/x-uie-image-asset'));
+      if (!asset) return;
+      event.preventDefault();
+      const bounds = event.currentTarget.getBoundingClientRect(), node = applyImageAsset(editor.strategy.createNode('ImageLabel'), asset);
+      node.properties.Position = { x: { scale: 0, offset: Math.round((event.clientX - bounds.x - pan.x) / zoom) }, y: { scale: 0, offset: Math.round((event.clientY - bounds.y - pan.y) / zoom) } };
+      editor.execute('拖入图片资产', document => insertNode(document, document.root.id, node, editor.strategy)); editor.select(node.id);
+    }} onPointerDown={event => { if (event.button === 0 && !space) editor.select(shown.root.id); start(event, 'pan'); }} onPointerMove={move} onPointerUp={event => finish(event)} onPointerCancel={event => finish(event, true)} onLostPointerCapture={event => finish(event, true)} onWheel={event => {
       if (gesture.current) return;
       if (event.ctrlKey || event.metaKey) {
         const next = Math.max(.1, Math.min(3, zoom * (event.deltaY > 0 ? .9 : 1.1)));

@@ -1,0 +1,92 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, readFile, writeFile, rename } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { ImageAssetStore } from '../electron/image-assets';
+import { normalizeRobloxId, applyImageAsset, resolveImageAssets } from '../src/shared/imageAssets';
+import { robloxStrategy } from '../src/editor/roblox';
+import { executeCode, robloxCodeAdapter } from '../electron/code-executor';
+import { writeDocument, readDocument } from '../electron/documents';
+import { validateTool } from '../src/shared/automation-tools';
+import { CommandHistory } from '../src/history/CommandHistory';
+import { documentCommand } from '../src/editor/commands';
+
+async function fixture() {
+  await mkdir('test-results', { recursive: true });
+  const root = await mkdtemp(resolve('test-results/image-assets-'));
+  const runtime = join(root, 'runtime'), project = join(root, 'project');
+  await mkdir(project); await mkdir(runtime);
+  return { root, runtime, project, store: new ImageAssetStore(runtime, project) };
+}
+test('Roblox IDs normalize and reject invalid input without losing precision', () => {
+  assert.equal(normalizeRobloxId(' 82793028306773 '), 'rbxassetid://82793028306773');
+  assert.equal(normalizeRobloxId('rbxassetid://123'), 'rbxassetid://123');
+  assert.equal(normalizeRobloxId(''), '');
+  for (const value of ['0', '-1', '1e3', '1.2', 'https://example.com/1', 'rbxassetid://', 123]) assert.throws(() => normalizeRobloxId(value));
+  assert.throws(() => validateTool('uie.assets.get', {}));
+});
+test('each image has one Roblox ID; permanent IDs are shared and project imports move with project', async () => {
+  const { store, root, runtime, project } = await fixture();
+  const initial = await store.list();
+  assert.equal(initial.length, 2);
+  const stud = initial.find(a => a.usage === 'tile')!, placeholder = initial.find(a => a.usage === 'placeholder')!;
+  assert.equal(placeholder.robloxId, '');
+  await store.update({ ...stud, robloxId: '12345' });
+  assert.equal((await new ImageAssetStore(runtime, project).list()).find(a => a.id === stud.id)!.robloxId, 'rbxassetid://12345');
+  const other = join(root, 'other'); await mkdir(other);
+  const otherStore = new ImageAssetStore(runtime, other);
+  assert.equal((await otherStore.list()).find(a => a.id === stud.id)!.robloxId, 'rbxassetid://12345');
+  assert.equal('projectRobloxId' in (await otherStore.list())[0], false);
+  const imported = await store.import('project', placeholder.previewImage);
+  await store.update({ ...imported, robloxId: '54321' });
+  assert.equal((await otherStore.list()).some(a => a.id === imported.id), false);
+  const moved = join(root, 'moved'); await rename(project, moved);
+  assert.equal((await new ImageAssetStore(runtime, moved).list()).find(a => a.id === imported.id)!.robloxId, 'rbxassetid://54321');
+});
+test('invalid updates and corrupt catalogs preserve data and report errors', async () => {
+  const { store, project } = await fixture();
+  const imported = await store.import('project', (await store.list())[0].previewImage);
+  const file = join(project, 'image-assets/catalog.json'), before = await readFile(file, 'utf8');
+  await assert.rejects(store.update({ ...imported, robloxId: 'invalid' }));
+  assert.equal(await readFile(file, 'utf8'), before);
+  await writeFile(file, '{}'); await assert.rejects(store.list(), /格式/);
+});
+test('legacy catalogs keep each image ID and stop applying old overrides; new writes remove override fields', async () => {
+  const { store, project, runtime } = await fixture();
+  const stud = (await store.list())[0];
+  await mkdir(join(project, 'image-assets'));
+  await mkdir(join(runtime, 'image-assets'));
+  await writeFile(join(project, 'image-assets/catalog.json'), JSON.stringify({ version: 1, assets: [], overrides: { [stud.id]: 'rbxassetid://999' } }));
+  await writeFile(join(runtime, 'image-assets/catalog.json'), JSON.stringify({ version: 1, assets: [{ ...stud, projectRobloxId: '' }], overrides: {} }));
+  assert.equal((await store.list())[0].robloxId, stud.robloxId);
+  await store.update({ ...stud, robloxId: '123' });
+  const saved = JSON.parse(await readFile(join(runtime, 'image-assets/catalog.json'), 'utf8'));
+  assert.equal(saved.version, 2); assert.equal('overrides' in saved, false);
+  assert.equal('projectRobloxId' in saved.assets[0], false);
+  assert.throws(() => validateTool('uie.assets.configure', { id: stud.id, sessionId: 's', revision: 1, projectRobloxId: '456' }), /不支持/);
+});
+test('asset references resolve the single Roblox ID while standalone documents retain snapshots; authoring remains undoable', async () => {
+  const { store, root } = await fixture();
+  const assets = await store.list(), stud = assets.find(a => a.usage === 'tile')!;
+  const document = robloxStrategy.createDocument('AssetTest');
+  const image = applyImageAsset(robloxStrategy.createNode('ImageLabel'), stud);
+  document.root.children.push(image);
+  const file = join(root, 'AssetTest.rbxui.json'); await writeDocument(file, document);
+  const loaded = await readDocument(file);
+  assert.equal(loaded.root.children[0].imageAssetId, stud.id);
+  assert.deepEqual(resolveImageAssets(loaded, []), loaded);
+  assert.equal(resolveImageAssets(loaded, assets), loaded);
+  const overridden = { ...stud, robloxId: 'rbxassetid://1234' };
+  const resolved = resolveImageAssets(loaded, [overridden]);
+  assert.equal(resolved.root.children[0].properties.Image, 'rbxassetid://1234');
+  assert.equal(loaded.root.children[0].properties.Image, stud.robloxId);
+  assert.deepEqual(resolved.root.children[0].previewImage, stud.previewImage);
+  const result = await executeCode(robloxCodeAdapter, resolve('native-bin'), robloxStrategy.createDocument('McpAsset'), 'luau', `local n=ui.nodes.create("ImageLabel"); ui.assets.apply(n.id,"${stud.id}")`, [overridden]);
+  assert.equal(result.document.root.children[0].properties.Image, 'rbxassetid://1234');
+  assert.equal(result.document.root.children[0].imageAssetId, stud.id);
+  assert.deepEqual(result.document.root.children[0].properties.TileSize, { x: { scale: 0, offset: 27 }, y: { scale: 0, offset: 27 } });
+  const before = robloxStrategy.createDocument('History'), history = new CommandHistory<typeof before>();
+  const after = history.execute(documentCommand('应用图片资产', () => result.document, robloxStrategy), before);
+  assert.deepEqual(history.undo(after), before); assert.deepEqual(history.redo(before), after);
+  await assert.rejects(executeCode(robloxCodeAdapter, resolve('native-bin'), document, 'luau', 'ui.assets.apply(ui.root.id,"missing")', assets));
+});

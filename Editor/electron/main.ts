@@ -13,6 +13,8 @@ import { startBridge } from './automation-bridge';
 import { executeCode, getCodeAdapter } from './code-executor';
 import { openInterface, saveInterface, listInterfaces } from './automation-files';
 import { createCodexMcpSettingsStore } from './codex-mcp-settings.cjs';
+import { ImageAssetStore } from './image-assets';
+import { resolveImageAssets, type ImageAssetUpdate, type ImageLibrary } from '../src/shared/imageAssets';
 
 const runtime = process.env.UI_EDITOR_USER_DATA
   ? process.env.UI_EDITOR_USER_DATA
@@ -82,7 +84,11 @@ if (!app.requestSingleInstanceLock()) {
       switch (input?.operation) {
         case 'settings:get': return mcpSettings.getStatus();
         case 'settings:set': return mcpSettings.setEnabled(argument);
-        case 'code': if (!activeProject || !automationReady) throw new Error('请先打开工程。'); return executeCode(getCodeAdapter(activeProject.manifest.mode), nativeDirectory, argument.document, argument.language, argument.source).catch(error => ({ error: error.message, stage: error.stage ?? 'execution', logs: error.logs ?? [] }));
+        case 'code': {
+          if (!activeProject || !automationReady) throw new Error('请先打开工程。');
+          const assets = await new ImageAssetStore(runtime, activeProject.path).list();
+          return executeCode(getCodeAdapter(activeProject.manifest.mode), nativeDirectory, argument.document, argument.language, argument.source, assets).catch(error => ({ error: error.message, stage: error.stage ?? 'execution', logs: error.logs ?? [] }));
+        }
         case 'file:open': { if (!activeProject || !automationReady) throw new Error('请先打开工程。'); const result = await openInterface(activeProject.path, argument.relativePath); documentPath = result.path; return result; }
         case 'file:new': if (!automationReady) throw new Error('请先打开工程。'); documentPath = null; return null;
         case 'file:list': if (!activeProject || !automationReady) throw new Error('请先打开工程。'); return listInterfaces(activeProject.path);
@@ -112,7 +118,8 @@ if (!app.requestSingleInstanceLock()) {
       stopRuntime();
       const revision = runtimeRevision;
       try {
-        const started = await LuauSession.start(join(__dirname, app.isPackaged ? '../../native-bin' : '../native-bin'), document);
+        const assets = await new ImageAssetStore(runtime, activeProject.path).list();
+        const started = await LuauSession.start(join(__dirname, app.isPackaged ? '../../native-bin' : '../native-bin'), resolveImageAssets(robloxStrategy.validate(document), assets));
         if (revision !== runtimeRevision || window.isDestroyed()) { started.session.abort(); return { ok: false, error: '运行启动已取消。' }; }
         runtimeSession = started.session;
         const session = runtimeSession;
@@ -196,6 +203,20 @@ if (!app.requestSingleInstanceLock()) {
     const requireProject = () => { if (!activeProject) throw new Error('请先打开工程。'); return activeProject; };
     handle('document:new', async () => { requireProject(); stopRuntime(); documentPath = null; return null; });
     handle('document:list-assets', async () => listDocumentAssets(requireProject().path));
+    const imageStore = () => new ImageAssetStore(runtime, requireProject().path);
+    handle('images:list', async () => imageStore().list());
+    handle('images:update', async input => imageStore().update(input as ImageAssetUpdate));
+    handle('images:import-file', async input => {
+      const value = input as { library: ImageLibrary; path: string };
+      if (!value || !['permanent', 'project'].includes(value.library) || typeof value.path !== 'string' || !value.path) throw new Error('请拖入本地图片文件。');
+      return imageStore().import(value.library, await readPreviewImage(value.path));
+    });
+    handle('images:import', async library => {
+      const store = imageStore();
+      if (!['permanent', 'project'].includes(String(library))) throw new Error('图片资产库无效。');
+      const result = await dialog.showOpenDialog(window, { title: '导入图片资产（不会上传）', properties: ['openFile'], filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }] });
+      return result.canceled || !result.filePaths[0] ? null : store.import(library as ImageLibrary, await readPreviewImage(result.filePaths[0]));
+    });
     handle('document:open', async assetPath => {
       stopRuntime();
       const project = requireProject();

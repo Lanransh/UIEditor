@@ -32,7 +32,7 @@ let app: Awaited<ReturnType<typeof electron.launch>> | undefined;
 try {
   assert.equal((await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'test', version: '1' } })).serverInfo.name, 'ui-editor');
   const listed = (await rpc('tools/list')).tools;
-  assert.equal(listed.length, 15); assert.ok(listed.some((tool: any) => tool.name === 'uie.scripts.set')); assert.ok(!listed.some((tool: any) => tool.name.startsWith('uie.history.')));
+  assert.equal(listed.length, 18); assert.ok(listed.some((tool: any) => tool.name === 'uie.scripts.set')); assert.ok(!listed.some((tool: any) => tool.name.startsWith('uie.history.')));
   assert.equal((await raw('uie.history.undo')).isError, true);
   assert.equal((await raw('uie.editor.get_state')).isError, true);
   const parent = join(root, 'project'); await mkdir(parent);
@@ -73,6 +73,7 @@ try {
   const blank = await state('full');
   const fixture = rewardExample();
   const build = `
+ui.nodes.rename(ui.root.id, ${quote(fixture.root.name)})
 for i, spec in ipairs({{"TextLabel","RewardTitle"},{"TextLabel","StatusText"},{"TextButton","ClaimButton"}}) do
     ui.nodes.create(spec[1], {name=spec[2], properties={Position=UDim2.fromOffset(440,80+i*100), Size=UDim2.fromOffset(400,70)}})
 end
@@ -116,7 +117,7 @@ print("Created reward UI")`;
   await uiHistory('undo'); assert.equal((await state('full')).document.name, 'OnlineReward');
   await uiHistory('redo'); assert.equal((await state('full')).document.name, 'Renamed');
   await uiHistory('undo');
-  const run = await mutate('uie.runtime.control', { action: 'run' }); assert.equal(run.result.ok, true);
+  const run = await mutate('uie.runtime.control', { action: 'run' }); assert.equal(run.result.ok, true, JSON.stringify(run.result));
   assert.equal((await call('uie.nodes.get', { id: button.id, view: 'runtime' })).node.properties.Text, 'Ready');
   assert.equal((await raw('uie.scripts.set', { sessionId: run.sessionId, revision: run.revision, source: fixture.scripts.source })).isError, true);
   assert.equal((await mutate('uie.runtime.click', { id: button.id })).dispatched, true);

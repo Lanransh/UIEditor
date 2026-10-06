@@ -26,7 +26,7 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 
 当前 Roblox 是固定工程模式，提供外部 AI 使用的 MCP，尚未提供内置 AI、状态外观编辑器或 Roblox 导入导出。MCP 服务需要可用的 Node.js；普通 App 使用不需要。支持类型和预览差异见 [静态 UI 设计](Docs/design/roblox-ui.md)。界面文件采用 version=3，只保存交互和接入两份类脚本；加载 version=2 时将配置、状态和引用转换到脚本中，不支持 version=1。
 
-中央工作区只有“界面 / 交互脚本 / 接入脚本”三个一级页签。交互脚本返回继承 FCUICompClass 的 FX 类，负责通用展示和事件；接入脚本返回继承交互类的测试类，在 Ctor 中定义临时 Config、State，在动作处理中维护状态并 RefreshUI。通过 FX.Loader:Here 获取节点，直接读写属性和连接 Activated 事件，不再使用二级配置、引用或模拟状态面板。“载入奖励示例”会替换当前界面，可撤销；示例运行后点击领取，由接入类模拟修改为 Claimed。需要测试其他状态时，停止后修改接入类中的初始状态，再重新运行。底部“输出”显示 print、warn、动作和源码错误，与“资产目录”共用面板。脚本支持 UDim、UDim2、Vector2、Color3 和当前 UI 属性使用的 Enum，具体子集见运行规范。
+中央工作区只有“界面 / 交互脚本 / 接入脚本”三个一级页签。交互脚本返回继承 FCUICompClass 的 FX 类，负责通用展示和事件；接入脚本返回继承交互类的测试类，在 Ctor 中定义临时 Config、State，在动作处理中维护状态并 RefreshUI。通过 FX.Loader:Here 获取节点，直接读写属性和连接 Activated 事件，不再使用二级配置、引用或模拟状态面板。“载入奖励示例”会替换当前界面，可撤销；示例运行后点击领取，由接入类模拟修改为 Claimed。需要测试其他状态时，停止后修改接入类中的初始状态，再重新运行。底部“输出”显示 print、warn、动作和源码错误，与“UI 资产 / 图片资产”共用底部面板。脚本支持 UDim、UDim2、Vector2、Color3 和当前 UI 属性使用的 Enum，具体子集见运行规范。
 
 “停止”恢复原设计，“重置”恢复运行开始时的快照。运行修改不保存为节点属性，也不影响撤销历史。接口、生命周期和限制见 [交互脚本与接入运行时](Docs/design/ui-runtime.md)。
 
@@ -58,6 +58,7 @@ npm run dev
 | `npm run build:mcp` | 构建独立 stdio MCP 服务，普通 build 已包含 |
 | `npm run test:mcp` | 构建并通过真实 stdio MCP 验证制作、查询、历史、运行与保存 |
 | `npm run test:mcp:packaged` | 验证已打包程序的 MCP 完整链路，需先 package |
+| `npm run test:assets` | 构建并验证图片库、共用属性面板、单一 Roblox ID、保存重开及资产 MCP |
 | `node tests/runtime-smoke.mjs --packaged` | 验证已打包 exe 的离线 Luau 运行 |
 | `npm run package` | 构建 Windows x64 应用到 ToolRuntime |
 

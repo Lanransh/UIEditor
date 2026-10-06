@@ -12,6 +12,11 @@ export async function callTool(name: string, args: Record<string, unknown>, disc
   const result = await response.json() as { ok: boolean; value?: any; error?: string };
   if (!result.ok) throw new Error(result.error);
   if (result.value?.png) return { content: [{ type: 'image', mimeType: 'image/png', data: result.value.png }, { type: 'text', text: JSON.stringify(result.value.metadata) }] };
+  if (name === 'uie.assets.get' && result.value?.asset?.previewImage) {
+    const { previewImage, ...asset } = result.value.asset;
+    const match = /^data:(image\/[^;]+);base64,(.+)$/.exec(previewImage.dataUrl);
+    if (match) return { content: [{ type: 'image', mimeType: match[1], data: match[2] }, { type: 'text', text: JSON.stringify({ ...result.value, asset: { ...asset, previewImage: { name: previewImage.name } } }) }] };
+  }
   return { content: [{ type: 'text', text: JSON.stringify(result.value) }] };
 }
 export function serve(discoveryPath: string) {

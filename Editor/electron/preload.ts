@@ -1,7 +1,8 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { ProjectAPI } from '../src/shared/project';
 import type { DocumentAPI } from '../src/shared/documents';
 import type { RuntimeAPI } from '../src/shared/runtime';
+import type { ImageAssetAPI } from '../src/shared/imageAssets';
 
 const api: ProjectAPI = {
   create: () => ipcRenderer.invoke('project:create'),
@@ -23,6 +24,13 @@ const documents: DocumentAPI = {
   close: () => ipcRenderer.send('document:close'),
 };
 contextBridge.exposeInMainWorld('documents', documents);
+const imageAssets: ImageAssetAPI = {
+  list: () => ipcRenderer.invoke('images:list'),
+  import: library => ipcRenderer.invoke('images:import', library),
+  importFile: (library, file) => ipcRenderer.invoke('images:import-file', { library, path: webUtils.getPathForFile(file) }),
+  update: value => ipcRenderer.invoke('images:update', value),
+};
+contextBridge.exposeInMainWorld('imageAssets', imageAssets);
 const runtime: RuntimeAPI = {
   start: document => ipcRenderer.invoke('runtime:start', document),
   command: (session, command) => ipcRenderer.invoke('runtime:command', { session, command }),
