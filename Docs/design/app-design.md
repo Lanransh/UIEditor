@@ -3,11 +3,11 @@
 ## 当前能力
 
 Windows 桌面应用，使用 Electron、React、TypeScript 和 Vite。采用中文浅色界面、原生窗口标题栏与单窗口页面切换。
-当前完成工程管理、Roblox 画布与节点编辑、JSON 保存加载，以及 Luau 脚本和模拟数据运行模式；模板、AI 及 Roblox 导入导出尚未实现。节点能力与格式见 [Roblox 静态 UI 编辑](roblox-ui.md)，运行接口见 [交互脚本与接入运行时](ui-runtime.md)。
+当前完成工程管理、Roblox 画布与节点编辑、JSON 保存加载、Luau 脚本和模拟数据运行模式，以及供外部 AI 使用的 MCP 自动化；内置 AI 生成、模板及 Roblox 导入导出尚未实现。节点能力与格式见 [Roblox 静态 UI 编辑](roblox-ui.md)，运行接口见 [交互脚本与接入运行时](ui-runtime.md)，AI 制作入口见 [MCP 自动化](mcp-automation.md)。
 
 ## 核心流程
 
-启动进入 Hub，不自动进入上次工程。Hub 参考 BlockModelEditor 的浅灰背景、白色单列卡片和青绿色操作按钮，分为“上次打开”和“最近工程”。
+启动进入 Hub，不自动进入上次工程。Hub 参考 BlockModelEditor 的浅灰背景、白色单列卡片和青绿色操作按钮，分为“上次打开”和“最近工程”。主操作区提供创建和打开工程，右上角“设置”提供 Codex MCP 配置。
 最新记录只显示在“上次打开”，其余按最近成功打开顺序展示。卡片显示父文件夹名称、完整工程路径、Roblox 标签及上次打开时间。
 
 创建工程仅选择父文件夹，自动创建固定名称 `UIEditorWorkspace`；不设置独立显示名称。目标已存在且有效时询问是否打开，无效时提示更换位置，不覆盖内容。

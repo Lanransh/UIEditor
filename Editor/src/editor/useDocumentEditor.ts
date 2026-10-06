@@ -7,6 +7,7 @@ import { useHistoryShortcuts } from '../history/useHistoryShortcuts';
 import { projectStrategy } from './roblox';
 import { deleteNode, documentCommand, duplicateNode, insertNode, pasteNode, reparentNode } from './commands';
 import { useRuntime } from './useRuntime';
+import { useAutomation } from './useAutomation';
 
 declare global { interface Window { documents: DocumentAPI } }
 
@@ -17,6 +18,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   const [selectedId, select] = useState(initial.root.id);
   const [path, setPath] = useState<string | null>(null);
   const [saved, setSaved] = useState(JSON.stringify(initial));
+  const fileState = useRef({ path: null as string | null, saved: JSON.stringify(initial) });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const operating = useRef(false);
@@ -41,6 +43,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
     const result = await window.documents.save(document, saveAs);
     if (!result.ok) { setError(result.error); return false; }
     if (!result.value) return false;
+    fileState.current = { path: result.value.path, saved: JSON.stringify(result.value.document) };
     setPath(result.value.path); setSaved(JSON.stringify(result.value.document)); setError('');
     return true;
   }
@@ -57,6 +60,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
     finally { operating.current = false; setBusy(false); }
   }
   function reset(value: UIDocument, file: string | null) {
+    fileState.current = { path: file, saved: JSON.stringify(value) };
     history.reset(value); setSaved(JSON.stringify(value)); setPath(file); select(value.root.id); setError('');
   }
   const newDocument = (name: string) => run(async () => {
@@ -119,7 +123,9 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
       history.execute(documentCommand('设置预览图片', value => ({ ...value, root: updateNode(value.root, selected.id, node => ({ ...node, previewImage: image })) }), strategy));
     }
   });
-  return { strategy, document, history, selected, select, editNode, execute, add, reparent, pickImage,
+  const editor = { projectPath: project.path, strategy, document, history, selected, select, editNode, execute, add, reparent, pickImage,
     newDocument, openDocument, save: (saveAs = false) => run(async () => { await save(saveAs); }), back, dirty, path, error, busy: busy || runtime.active, runtime };
+  useAutomation(editor, { reset, saved: () => fileState.current.saved, path: () => fileState.current.path, busy: value => { operating.current = value; setBusy(value); }, markSaved: (value, file) => { fileState.current = { path: file, saved: JSON.stringify(value) }; setPath(file); setSaved(fileState.current.saved); } });
+  return editor;
 }
 export type DocumentEditor = ReturnType<typeof useDocumentEditor>;

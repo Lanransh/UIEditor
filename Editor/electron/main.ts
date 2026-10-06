@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron';
-import { join, dirname, basename } from 'node:path';
+import { join, dirname, basename, relative } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { mkdir, stat } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
@@ -8,6 +9,10 @@ import type { Project, Result, RecentProjectView } from '../src/shared/project';
 import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset } from './documents';
 import { robloxStrategy } from '../src/editor/roblox';
 import { LuauSession, RuntimeError } from './runtime';
+import { startBridge } from './automation-bridge';
+import { executeCode, getCodeAdapter } from './code-executor';
+import { openInterface, saveInterface, listInterfaces } from './automation-files';
+import { createCodexMcpSettingsStore } from './codex-mcp-settings.cjs';
 
 const runtime = process.env.UI_EDITOR_USER_DATA
   ? process.env.UI_EDITOR_USER_DATA
@@ -21,7 +26,7 @@ for (const name of ['userData', 'sessionData', 'logs', 'crashDumps'] as const) {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  void app.whenReady().then(() => {
+  void app.whenReady().then(async () => {
     Menu.setApplicationMenu(null);
     const window = new BrowserWindow({
       width: 1200, height: 800, minWidth: 900, minHeight: 600,
@@ -41,6 +46,62 @@ if (!app.requestSingleInstanceLock()) {
     let dirty = false;
     let allowClose = false;
     const trusted = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === source;
+    const nativeDirectory = join(__dirname, app.isPackaged ? '../../native-bin' : '../native-bin');
+    const discoveryPath = join(runtime, 'ui-editor-automation.json');
+    const mcpSettings = createCodexMcpSettingsStore({ serverPath: app.isPackaged ? join(process.resourcesPath, 'mcp-dist/server.mjs') : join(__dirname, '../mcp-dist/server.mjs'), discoveryPath });
+    let automationReady = false;
+    const pending = new Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
+    const consoleLogs: { cursor: number; level: string; message: string }[] = []; let consoleCursor = 0;
+    window.webContents.on('console-message', (_event, level, message) => { consoleLogs.push({ cursor: ++consoleCursor, level: String(level), message: message.slice(0, 4096) }); if (consoleLogs.length > 500) consoleLogs.shift(); });
+    function cancelAutomation() { automationReady = false; for (const item of pending.values()) { clearTimeout(item.timer); item.reject(new Error('编辑会话已关闭。')); } pending.clear(); }
+    ipcMain.on('automation:ready', (event, ready) => { if (trusted(event)) { if (!ready) cancelAutomation(); else automationReady = true; } });
+    ipcMain.handle('automation:reply', (event, reply) => {
+      if (!trusted(event)) throw new Error('无效来源。');
+      const item = pending.get(reply?.requestId); if (!item) return;
+      clearTimeout(item.timer); pending.delete(reply.requestId);
+      if (reply.ok) item.resolve(reply.value); else item.reject(new Error(reply.error));
+    });
+    const bridge = await startBridge(discoveryPath, async request => {
+      if (!automationReady || window.isDestroyed()) {
+        if (request.name === 'uie.debug.get_diagnostics') return { connected: true, state: 'hub', console: consoleLogs, consoleCursor };
+        throw new Error('请先打开工程，当前没有编辑会话。');
+      }
+      const requestId = randomUUID();
+      const value = await new Promise<unknown>((resolve, reject) => {
+        const timer = setTimeout(() => { pending.delete(requestId); reject(new Error('编辑器操作超时。')); }, 12000);
+        pending.set(requestId, { resolve, reject, timer }); window.webContents.send('automation:request', { ...request, requestId });
+      });
+      const cursor = typeof request.arguments.consoleCursor === 'number' ? request.arguments.consoleCursor : 0;
+      return request.name === 'uie.debug.get_diagnostics' ? { ...(value as object), console: consoleLogs.filter(log => log.cursor > cursor), consoleCursor, consoleTruncated: cursor < (consoleLogs[0]?.cursor ?? consoleCursor + 1) - 1 } : value;
+    });
+    window.on('closed', () => { cancelAutomation(); bridge.close(); });
+    window.webContents.on('render-process-gone', cancelAutomation);
+    ipcMain.handle('automation:invoke', async (event, input) => {
+      if (!trusted(event)) throw new Error('无效来源。');
+      const argument = input?.argument;
+      switch (input?.operation) {
+        case 'settings:get': return mcpSettings.getStatus();
+        case 'settings:set': return mcpSettings.setEnabled(argument);
+        case 'code': if (!activeProject || !automationReady) throw new Error('请先打开工程。'); return executeCode(getCodeAdapter(activeProject.manifest.mode), nativeDirectory, argument.document, argument.language, argument.source).catch(error => ({ error: error.message, stage: error.stage ?? 'execution', logs: error.logs ?? [] }));
+        case 'file:open': { if (!activeProject || !automationReady) throw new Error('请先打开工程。'); const result = await openInterface(activeProject.path, argument.relativePath); documentPath = result.path; return result; }
+        case 'file:new': if (!automationReady) throw new Error('请先打开工程。'); documentPath = null; return null;
+        case 'file:list': if (!activeProject || !automationReady) throw new Error('请先打开工程。'); return listInterfaces(activeProject.path);
+        case 'file:save': {
+          if (!activeProject || !automationReady) throw new Error('请先打开工程。');
+          const target = argument.relativePath ?? (documentPath ? relative(join(activeProject.path, 'interfaces'), documentPath) : null);
+          const result = await saveInterface(activeProject.path, target, robloxStrategy.validate(argument.document), argument.relativePath !== undefined);
+          documentPath = result.path; return result;
+        }
+        case 'screenshot': {
+          if (!automationReady) throw new Error('请先打开工程。');
+          const { x, y, width, height } = argument.rect;
+          if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) throw new Error('画布区域不可见。');
+          const image = await window.webContents.capturePage({ x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) });
+          return { png: image.toPNG().toString('base64'), metadata: { width: image.getSize().width, height: image.getSize().height, zoom: argument.zoom } };
+        }
+        default: throw new Error('不支持的自动化操作。');
+      }
+    });
     let runtimeSession: LuauSession | null = null;
     let runtimeRevision = 0;
     const stopRuntime = () => { ++runtimeRevision; runtimeSession?.abort(); runtimeSession = null; };

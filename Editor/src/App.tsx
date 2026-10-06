@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { AlertTriangle, ArrowLeft, Clock3, Folder, FolderOpen, FolderPlus, Layers3, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Clock3, Folder, FolderOpen, FolderPlus, Layers3, Settings, Trash2 } from 'lucide-react';
 import type { Project, ProjectAPI, RecentProjectView, Result } from './shared/project';
 import { useDocumentEditor } from './editor/useDocumentEditor';
 import { NodeTree, NodeProperties } from './editor/NodePanels';
@@ -7,6 +7,7 @@ import { DocumentCanvas } from './editor/Canvas';
 import { DocumentAssets } from './editor/DocumentAssets';
 import { ScriptPanel, RuntimeOutput } from './editor/ScriptPanel';
 import { NewInterfaceDialog } from './editor/NewInterfaceDialog';
+import { McpSettings } from './editor/McpSettings';
 
 declare global { interface Window { projects: ProjectAPI } }
 
@@ -17,6 +18,7 @@ export function App() {
 }
 
 function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
+  const [mcpSettings, setMcpSettings] = useState(false);
   const [recent, setRecent] = useState<RecentProjectView[] | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(true);
@@ -78,7 +80,10 @@ function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
 
   return <main className="hub" aria-labelledby="hub-title">
     <header className="hub-header">
-      <div className="brand"><img src="./app-icon.svg" width={28} height={28} alt="" /> UI EDITOR</div>
+      <div className="hub-topbar">
+        <div className="brand"><img src="./app-icon.svg" width={28} height={28} alt="" /> UI EDITOR</div>
+        <button className="secondary" onClick={() => setMcpSettings(true)}><Settings size={18} />设置</button>
+      </div>
       <h1 id="hub-title">选择工程</h1>
       <p>创建或打开一个 Roblox 工程，开始你的 UI 设计。</p>
       <div className="hub-actions">
@@ -96,6 +101,7 @@ function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
       </>}
     </div>
     <footer className="hub-footer"><span>UI 编辑器 · 基础版</span><span>本地工程 / Roblox</span></footer>
+    {mcpSettings && <McpSettings onClose={() => setMcpSettings(false)} />}
   </main>;
 }
 
@@ -106,6 +112,11 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
   const [assetLibrary, setAssetLibrary] = useState('项目资产');
   const [bottomTab, setBottomTab] = useState<'assets' | 'output'>('assets');
   const [workspaceTab, setWorkspaceTab] = useState<'design' | 'source' | 'integration'>('design');
+  useEffect(() => {
+    const show = () => setWorkspaceTab('design'); window.addEventListener('uie:screenshot-start', show);
+    return () => window.removeEventListener('uie:screenshot-start', show);
+  }, []);
+  useEffect(() => { if (editor.runtime.active) setWorkspaceTab('design'); }, [editor.runtime.active]);
   const content = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState({ width: window.innerWidth, height: window.innerHeight - 63 });
   const [sizes, setSizes] = useState({ tree: window.innerWidth <= 1000 ? 180 : 210, properties: window.innerWidth <= 1000 ? 190 : 230, assets: Math.min(240, Math.max(150, window.innerHeight * .25)) });

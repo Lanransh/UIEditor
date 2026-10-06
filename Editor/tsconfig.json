@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src", "electron", "tests/**/*.ts", "tests/**/*.tsx", "vite.config.ts"]
+  "include": ["src", "electron", "mcp", "tests/**/*.ts", "tests/**/*.tsx", "vite.config.ts"]
 }

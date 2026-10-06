@@ -7,7 +7,8 @@ button:focus-visible { outline: 3px solid #76bab6; outline-offset: 3px; }
 svg { flex-shrink: 0; }
 .hub { width: min(1120px, calc(100% - 80px)); margin: 0 auto; padding: 48px 0 24px; }
 .hub-header { display: grid; justify-items: start; }
-.brand { display: flex; align-items: center; gap: 9px; margin-bottom: 22px; color: var(--accent); font-size: 13px; font-weight: 800; letter-spacing: .12em; }
+.hub-topbar { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 22px; }
+.brand { display: flex; align-items: center; gap: 9px; color: var(--accent); font-size: 13px; font-weight: 800; letter-spacing: .12em; }
 .hub h1 { margin: 0; font-size: 42px; line-height: 1.2; font-weight: 650; letter-spacing: -.04em; }
 .hub-header > p { margin: 12px 0 0; color: var(--muted); font-size: 15px; }
 .hub-actions { display: flex; gap: 12px; margin-top: 28px; }
@@ -188,3 +189,5 @@ svg { flex-shrink: 0; }
 .script-logs .error { color: #b33434; }
 .script-logs .action { color: #167764; }
 .script-help { font-size: 11px; display: flex; flex-direction: column; gap: 8px; color: #62716e; }
+.mcp-dialog { position: fixed; z-index: 100; inset: 20% 20% auto; padding: 24px; background: white; border: 1px solid #cbd5d5; border-radius: 12px; box-shadow: 0 12px 60px #0003; overflow-wrap: anywhere; }
+.mcp-dialog button { margin-right: 8px; }

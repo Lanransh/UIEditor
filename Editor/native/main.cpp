@@ -157,7 +157,12 @@ int main() {
             Json input = Json::parse(line);
             ctx.deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(250);
             ctx.values = ctx.bytes = 0;
-            if (input["type"] == "start") {
+            if (input["type"] == "edit") {
+                load(L, input["bootstrap"], "=editor-host"); call(L, 0, 1); host = lua_ref(L, -1); lua_pop(L, 1);
+                push(L, input, ctx); hostCall(L, host, "initialize", 1); lua_settop(L, 0);
+                int env = environment(L, host);
+                load(L, input["source"], "=authoring", env); call(L, 0, 0); lua_settop(L, 0);
+            } else if (input["type"] == "start") {
                 load(L, input["bootstrap"], "=host"); call(L, 0, 1); host = lua_ref(L, -1); lua_pop(L, 1);
                 push(L, input, ctx); hostCall(L, host, "initialize", 1); lua_settop(L, 0);
                 push(L, input, ctx); hostCall(L, host, "prepare", 1); lua_settop(L, 0);
@@ -178,7 +183,7 @@ int main() {
             auto response = Json({ { "ok", true }, { "value", output } }).dump();
             if (response.size() > 8 * 1024 * 1024) throw std::runtime_error("Runtime output exceeds 8 MiB");
             std::cout << response << std::endl;
-            if (input["type"] == "stop") break;
+            if (input["type"] == "stop" || input["type"] == "edit") break;
         } catch (const std::exception& error) {
             Json logs = Json::array();
             if (host) {

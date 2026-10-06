@@ -2,6 +2,7 @@ import { dim, dim2, emptyScripts, type UIDocument, type UINode, type Vector2 } f
 import { validateScripts } from '../shared/runtime';
 import type { NodeDefinition, PreviewRect, ProjectStrategy, PropertyDefinition } from './strategy';
 import { layoutChildren } from './layout';
+import { robloxAutomation } from './automationCapabilities';
 
 const number = (value: number, min?: number, max?: number, integer = false): PropertyDefinition => ({ kind: 'number', value, min, max, integer });
 const string = (value: string): PropertyDefinition => ({ kind: 'string', value });
@@ -71,6 +72,7 @@ export function layoutComponent(node: UINode) { return node.children.find(child 
 export function auxiliary(node: UINode, className: string) { return node.children.find(child => child.className === className); }
 
 export class RobloxProjectStrategy implements ProjectStrategy {
+  readonly automation = robloxAutomation;
   readonly mode = 'roblox' as const;
   readonly nodes = nodeDefinitions;
   createNode(className: string): UINode {

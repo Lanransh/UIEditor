@@ -10,23 +10,26 @@ export function useRuntime(document: UIDocument) {
   const session = useRef<string | null>(null);
   const generation = useRef(0);
   const snapshot = useRef<UIDocument | null>(null);
-  function append(entries: RuntimeLog[]) { setLogs(value => [...value, ...entries].slice(-500)); }
+  const current = useRef<{ frame: RuntimeFrame | null; logs: (RuntimeLog & { cursor: number })[]; cursor: number; sequence: number }>({ frame: null, logs: [], cursor: 0, sequence: 0 });
+  function frameChanged(value: RuntimeFrame | null) { current.current.frame = value; ++current.current.sequence; setFrame(value); }
+  function append(entries: RuntimeLog[]) { current.current.logs = [...current.current.logs, ...entries.map(log => ({ ...log, cursor: ++current.current.cursor }))].slice(-500); setLogs(current.current.logs); }
   async function stop() {
     const token = ++generation.current;
     const id = session.current; session.current = null;
-    setActive(false); setFrame(null);
+    setActive(false); frameChanged(null);
     if (id) {
       try {
         const result = await window.runtime.stop(id);
-        if (!result.ok && token === generation.current) append([{ kind: 'error', message: result.error }]);
-      } catch (error) { if (token === generation.current) append([{ kind: 'error', message: String(error) }]); }
+        if (!result.ok && token === generation.current) { append([{ kind: 'error', message: result.error }]); return result; }
+      } catch (error) { if (token === generation.current) append([{ kind: 'error', message: String(error) }]); return { ok: false, error: String(error) }; }
     }
+    return { ok: true };
   }
   async function start(source = document) {
     const token = ++generation.current;
     const previous = session.current; session.current = null;
     snapshot.current = structuredClone(source);
-    setLogs([]); setActive(true); setFrame(null);
+    current.current.logs = []; setLogs([]); setActive(true); frameChanged(null);
     try {
       if (previous) await window.runtime.stop(previous);
       if (token !== generation.current) return;
@@ -34,25 +37,29 @@ export function useRuntime(document: UIDocument) {
       if (token !== generation.current) { if (result.ok) await window.runtime.stop(result.value.session); return; }
       if (!result.ok) { append(result.logs ?? []); throw new Error(result.error); }
       session.current = result.value.session;
-      setFrame(result.value.frame); append(result.value.frame.logs);
+      frameChanged(result.value.frame); append(result.value.frame.logs);
+      return { ok: true, sessionId: session.current, logs: result.value.frame.logs };
     } catch (error) {
-      if (token === generation.current) { setActive(false); setFrame(null); append([{ kind: 'error', message: String(error) }]); }
+      if (token === generation.current) { setActive(false); frameChanged(null); append([{ kind: 'error', message: String(error) }]); }
+      return { ok: false, error: String(error) };
     }
   }
   async function command(input: { type: 'event'; node: string }) {
     const id = session.current, token = generation.current;
-    if (!id) return;
+    if (!id) return { ok: false, error: '运行会话不存在。' };
     try {
       const result = await window.runtime.command(id, input);
       if (token !== generation.current) return;
       if (!result.ok) { append(result.logs ?? []); throw new Error(result.error); }
-      setFrame(result.value); append(result.value.logs);
+      frameChanged(result.value); append(result.value.logs);
+      return { ok: true, logs: result.value.logs };
     } catch (error) {
       if (token === generation.current) {
         const stoppedAt = generation.current + 1;
         await stop();
         if (stoppedAt === generation.current) append([{ kind: 'error', message: String(error) }]);
       }
+      return { ok: false, error: String(error) };
     }
   }
   useEffect(() => () => {
@@ -63,8 +70,8 @@ export function useRuntime(document: UIDocument) {
   useEffect(() => window.runtime?.onEnded(event => {
     if (session.current !== event.session) return;
     ++generation.current; session.current = null;
-    setActive(false); setFrame(null);
+    setActive(false); frameChanged(null);
     append([...(event.logs ?? []), { kind: 'error', message: event.error }]);
   }), []);
-  return { active, ready: !!frame, frame, logs, start: () => start(), stop, reset: () => start(snapshot.current ?? document), activate: (node: string) => command({ type: 'event', node }) };
+  return { active, ready: !!frame, frame, logs, start: (source = document) => start(source), stop, reset: () => start(snapshot.current ?? document), activate: (node: string) => command({ type: 'event', node }), inspect: () => ({ ...current.current, sessionId: session.current }) };
 }

@@ -1,4 +1,5 @@
 import { build } from 'esbuild';
+import './build-mcp.mjs';
 
 await build({
   entryPoints: ['electron/main.ts', 'electron/preload.ts'],

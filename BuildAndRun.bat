@@ -23,7 +23,9 @@ echo Preparing Electron runtime...
 call node node_modules\electron\install.js
 if errorlevel 1 goto :error
 echo Building UI Editor...
-if not exist native-bin\ui-luau.exe (
+if not exist native-bin\ui-luau.exe set "UI_EDITOR_BUILD_NATIVE=1"
+if not exist native-bin\editor.luau set "UI_EDITOR_BUILD_NATIVE=1"
+if defined UI_EDITOR_BUILD_NATIVE (
   echo Building Luau host - requires CMake and a C++ compiler...
   call npm run build:runtime
   if errorlevel 1 goto :error

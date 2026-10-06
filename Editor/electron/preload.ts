@@ -34,3 +34,15 @@ const runtime: RuntimeAPI = {
   },
 };
 contextBridge.exposeInMainWorld('runtime', runtime);
+contextBridge.exposeInMainWorld('automation', {
+  invoke: (operation: string, argument: unknown) => ipcRenderer.invoke('automation:invoke', { operation, argument }),
+  onRequest: (handler: (request: import('../src/shared/automation').AutomationRequest) => Promise<unknown>) => {
+    const listener = async (_event: Electron.IpcRendererEvent, request: { requestId: string; name: string; arguments: Record<string, unknown> }) => {
+      try { await ipcRenderer.invoke('automation:reply', { requestId: request.requestId, ok: true, value: await handler(request) }); }
+      catch (error) { await ipcRenderer.invoke('automation:reply', { requestId: request.requestId, ok: false, error: error instanceof Error ? error.message : String(error) }); }
+    };
+    ipcRenderer.on('automation:request', listener);
+    ipcRenderer.send('automation:ready', true);
+    return () => { ipcRenderer.removeListener('automation:request', listener); ipcRenderer.send('automation:ready', false); };
+  },
+});

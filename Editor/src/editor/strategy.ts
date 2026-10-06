@@ -1,4 +1,5 @@
 import type { UIDocument, UINode, PropertyValue } from '../shared/uiDocument';
+import type { AutomationCapabilities } from './automationCapabilities';
 
 export interface PropertyDefinition {
   kind: 'number' | 'string' | 'boolean' | 'color' | 'enum' | 'udim' | 'udim2' | 'vector';
@@ -14,6 +15,7 @@ export interface NodeDefinition {
 }
 export interface PreviewRect { x: number; y: number; width: number; height: number; scale: number }
 export interface ProjectStrategy {
+  automation: AutomationCapabilities;
   mode: 'roblox';
   nodes: Record<string, NodeDefinition>;
   createDocument(name?: string): UIDocument;

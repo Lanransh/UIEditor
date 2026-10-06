@@ -21,6 +21,12 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
   const draftRef = useRef<UIDocument | null>(null);
   const gesture = useRef<Gesture | null>(null);
   const [space, setSpace] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+  useEffect(() => {
+    const start = () => setCapturing(true), end = () => setCapturing(false);
+    window.addEventListener('uie:screenshot-start', start); window.addEventListener('uie:screenshot-end', end);
+    return () => { window.removeEventListener('uie:screenshot-start', start); window.removeEventListener('uie:screenshot-end', end); };
+  }, []);
   const shown = editor.runtime.frame?.document ?? draft ?? editor.document;
   useEffect(() => {
     const down = (event: KeyboardEvent) => { if (event.code === 'Space' && event.target instanceof HTMLElement && !event.target.closest('input,textarea,select,button')) { event.preventDefault(); setSpace(true); } };
@@ -102,7 +108,7 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
     const stroke = auxiliary(node, 'UIStroke')?.properties;
     const gradient = auxiliary(node, 'UIGradient')?.properties;
     const textNode = node.className.startsWith('Text');
-    const selected = !editor.runtime.active && (editor.selected.id === node.id || (editor.strategy.nodes[editor.selected.className].category === 'component' && findParent(shown.root, editor.selected.id)?.id === node.id));
+    const selected = !capturing && !editor.runtime.active && (editor.selected.id === node.id || (editor.strategy.nodes[editor.selected.className].category === 'component' && findParent(shown.root, editor.selected.id)?.id === node.id));
     const resizeLocked = layoutComponent(findParent(shown.root, node.id)!)?.className === 'UIGridLayout';
     const radius = corner ? Math.max(0, pixels(corner, Math.min(rect.width, rect.height))) : 0;
     const style: CSSProperties = {
@@ -160,7 +166,7 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
   const rectangles = editor.strategy.layout(shown.root, 1280, 720);
   return <section className="canvas" aria-label="Roblox 画布">
     <div className="canvas-heading"><span>1280 × 720 · {editor.document.name}</span><div className="canvas-tools"><button disabled={editor.busy && !editor.runtime.active} onClick={fit}>适应窗口</button><select aria-label="画布缩放" disabled={editor.busy && !editor.runtime.active} value={zoom} onChange={event => setZoom(Number(event.target.value))}><option value={zoom}>{Math.round(zoom * 100)}%</option>{[.25, .5, .75, 1, 1.5, 2].filter(value => value !== zoom).map(value => <option key={value} value={value}>{value * 100}%</option>)}</select></div></div>
-    <div ref={viewport} className={`canvas-viewport${space ? ' panning' : ''}`} onPointerDown={event => { if (event.button === 0 && !space) editor.select(shown.root.id); start(event, 'pan'); }} onPointerMove={move} onPointerUp={event => finish(event)} onPointerCancel={event => finish(event, true)} onLostPointerCapture={event => finish(event, true)} onWheel={event => {
+    <div ref={viewport} data-zoom={zoom} className={`canvas-viewport${space ? ' panning' : ''}`} onPointerDown={event => { if (event.button === 0 && !space) editor.select(shown.root.id); start(event, 'pan'); }} onPointerMove={move} onPointerUp={event => finish(event)} onPointerCancel={event => finish(event, true)} onLostPointerCapture={event => finish(event, true)} onWheel={event => {
       if (gesture.current) return;
       if (event.ctrlKey || event.metaKey) {
         const next = Math.max(.1, Math.min(3, zoom * (event.deltaY > 0 ? .9 : 1.1)));
@@ -171,7 +177,7 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
       <div className="ui-artboard" data-testid="ui-artboard" style={{ width: 1280, height: 720, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
         {shown.root.properties.Enabled && shown.root.children.filter(isObject).map(node => renderNode(node, rectangles.get(node.id)!))}
       </div>
-      <div className="canvas-hint">{editor.runtime.active ? '运行模式 · 点击按钮执行脚本' : '空白处拖动 / 空格或中键平移 · Ctrl+滚轮缩放 · 静态设计'}</div>
+      {!capturing && <div className="canvas-hint">{editor.runtime.active ? '运行模式 · 点击按钮执行脚本' : '空白处拖动 / 空格或中键平移 · Ctrl+滚轮缩放 · 静态设计'}</div>}
     </div>
   </section>;
 }
