@@ -26,6 +26,7 @@ if (!app.requestSingleInstanceLock()) {
     const window = new BrowserWindow({
       width: 1200, height: 800, minWidth: 900, minHeight: 600,
       title: 'UI 编辑器', backgroundColor: '#f7f8fa', show: false,
+      icon: join(__dirname, '../dist/app-icon.png'),
       webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },
     });
     app.on('second-instance', () => { if (window.isMinimized()) window.restore(); window.focus(); });

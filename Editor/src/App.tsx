@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { AlertTriangle, ArrowLeft, Clock3, Folder, FolderOpen, FolderPlus, Layers3, PanelTop, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Clock3, Folder, FolderOpen, FolderPlus, Layers3, Trash2 } from 'lucide-react';
 import type { Project, ProjectAPI, RecentProjectView, Result } from './shared/project';
 import { useDocumentEditor } from './editor/useDocumentEditor';
 import { NodeTree, NodeProperties } from './editor/NodePanels';
@@ -77,7 +77,7 @@ function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
 
   return <main className="hub" aria-labelledby="hub-title">
     <header className="hub-header">
-      <div className="brand"><PanelTop size={19} /> UI EDITOR</div>
+      <div className="brand"><img src="./app-icon.svg" width={28} height={28} alt="" /> UI EDITOR</div>
       <h1 id="hub-title">选择工程</h1>
       <p>创建或打开一个 Roblox 工程，开始你的 UI 设计。</p>
       <div className="hub-actions">

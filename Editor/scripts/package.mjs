@@ -12,6 +12,7 @@ const paths = await packager({
   out: '../ToolRuntime',
   name: 'UIEditor',
   executableName: 'UIEditor',
+  icon: resolve('public/app-icon.ico'),
   platform: 'win32',
   arch: 'x64',
   asar: true,
