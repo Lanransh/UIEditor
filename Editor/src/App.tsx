@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { AlertTriangle, ArrowLeft, Clock3, Folder, FolderOpen, FolderPlus, Layers3, MousePointer2, PanelTop, Trash2 } from 'lucide-react';
 import type { Project, ProjectAPI, RecentProjectView, Result } from './shared/project';
 
@@ -95,7 +95,61 @@ function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
 
 function Workspace({ project, onBack }: { project: Project; onBack: () => void }) {
   const [assetLibrary, setAssetLibrary] = useState('项目资产');
-  return <main className="workspace">
+  const content = useRef<HTMLDivElement>(null);
+  const [bounds, setBounds] = useState({ width: window.innerWidth, height: window.innerHeight - 63 });
+  const [sizes, setSizes] = useState({ tree: window.innerWidth <= 1000 ? 180 : 210, properties: window.innerWidth <= 1000 ? 190 : 230, assets: Math.min(240, Math.max(150, window.innerHeight * .25)) });
+  const [dragging, setDragging] = useState<keyof typeof sizes | null>(null);
+  const drag = useRef<{ panel: keyof typeof sizes; pointerId: number; start: number; size: number } | null>(null);
+  const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+  const tree = clamp(sizes.tree, 160, bounds.width - 180 - 240 - 12);
+  const properties = clamp(sizes.properties, 180, bounds.width - tree - 240 - 12);
+  const assets = clamp(sizes.assets, 120, bounds.height - 180 - 6);
+  const current = { tree, properties, assets };
+  const limits = { tree: [160, bounds.width - properties - 240 - 12], properties: [180, bounds.width - tree - 240 - 12], assets: [120, bounds.height - 180 - 6] };
+
+  useEffect(() => {
+    const observer = new ResizeObserver(([entry]) => setBounds({ width: entry.contentRect.width, height: entry.contentRect.height }));
+    observer.observe(content.current!);
+    return () => observer.disconnect();
+  }, []);
+
+  function resize(panel: keyof typeof sizes, value: number) {
+    setSizes({ ...current, [panel]: clamp(value, limits[panel][0], limits[panel][1]) });
+  }
+
+  function separator(panel: keyof typeof sizes, label: string) {
+    const horizontal = panel === 'assets';
+    return <div className={`workspace-divider${horizontal ? ' horizontal' : ''}`} role="separator" aria-label={label} aria-orientation={horizontal ? 'horizontal' : 'vertical'} aria-valuemin={limits[panel][0]} aria-valuemax={limits[panel][1]} aria-valuenow={Math.round(current[panel])} tabIndex={0}
+      onPointerDown={event => {
+        if (event.button !== 0 || drag.current) return;
+        event.preventDefault();
+        event.currentTarget.focus();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        drag.current = { panel, pointerId: event.pointerId, start: horizontal ? event.clientY : event.clientX, size: current[panel] };
+        setDragging(panel);
+      }}
+      onPointerMove={event => {
+        if (!drag.current || drag.current.pointerId !== event.pointerId) return;
+        const delta = (horizontal ? event.clientY : event.clientX) - drag.current.start;
+        resize(panel, drag.current.size + (panel === 'tree' ? delta : -delta));
+      }}
+      onPointerUp={event => {
+        if (drag.current?.pointerId !== event.pointerId) return;
+        event.currentTarget.releasePointerCapture(event.pointerId);
+        drag.current = null;
+        setDragging(null);
+      }}
+      onLostPointerCapture={() => { drag.current = null; setDragging(null); }}
+      onKeyDown={event => {
+        const keys = horizontal ? ['ArrowUp', 'ArrowDown'] : ['ArrowLeft', 'ArrowRight'];
+        const direction = keys.indexOf(event.key);
+        if (direction === -1) return;
+        event.preventDefault();
+        resize(panel, current[panel] + (direction === 0 ? -10 : 10) * (panel === 'tree' ? 1 : -1));
+      }} />;
+  }
+
+  return <main className={`workspace${dragging ? ` resizing ${dragging === 'assets' ? 'resizing-horizontal' : 'resizing-vertical'}` : ''}`} style={{ '--tree-width': `${tree}px`, '--properties-width': `${properties}px`, '--assets-height': `${assets}px` } as CSSProperties}>
     <header className="workspace-toolbar">
       <details className="workspace-menu" onBlur={event => {
         if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
@@ -110,11 +164,15 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
       </details>
       <button className="workspace-menu-label" disabled>编辑</button>
     </header>
+    <div className="workspace-content" ref={content}>
     <div className="workspace-body">
       <aside className="panel" aria-label="节点树"><h2><Layers3 size={16} />节点树</h2><div className="panel-empty"><Layers3 size={28} /><p>暂无节点</p><span>当前工程尚未创建界面</span></div></aside>
+      {separator('tree', '调整节点树宽度')}
       <section className="canvas" aria-label="空画布"><div className="canvas-heading">画布<span>空工作台</span></div><div className="canvas-surface"><div className="canvas-empty"><PanelTop size={38} strokeWidth={1.3} /><h1>从这里开始设计</h1><p>工程已就绪</p><span>基础版提供工程管理，界面编辑能力将在后续加入。</span></div></div></section>
+      {separator('properties', '调整属性面板宽度')}
       <aside className="panel properties" aria-label="属性面板"><h2>属性面板</h2><div className="panel-empty"><MousePointer2 size={28} /><p>未选择节点</p><span>节点属性将显示在这里</span></div></aside>
     </div>
+    {separator('assets', '调整资产目录高度')}
     <section className="panel assets" aria-label="资产目录">
       <h2 aria-label="资产目录"><FolderOpen size={16} />资产目录<span className="assets-location">{assetLibrary}</span></h2>
       <div className="assets-body">
@@ -124,6 +182,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
         <div className="assets-empty" role="status">暂无{assetLibrary}</div>
       </div>
     </section>
+    </div>
     <footer className="workspace-status"><span><i />工程已保存</span><span>Roblox · 本地工程</span></footer>
   </main>;
 }

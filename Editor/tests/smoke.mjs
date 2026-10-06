@@ -45,6 +45,47 @@ async function checkWorkspaceLayout() {
   assert.ok(assets.y >= Math.max(tree.y + tree.height, canvas.y + canvas.height, properties.y + properties.height));
   assert.equal(assets.width, await page.evaluate(() => innerWidth));
 }
+async function checkWorkspaceResize() {
+  const cases = [
+    ['调整节点树宽度', page.getByRole('complementary', { name: '节点树', exact: true }), 'width', 80, 0],
+    ['调整属性面板宽度', page.getByRole('complementary', { name: '属性面板', exact: true }), 'width', -80, 0],
+    ['调整资产目录高度', page.getByRole('region', { name: '资产目录', exact: true }), 'height', 0, -60],
+  ];
+  for (const [name, panel, dimension, dx, dy] of cases) {
+    const divider = page.getByRole('separator', { name, exact: true });
+    const before = (await panel.boundingBox())[dimension];
+    for (const direction of [1, -1]) {
+      const box = await divider.boundingBox();
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2 + dx * direction, box.y + box.height / 2 + dy * direction, { steps: 5 });
+      await page.mouse.up();
+      const expected = before + (direction === 1 ? Math.abs(dx || dy) : 0);
+      await page.waitForFunction(({ name, expected }) => Number(document.querySelector(`[role="separator"][aria-label="${name}"]`).getAttribute('aria-valuenow')) === Math.round(expected), { name, expected }, { timeout: 5000 });
+      assert.ok(Math.abs((await panel.boundingBox())[dimension] - expected) < 1);
+      await checkWorkspaceLayout();
+    }
+  }
+  const treeDivider = page.getByRole('separator', { name: '调整节点树宽度' });
+  const before = Number(await treeDivider.getAttribute('aria-valuenow'));
+  await treeDivider.press('ArrowRight');
+  assert.equal(Number(await treeDivider.getAttribute('aria-valuenow')), before + 10);
+  await treeDivider.press('ArrowLeft');
+  // Drag well past the canvas: pointer capture must keep resizing and stop at the limit.
+  for (const [name, , , dx, dy] of cases) {
+    const divider = page.getByRole('separator', { name, exact: true });
+    const box = await divider.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(dx > 0 ? 2000 : dx < 0 ? -1000 : box.x + box.width / 2, dy < 0 ? -1000 : box.y + box.height / 2, { steps: 5 });
+    await page.mouse.up();
+    assert.equal(await divider.getAttribute('aria-valuenow'), await divider.getAttribute('aria-valuemax'));
+    await checkWorkspaceLayout();
+  }
+  assert.equal(await page.locator('.workspace.resizing').count(), 0);
+  const canvas = await page.getByRole('region', { name: '空画布' }).boundingBox();
+  assert.ok(canvas.width >= 240 && canvas.height >= 180);
+}
 try {
   await launch();
   await page.getByText('还没有打开过工程，创建你的第一个 Roblox 工程吧。').waitFor();
@@ -77,9 +118,15 @@ try {
   const manifest = JSON.parse(await readFile(join(workspace, 'project.json'), 'utf8'));
   assert.equal(manifest.mode, 'roblox');
   await page.screenshot({ path: join(output, 'workspace.png') });
+  await checkWorkspaceResize();
+  await page.screenshot({ path: join(output, 'workspace-resized.png') });
   await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(900, 600));
+  await page.waitForFunction(() => innerWidth <= 900);
+  await page.waitForFunction(() => document.documentElement.scrollWidth <= innerWidth, null, { timeout: 5000 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await checkWorkspaceLayout();
+  const smallCanvas = await page.getByRole('region', { name: '空画布' }).boundingBox();
+  assert.ok(smallCanvas.width >= 240 && smallCanvas.height >= 180);
   await page.screenshot({ path: join(output, 'workspace-small.png') });
   await clickReady('返回 Hub');
   await page.getByRole('button', { name: '打开 中文 工程', exact: true }).waitFor();
@@ -119,6 +166,6 @@ try {
   await page.getByText('还没有打开过工程，创建你的第一个 Roblox 工程吧。').waitFor();
   assert.equal(JSON.parse(await readFile(join(root, 'moved', 'UIEditorWorkspace', 'project.json'), 'utf8')).id, manifest.id);
   assert.deepEqual(errors, []);
-  console.log('PASS: Hub, cancellation, create/open, restart, duplicate creation, missing/corrupt projects, remove history, Chinese paths, resize.');
+  console.log('PASS: Hub, cancellation, create/open, restart, duplicate creation, missing/corrupt projects, remove history, Chinese paths, panel dragging, keyboard resize, size limits, window resize.');
   console.log(`Screenshots: ${output}`);
 } finally { if (application) await application.close(); }
