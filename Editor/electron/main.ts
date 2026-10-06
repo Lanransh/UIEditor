@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
 import { join, dirname, basename, relative } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
@@ -206,6 +206,12 @@ if (!app.requestSingleInstanceLock()) {
     const imageStore = () => new ImageAssetStore(runtime, requireProject().path);
     handle('images:list', async () => imageStore().list());
     handle('images:update', async input => imageStore().update(input as ImageAssetUpdate));
+    handle('images:open-directory', async id => {
+      if (typeof id !== 'string') throw new Error('图片资产 ID 无效。');
+      const error = await shell.openPath(await imageStore().assetDirectory(id));
+      if (error) throw new Error(error);
+      return null;
+    });
     handle('images:import-file', async input => {
       const value = input as { library: ImageLibrary; path: string };
       if (!value || !['permanent', 'project'].includes(value.library) || typeof value.path !== 'string' || !value.path) throw new Error('请拖入本地图片文件。');

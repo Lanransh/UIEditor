@@ -25,6 +25,15 @@ test('Roblox IDs normalize and reject invalid input without losing precision', (
   for (const value of ['0', '-1', '1e3', '1.2', 'https://example.com/1', 'rbxassetid://', 123]) assert.throws(() => normalizeRobloxId(value));
   assert.throws(() => validateTool('uie.assets.get', {}));
 });
+
+test('asset directories follow the library and reject unknown asset IDs', async () => {
+  const { store, runtime, project } = await fixture();
+  const builtin = (await store.list())[0];
+  assert.equal(await store.assetDirectory(builtin.id), join(runtime, 'image-assets'));
+  const imported = await store.import('project', builtin.previewImage);
+  assert.equal(await store.assetDirectory(imported.id), join(project, 'image-assets'));
+  await assert.rejects(store.assetDirectory('../outside'), /不存在/);
+});
 test('each image has one Roblox ID; permanent IDs are shared and project imports move with project', async () => {
   const { store, root, runtime, project } = await fixture();
   const initial = await store.list();

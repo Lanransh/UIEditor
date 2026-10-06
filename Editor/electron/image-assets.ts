@@ -22,6 +22,13 @@ function validateAsset(value: unknown): ImageAsset {
 export class ImageAssetStore {
   constructor(private runtime: string, private project: string) {}
   private directory(library: ImageLibrary) { return join(library === 'permanent' ? this.runtime : this.project, 'image-assets'); }
+  async assetDirectory(id: string): Promise<string> {
+    const asset = (await this.list()).find(a => a.id === id);
+    if (!asset) throw new Error('图片资产不存在。');
+    const directory = this.directory(asset.library);
+    await regular(directory, true); await mkdir(directory, { recursive: true });
+    return directory;
+  }
   private async read(library: ImageLibrary): Promise<Catalog> {
     const directory = this.directory(library), path = join(directory, 'catalog.json');
     if (!await regular(directory, true)) return empty();

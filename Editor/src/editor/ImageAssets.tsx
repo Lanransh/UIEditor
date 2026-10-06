@@ -5,54 +5,65 @@ import { normalizeRobloxId, type ImageAsset } from '../shared/imageAssets';
 export function ImageAssets({ editor, library, selectedId, select }: {
   editor: DocumentEditor; library: string; selectedId: string | null; select(id: string): void;
 }) {
-  const [query, setQuery] = useState('');
   const [error, setError] = useState('');
-  const [pending, setPending] = useState(false);
-  const [menu, setMenu] = useState<string | null>(null);
+  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const menuElement = useRef<HTMLDivElement>(null);
   const scope = library === '永久图片' ? 'permanent' : 'project';
-  const assets = editor.imageAssets.filter(a => a.library === scope && `${a.name} ${a.tags}`.toLowerCase().includes(query.toLowerCase()));
-  const asset = assets.find(a => a.id === selectedId);
-  useEffect(() => { setMenu(null); }, [library]);
-  async function importImage(files?: File[]) {
-    setPending(true); setError('');
-    try {
-      for (const file of files?.length ? files : [undefined]) {
-        const asset = await editor.importImage(scope, file); if (asset) { setQuery(''); select(asset.id); }
-      }
+  const assets = editor.imageAssets.filter(a => a.library === scope);
+  const asset = assets.find(a => a.id === menu?.id);
+  useEffect(() => { setMenu(null); }, [library, editor.busy]);
+  useEffect(() => {
+    if (!menu) return;
+    function dismiss(event: PointerEvent) {
+      if (!menuElement.current?.contains(event.target as Node)) setMenu(null);
     }
-    catch (cause) { setError(String(cause)); } finally { setPending(false); }
+    const close = () => setMenu(null);
+    window.addEventListener('pointerdown', dismiss);
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', close, true);
+    return () => {
+      window.removeEventListener('pointerdown', dismiss);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', close, true);
+    };
+  }, [menu]);
+  async function openDirectory(id: string) {
+    setMenu(null); setError('');
+    try {
+      const result = await window.imageAssets.openDirectory(id);
+      if (!result.ok) setError(result.error);
+    } catch (cause) { setError(String(cause)); }
   }
-  return <div className="image-assets" onDragOver={event => {
-    if (!editor.busy && !pending && event.dataTransfer.types.includes('Files')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; }
-  }} onDrop={event => {
-    if (editor.busy || pending || !event.dataTransfer.files.length) return;
-    event.preventDefault(); void importImage(Array.from(event.dataTransfer.files));
-  }}>
+  return <div className="image-assets">
     <div className="image-asset-list">
-      <div className="image-asset-toolbar"><input aria-label="搜索图片资产" placeholder="搜索名称或标签 · 拖入图片即可导入" value={query} onChange={event => setQuery(event.target.value)} />
-        <button disabled={editor.busy || pending || editor.assetsLoading} onClick={() => void importImage()}>导入图片</button></div>
       {error && <p role="alert" className="asset-error">{error}</p>}
       {editor.assetsLoading ? <p role="status">正在加载图片资产…</p> : <div className="asset-grid">
         {assets.map(a => <div key={a.id} className="image-asset-entry">
           <button className={`ui-asset${selectedId === a.id ? ' current' : ''}`} aria-label={`图片资产 ${a.name}`} aria-pressed={selectedId === a.id}
             draggable={!editor.busy} onDragStart={event => { event.dataTransfer.setData('application/x-uie-image-asset', a.id); event.dataTransfer.effectAllowed = 'copy'; }}
             onClick={() => { select(a.id); setMenu(null); }}
-            onContextMenu={event => { event.preventDefault(); select(a.id); setMenu(a.id); }}>
+            onContextMenu={event => {
+              event.preventDefault(); select(a.id);
+              const bounds = event.currentTarget.getBoundingClientRect();
+              setMenu({ id: a.id, x: Math.max(0, Math.min(event.clientX || bounds.left, window.innerWidth - 150)), y: Math.max(0, Math.min(event.clientY || bounds.bottom, window.innerHeight - 160)) });
+            }}>
             <span className="ui-asset-preview image-checker"><img src={a.previewImage.dataUrl} alt="" /></span>
             <span className="ui-asset-name">{a.name}</span><small>{a.usage === 'placeholder' ? '占位图 · ' : ''}{a.robloxId ? '已配置 ID' : '仅本地'}</small>
           </button>
-          {menu === a.id && <div className="image-asset-actions" onKeyDown={event => { if (event.key === 'Escape') setMenu(null); }}>
-            <button disabled={!a.robloxId} onClick={() => {
-              void navigator.clipboard.writeText(a.robloxId).then(() => setMenu(null)).catch(cause => setError(String(cause)));
-            }}>复制资源 ID</button>
-            <button disabled={editor.busy} onClick={() => { setMenu(null); editor.useImage(a); }}>应用图片</button>
-          </div>}
         </div>)}
       </div>}
-      {!editor.assetsLoading && !assets.length && <p role="status">暂无{library}{query ? '搜索结果' : ''}</p>}
-      {asset && <div className="image-asset-actions">
-        <button disabled={editor.busy} onClick={() => editor.useImage(asset)}>应用到选中节点</button>
-        <button disabled={editor.busy} onClick={() => editor.useImage(asset, true)}>插入图片节点</button></div>}
+      {!editor.assetsLoading && !assets.length && <p role="status">暂无{library}</p>}
+      {menu && asset && <div ref={menuElement} className="asset-context-menu" role="menu" aria-label="图片资产操作" style={{ left: menu.x, top: menu.y }}
+        onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setMenu(null); } }}
+        onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setMenu(null); }}>
+        <button role="menuitem" autoFocus disabled={editor.busy} onClick={() => { setMenu(null); editor.useImage(asset); }}>应用到选中节点</button>
+        <button role="menuitem" disabled={editor.busy} onClick={() => { setMenu(null); editor.useImage(asset, true); }}>插入图片节点</button>
+        <button role="menuitem" disabled={editor.busy} onClick={() => void openDirectory(asset.id)}>打开目录</button>
+        <button role="menuitem" disabled={!asset.robloxId} onClick={() => {
+          setMenu(null);
+          void navigator.clipboard.writeText(asset.robloxId).catch(cause => setError(String(cause)));
+        }}>复制 ID</button>
+      </div>}
     </div>
   </div>;
 }

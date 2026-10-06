@@ -29,6 +29,7 @@ const imageAssets: ImageAssetAPI = {
   import: library => ipcRenderer.invoke('images:import', library),
   importFile: (library, file) => ipcRenderer.invoke('images:import-file', { library, path: webUtils.getPathForFile(file) }),
   update: value => ipcRenderer.invoke('images:update', value),
+  openDirectory: id => ipcRenderer.invoke('images:open-directory', id),
 };
 contextBridge.exposeInMainWorld('imageAssets', imageAssets);
 const runtime: RuntimeAPI = {
