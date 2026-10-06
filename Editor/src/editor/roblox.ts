@@ -19,10 +19,10 @@ const common = {
 };
 const text = {
   Text: string('文字'), TextColor3: color('#263a3a'), TextSize: number(24, 1, 100), TextTransparency: number(0, 0, 1),
-  Font: enumeration('SourceSans', ['SourceSans', 'Arial', 'Gotham']), TextWrapped: bool(true), TextScaled: bool(false),
+  Font: enumeration('SourceSans', ['SourceSans', 'Arial', 'Gotham', 'GothamBold']), TextWrapped: bool(true), TextScaled: bool(false),
   TextXAlignment: enumeration('Center', ['Left', 'Center', 'Right']), TextYAlignment: enumeration('Center', ['Top', 'Center', 'Bottom']),
 };
-const image = { Image: string(''), ImageColor3: color('#ffffff'), ImageTransparency: number(0, 0, 1), ScaleType: enumeration('Fit', ['Fit', 'Stretch', 'Crop', 'Tile']) };
+const image = { Image: string(''), ImageColor3: color('#ffffff'), ImageTransparency: number(0, 0, 1), ScaleType: enumeration('Fit', ['Fit', 'Stretch', 'Crop', 'Tile']), TileSize: { kind: 'udim2', value: { x: dim(1, 0), y: dim(1, 0) } } as PropertyDefinition };
 const alignment = {
   FillDirection: enumeration('Vertical', ['Vertical', 'Horizontal']), SortOrder: enumeration('LayoutOrder', ['LayoutOrder', 'Name']),
   HorizontalAlignment: enumeration('Left', ['Left', 'Center', 'Right']), VerticalAlignment: enumeration('Top', ['Top', 'Center', 'Bottom']),
@@ -94,6 +94,7 @@ export class RobloxProjectStrategy implements ProjectStrategy {
   }
   validate(source: unknown): UIDocument {
     if (!isRecord(source)) throw new Error('界面格式或版本不支持。');
+    source = structuredClone(source);
     if (!exact(source, ['format', 'version', 'id', 'name', 'canvas', 'root', 'scripts']) || source.format !== 'roblox-ui' || ![2, 3].includes(source.version as number)) throw new Error('界面格式或版本不支持。');
     if (typeof source.id !== 'string' || !source.id.trim() || typeof source.name !== 'string' || !source.name.trim() || !exact(source.canvas, ['width', 'height']) || source.canvas.width !== 1280 || source.canvas.height !== 720) throw new Error('界面名称、ID 或画布尺寸无效。');
     const ids = new Set<string>();
@@ -103,6 +104,7 @@ export class RobloxProjectStrategy implements ProjectStrategy {
       if (!isRecord(value) || Object.keys(value).some(key => !['id', 'name', 'className', 'properties', 'children', 'previewImage'].includes(key)) || typeof value.id !== 'string' || !value.id.trim() || ids.has(value.id) || typeof value.name !== 'string' || !value.name.trim() || typeof value.className !== 'string' || !Object.hasOwn(this.nodes, value.className) || !Array.isArray(value.children)) throw new Error('节点类型、名称、ID 或层级无效（ID 不可重复）。');
       ids.add(value.id);
       const definition = this.nodes[value.className];
+      if (value.className.startsWith('Image') && isRecord(value.properties) && !Object.hasOwn(value.properties, 'TileSize')) value.properties.TileSize = structuredClone(image.TileSize.value);
       if (!exact(value.properties, Object.keys(definition.properties))) throw new Error(`${value.name} 存在缺失或不支持的属性。`);
       for (const [key, property] of Object.entries(definition.properties)) if (!validProperty(value.properties[key], property)) throw new Error(`${value.name}.${key} 属性值无效。`);
       const p = value.properties;

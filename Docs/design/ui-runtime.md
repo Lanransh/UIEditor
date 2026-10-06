@@ -23,7 +23,8 @@ local FX = _G.FX
 local UI = FX.Class("COnlineRewardUIBaseCompClass", "FCUICompClass")
 
 function UI:OnReady()
-    self.Button = FX.Loader:Here(self:GetRootNode(), "Panel/Button")
+    local root = FX.Loader:PlayerGui("OnlineRewardUI")
+    self.Button = FX.Loader:Here(root, "Panel.Button")
     self:TrackConnection(self.Button.Activated:Connect(function()
         self:EmitUIAction("ClaimReward", { RewardId = self:GetUIConfig().Reward.Id })
     end))
@@ -44,7 +45,7 @@ App 提供 FX.Class、FX.GetClass、Super、New、IsA、GetClassName 的兼容�
 
 ## 节点与支持接口
 
-脚本直接获取节点对象，不需要额外绑定引用名。FX.Loader:Here(root, "父节点/子节点") 按层级查找；FX.Loader:PlayerGui(name) 返回当前 ScreenGui。节点支持 Name/ClassName/Parent、FindFirstChild、WaitForChild、IsA、子节点字段、支持属性的读写，以及按钮 Activated:Connect。这里只模拟已有静态节点，不支持 Instance.new 或动态增删。节点路径不存在、同级重名导致歧义或属性不支持时明确报错；修改节点名称或层级后需同步脚本路径。
+脚本直接获取节点对象，不需要额外绑定引用名。FX.Loader:Here(root, "父节点.子节点") 按层级查找，只接受点分隔路径；FX.Loader:PlayerGui("界面名.子节点") 从模拟 PlayerGui 查找当前 ScreenGui 或其子节点。生成脚本优先用 PlayerGui 获取界面、Here 获取子节点，不通过 GetRootNode 查找。PlayerGui 仅包含当前文档，空路径、空段和斜杠明确报错。节点支持 Name/ClassName/Parent、FindFirstChild、WaitForChild、IsA、子节点字段、支持属性的读写，以及按钮 Activated:Connect。这里只模拟已有静态节点，不支持 Instance.new 或动态增删。节点路径不存在、同级重名导致歧义或属性不支持时明确报错；修改节点名称或层级后需同步脚本路径。
 
 | 方法 | 行为 |
 | --- | --- |

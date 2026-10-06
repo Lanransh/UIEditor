@@ -18,6 +18,8 @@ scripts.get 读取交互代码 source、接入代码 integration，可用 kind �
 
 制作执行在独立 Luau VM 中操作草稿，通过当前节点注册表提供创建和属性转换。值类型构造与现有运行宿主共享；不开放文件、网络、require 或 Electron。每次代码最多 256 KiB、5000 次编辑操作、200 条制作日志，沿用 64 MiB VM、250 ms 执行预算、2 秒主进程看门狗及 8 MiB 消息限制。
 
+图片节点可在 create 的 previewImage 选项中附加 `{name,dataUrl}`，或使用 ui.nodes.setPreviewImage 更新、传 nil 清除。图片沿用完整文档校验，不接受远程 URL，不在制作 VM 中读取文件或联网；失败仍整笔回滚。Roblox Image 资源 ID 与本地预览图分别保存。
+
 源码执行成功后严格校验完整文档，再校验当前 sessionId/revision，最后提交一条现有文档命令。节点、属性、层级和两份源码的一次组合修改可以在 App 内整体撤销，scripts.set 的一次修改同样进入文档历史。App redo 恢复已验证快照，不重跑代码。失败、超时、冲突、dry-run 和无变化不影响历史；新编辑清空 redo。手动与 MCP 编辑共用历史，保存不清空历史，新建或打开另一界面重置历史。revision 同时覆盖手动编辑、MCP 提交及 App 内 undo/redo；MCP 不提供历史操作和历史摘要。
 
 ## 运行与文件

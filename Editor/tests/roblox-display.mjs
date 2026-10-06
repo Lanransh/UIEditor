@@ -43,7 +43,15 @@ try {
       const text = nodes.find(n => n.className === 'TextLabel');
       assert.match(text.style.outline, /none/); assert.equal(text.textStroke.webkitTextStrokeWidth, '6px');
     }
-    if (cases[i].property === 'effect:image-Tile') assert.equal(nodes.find(n => n.className === cases[i].className).image.backgroundSize, '100% 100%');
+    if (cases[i].property === 'effect:image-Tile') {
+      const image = nodes.find(n => n.className === cases[i].className);
+      assert.equal(image.image.backgroundSize, `${image.rect.width}px ${image.rect.height}px`);
+    }
+    if (cases[i].property === 'effect:image-stud-tile') {
+      const image = nodes.find(n => n.className === cases[i].className);
+      assert.equal(image.image.backgroundSize, '27px 27px');
+      assert.equal(image.image.backgroundRepeat, 'repeat');
+    }
     if (cases[i].property.startsWith('effect:') || cases[i].property === '(default)' || ['UIGradient', 'UIStroke', 'UICorner', 'CanvasGroup', 'ScrollingFrame'].includes(cases[i].className) && ['ColorStart', 'Color', 'CornerRadius', 'Rotation', 'GroupTransparency', 'CanvasPosition'].includes(cases[i].property)) {
       await page.getByTestId('ui-artboard').screenshot({ path: resolve(output, `editor-${cases[i].id}.png`) });
     }

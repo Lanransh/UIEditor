@@ -13,8 +13,9 @@
 | `ui.nodes.get(id)` | 节点快照，不能通过直接修改快照写入文档 |
 | `ui.nodes.children(id)` | 直属子节点快照数组 |
 | `ui.nodes.find(options)` | 分页查询，返回 nodes、total、nextOffset |
-| `ui.nodes.create(className, {parentId?,name?,properties?})` | 创建并返回节点快照，父节点缺省为根 |
+| `ui.nodes.create(className, {parentId?,name?,properties?,previewImage?})` | 创建并返回节点快照，父节点缺省为根 |
 | `ui.nodes.setProperties(id, properties)` | 更新传入属性，其他属性保留 |
+| `ui.nodes.setPreviewImage(id, {name,dataUrl} 或 nil)` | ImageLabel/ImageButton 附加嵌入式预览图；nil 清除。事务结束校验格式与长度 |
 | `ui.nodes.rename(id, name)` | 修改名称 |
 | `ui.nodes.reparent(id, parentId)` | 移到父节点末尾，禁止根操作和层级环 |
 | `ui.nodes.duplicate(id, parentId?)` | 复制子树并生成新 ID，缺省在原父节点末尾 |
@@ -23,6 +24,8 @@
 | `ui.scripts.set(kind, source)` | 替换一份源码，和节点变更一起提交 |
 
 属性支持 UDim.new、UDim2.new/fromScale/fromOffset、Vector2.new、Color3.new/fromRGB/fromHex、Enum，以及现有 JSON 属性形式。没有隐式像素与 Scale 换算。
+
+Stud 使用 ImageLabel 的 ScaleType=Enum.ScaleType.Tile、TileSize=UDim2.fromOffset(27,27)。previewImage.dataUrl 只接受已在本地取得的 PNG/JPEG/WebP/GIF base64 Data URL，不传远程链接或文件路径；Image 仍单独保存真实 Roblox 资源 ID。制作 VM 本身不能读取文件或下载资源。
 
 `find` 与 MCP 查询共同采用名称 exact/contains、className、parentId、recursive、offset、limit。默认递归，默认 50 条，最多 200 条。过滤条件取交集。parentId 指定时不包含父节点自身；recursive=false 只查直属子节点。
 

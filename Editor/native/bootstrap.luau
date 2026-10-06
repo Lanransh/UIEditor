@@ -165,14 +165,37 @@ local function makeProxy(id)
     return proxy
 end
 local Loader = {}
+-- 校验固定路径，避免空段或斜杠被静默解析为其他节点。
+-- @param path string 点分隔路径
+local function validatePath(path)
+    assert(type(path) == "string" and #path > 0, "Expected non-empty node path")
+    assert(not string.find(path, "/", 1, true), "UI node paths use '.'; '/' is not supported")
+    assert(string.sub(path, 1, 1) ~= "." and string.sub(path, -1) ~= "."
+        and not string.find(path, "..", 1, true), "Invalid UI node path: " .. path)
+end
+
+-- 从指定节点逐层查找，只接受点分隔路径。
+-- @param parent Instance 查找根节点
+-- @param path string 相对节点路径，不包含根节点名称
+-- @return Instance 必需的目标节点，缺失或同级重名时抛错
 function Loader:Here(parent, path)
-    assert(type(path) == "string", "Expected node path")
-    for name in string.gmatch(path, "[^/]+") do parent = assert(child(parent, name), "Missing UI node: " .. path) end
+    validatePath(path)
+    for name in string.gmatch(path, "[^.]+") do
+        parent = assert(child(parent, name), "Missing UI node: " .. path)
+    end
     return parent
 end
-function Loader:PlayerGui(name)
-    assert(nodes[root].name == name, "Missing ScreenGui: " .. tostring(name))
-    return proxies[root]
+-- 从模拟 PlayerGui 查找当前界面，可继续查找其子节点。
+-- @param path string 以当前 ScreenGui 名称开头的点分隔路径
+-- @return Instance 目标界面或子节点；只包含当前文档，不模拟其他界面
+function Loader:PlayerGui(path)
+    validatePath(path)
+    local name, relativePath = string.match(path, "^([^.]+)%.?(.*)$")
+    assert(nodes[root].name == name, "Missing ScreenGui: " .. name)
+    if relativePath == "" then
+        return proxies[root]
+    end
+    return self:Here(proxies[root], relativePath)
 end
 FX.Loader = table.freeze(Loader)
 function Base:Ctor(owner)

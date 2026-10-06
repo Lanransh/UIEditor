@@ -1,0 +1,3 @@
+interface:
+  display_name: "Roblox Stud UI"
+  short_description: "在 UIEditor 中用可编辑节点制作 Stud 游戏界面"

@@ -92,12 +92,13 @@ scripts 只保存交互和测试接入两份类源码，配置和状态由接入
 
 Image 保存 Roblox 资源标识；节点的 previewImage 分别保存本地文件名和图片 Data URL。
 预览图嵌入文档，移动工程不依赖原图片路径；支持 PNG/JPEG/WebP/GIF，单张最多 10 MiB。
-图片只能通过主进程选择并读取，不自动上传或访问远程资源。缺失预览图显示占位提示。
+图片可通过主进程选择并读取，或通过制作 API 附加已经取得的图片 Data URL，不自动上传或访问远程资源。缺失预览图显示占位提示。
 
 编辑模式的按钮和输入框只用于选择；运行模式的 TextButton、ImageButton 支持 Activated，输入框仍不提供运行交互。字体使用本机替代字体，TextScaled
 使用静态估算，GroupColor3 使用浏览器混合近似展示。ImageColor3 只乘入实际图片
-像素，保留透明度和 Fit 留白；Tile 按 Roblox 默认 TileSize（1×1 Scale）展示，
-当前不提供自定义 TileSize。UIStroke 在文本节点上描画文字，在其他节点上画外边框。
+像素，保留透明度和 Fit 留白；TileSize 支持 Scale/Offset，默认 1×1 Scale，
+平铺从左上角开始。旧图片节点缺少 TileSize 时加载补入默认值，文件版本保持 3。
+GothamBold 在本机以 Segoe UI 粗体替代。UIStroke 在文本节点上描画文字，在其他节点上画外边框。
 UIGradient 分别插值颜色和透明度，并与背景、文字或图片的颜色及透明度相乘；
 旋转渐变的中心线控制点落在节点边界上。
 ScrollingFrame 通过 CanvasSize 与 CanvasPosition 展示静态滚动区域，位置按原生规则

@@ -5,6 +5,21 @@ import { allNodes, dim, dim2, findNode, findParent } from '../src/shared/uiDocum
 import { deleteNode, documentCommand, duplicateNode, insertNode, moveNode, nodeDropParent, pasteNode, reparentNode, reorderNode } from '../src/editor/commands';
 import { CommandHistory } from '../src/history/CommandHistory';
 
+test('older image documents gain default TileSize without changing their source', () => {
+  const document = strategy.createDocument();
+  const image = strategy.createNode('ImageLabel');
+  document.root.children.push(image);
+  delete image.properties.TileSize;
+  const saved = JSON.stringify(document);
+  const loaded = strategy.validate(JSON.parse(saved));
+  assert.deepEqual(loaded.root.children[0].properties.TileSize, { x: dim(1, 0), y: dim(1, 0) });
+  assert.equal(JSON.stringify(document), saved);
+  loaded.root.children[0].properties.TileSize = dim2(27, 27);
+  assert.deepEqual(strategy.validate(JSON.parse(JSON.stringify(loaded))), loaded);
+  loaded.root.children[0].properties.TileSize = 27;
+  assert.throws(() => strategy.validate(loaded));
+});
+
 test('树拖拽支持前后排序、移入和跨父级移动，整个子树一次撤销重做', () => {
   const initial = strategy.createDocument(), a = strategy.createNode('Frame'), b = strategy.createNode('Frame'), c = strategy.createNode('TextLabel');
   a.children.push(c);

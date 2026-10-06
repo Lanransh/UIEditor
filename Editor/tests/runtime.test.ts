@@ -98,6 +98,38 @@ end`);
   session.abort();
 });
 
+test('PlayerGui and Here resolve dot paths and reject slash or malformed paths', async () => {
+  const document = rewardExample();
+  const panel = robloxStrategy.createNode('Frame');
+  panel.name = 'Panel';
+  const button = document.root.children.pop()!;
+  panel.children.push(button);
+  document.root.children.push(panel);
+  document.scripts.source = document.scripts.source.replace('"ClaimButton"', '"Panel.ClaimButton"');
+  for (const lookup of ['FXLoader:Here(root, "Panel.ClaimButton")', 'FXLoader:PlayerGui("OnlineRewardUI.Panel.ClaimButton")']) {
+    const variant = structuredClone(document);
+    variant.scripts.source = variant.scripts.source.replace('FXLoader:Here(root, "Panel.ClaimButton")', lookup);
+    const { session, frame } = await LuauSession.start(directory, variant);
+    try {
+      const claimed = await session.command({ type: 'event', node: button.id });
+      assert.equal(findNode(claimed.document.root, button.id)?.properties.Text, 'Claimed');
+      assert.equal(findNode(frame.document.root, button.id)?.properties.Text, 'Ready');
+    } finally { await session.stop(); }
+  }
+  for (const path of ['Panel/ClaimButton', '', '.Panel', 'Panel.', 'Panel..ClaimButton']) {
+    const variant = structuredClone(document);
+    variant.scripts.source = variant.scripts.source.replace('"Panel.ClaimButton"', JSON.stringify(path));
+    await assert.rejects(LuauSession.start(directory, variant), /not supported|non-empty|Invalid UI node path/);
+  }
+  for (const path of ['OnlineRewardUI/Panel/ClaimButton', 'OtherUI.Panel', 'OnlineRewardUI.Panel.Missing']) {
+    const variant = structuredClone(document);
+    variant.scripts.source = variant.scripts.source.replace('FXLoader:Here(root, "Panel.ClaimButton")', `FXLoader:PlayerGui(${JSON.stringify(path)})`);
+    await assert.rejects(LuauSession.start(directory, variant), /not supported|Missing ScreenGui|Missing UI node/);
+  }
+  document.scripts.source = document.scripts.source.replace('Panel.ClaimButton', 'Panel.Missing');
+  await assert.rejects(LuauSession.start(directory, document), /Missing UI node: Panel.Missing/);
+});
+
 test('node paths, missing nodes and duplicate sibling names give explicit feedback', async () => {
   const document = rewardExample();
   document.root.children[2].name = 'Changed';

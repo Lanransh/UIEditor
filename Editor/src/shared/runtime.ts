@@ -25,8 +25,8 @@ export function validateJSON(value: unknown, depth = 0): JSONValue {
 }
 function luauData(value: JSONValue): string {
   if (value === null) return 'JSONNull';
-  if (Array.isArray(value)) return `{${value.map(luauData).join(',')}}`;
-  if (typeof value === 'object') return `{${Object.entries(value).map(([key, item]) => `[${luauData(key)}]=${luauData(item)}`).join(',')}}`;
+  if (Array.isArray(value)) return `{ ${value.map(luauData).join(', ')} }`;
+  if (typeof value === 'object') return `{ ${Object.entries(value).map(([key, item]) => `[${luauData(key)}] = ${luauData(item)}`).join(', ')} }`;
   return JSON.stringify(value).replace(/\\(?:u([0-9a-f]{4})|.)/gi, (escaped, code) => code ? `\\u{${code}}` : escaped);
 }
 export function validateScripts(value: unknown, legacy = false): UIScripts {

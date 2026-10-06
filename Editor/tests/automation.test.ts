@@ -14,6 +14,29 @@ import { startBridge } from '../electron/automation-bridge';
 import { getCapabilities } from '../src/editor/automationCapabilities';
 
 const directory = resolve('native-bin');
+test('authoring embeds and clears preview images with tiled properties; invalid images roll back', async () => {
+  const before = robloxStrategy.createDocument('Stud');
+  const preview = { name: 'StudTile.png', dataUrl: 'data:image/png;base64,aGVsbG8=' };
+  const result = await executeCode(robloxCodeAdapter, directory, before, 'luau', `
+local image = ui.nodes.create("ImageLabel", {name="StudTextureImg", previewImage={name="${preview.name}",dataUrl="${preview.dataUrl}"}, properties={ScaleType=Enum.ScaleType.Tile,TileSize=UDim2.fromOffset(27,27)}})
+assert(ui.nodes.get(image.id).previewImage.name == "StudTile.png")
+local copy = ui.nodes.duplicate(image.id)
+ui.nodes.setPreviewImage(copy.id, nil)
+`);
+  assert.deepEqual(result.document.root.children[0].previewImage, preview);
+  assert.deepEqual(result.document.root.children[0].properties.TileSize, { x: { scale: 0, offset: 27 }, y: { scale: 0, offset: 27 } });
+  assert.equal(result.document.root.children[1].previewImage, undefined);
+  const history = new CommandHistory<typeof before>();
+  const after = history.execute(documentCommand('Stud', () => result.document, robloxStrategy), before);
+  assert.deepEqual(history.undo(after), before);
+  assert.deepEqual(history.redo(before), after);
+  for (const source of [
+    'local n=ui.nodes.create("Frame");ui.nodes.setPreviewImage(n.id,{name="a",dataUrl="data:image/png;base64,YQ=="})',
+    'local n=ui.nodes.create("ImageLabel");ui.nodes.setPreviewImage(n.id,{name="a",dataUrl="https://example.com/a.png"})',
+    'local n=ui.nodes.create("ImageLabel");ui.nodes.setPreviewImage(n.id,{name="a",dataUrl="data:image/png;base64,YQ==",extra=true})',
+  ]) await assert.rejects(executeCode(robloxCodeAdapter, directory, before, 'luau', source));
+  assert.equal(before.root.children.length, 0);
+});
 test('authoring creates nodes and source in one undoable snapshot; values and IDs survive redo', async () => {
   const before = robloxStrategy.createDocument('Test');
   const result = await executeCode(robloxCodeAdapter, directory, before, 'luau', `

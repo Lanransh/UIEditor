@@ -7,12 +7,12 @@ export interface AutomationCapabilities {
 export const robloxAutomation: AutomationCapabilities = {
   authoring: {
     language: 'luau', version: '0.694', sourceLimitBytes: 262144, memoryMiB: 64, executionMs: 250,
-    api: ['ui.projectType', 'ui.capabilities', 'ui.root.id', 'ui.nodes.get(id)', 'ui.nodes.children(id)', 'ui.nodes.find({name,match,className,parentId,recursive,offset,limit})', 'ui.nodes.create(className,{parentId,name,properties})', 'ui.nodes.setProperties(id,properties)', 'ui.nodes.rename(id,name)', 'ui.nodes.reparent(id,parentId)', 'ui.nodes.duplicate(id,parentId?)', 'ui.nodes.remove(id)', 'ui.scripts.get("source"|"integration")', 'ui.scripts.set("source"|"integration",source)', 'print/warn'],
+    api: ['ui.projectType', 'ui.capabilities', 'ui.root.id', 'ui.nodes.get(id)', 'ui.nodes.children(id)', 'ui.nodes.find({name,match,className,parentId,recursive,offset,limit})', 'ui.nodes.create(className,{parentId,name,properties,previewImage?})', 'ui.nodes.setProperties(id,properties)', 'ui.nodes.setPreviewImage(id,{name,dataUrl}|nil)', 'ui.nodes.rename(id,name)', 'ui.nodes.reparent(id,parentId)', 'ui.nodes.duplicate(id,parentId?)', 'ui.nodes.remove(id)', 'ui.scripts.get("source"|"integration")', 'ui.scripts.set("source"|"integration",source)', 'print/warn'],
     values: ['UDim', 'UDim2', 'Vector2', 'Color3', 'Enum'],
   },
   runtime: {
     language: 'luau', version: '0.694', actions: ['run', 'stop', 'reset'], event: 'Activated', clickableNodeTypes: ['TextButton', 'ImageButton'], scripts: ['source', 'integration'],
-    api: ['_G.FX.Class', 'FX.Loader:Here(root,path)', 'FCUICompClass', 'OnReady', 'Render', 'GetUIConfig', 'GetUIState', 'RefreshUI', 'OnUIAction', 'EmitUIAction', 'TrackConnection', 'SetButtonEnabled'],
+    api: ['_G.FX.Class', 'FX.Loader:PlayerGui("ScreenGui.Child")', 'FX.Loader:Here(root,"Child.Descendant")', 'FCUICompClass', 'OnReady', 'Render', 'GetUIConfig', 'GetUIState', 'RefreshUI', 'OnUIAction', 'EmitUIAction', 'TrackConnection', 'SetButtonEnabled'],
   },
 };
 export function getCapabilities(strategy: ProjectStrategy) {

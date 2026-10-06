@@ -35,35 +35,49 @@ export interface UIScripts { source: string; integration: string }
 export function emptyScripts(name = 'Untitled'): UIScripts {
   const classes = scriptClassNames(name);
   return { source: `local FX = _G.FX
+local FXLoader = FX.Loader
 local ${classes.source} = FX.Class("${classes.source}", "FCUICompClass")
 
+-- 先用 FXLoader:PlayerGui("实际ScreenGui名") 获取界面，再用 Here(root, "Panel.Button") 查子节点。
 function ${classes.source}:OnReady()
 end
 
+-- 根据接入类数据刷新展示，不在这里创建视觉效果。
+-- @param state table 接入类提供的显示状态
 function ${classes.source}:Render(state)
 end
 
 return ${classes.source}`, integration: `local FX = _G.FX
 local ${classes.integration} = FX.Class("${classes.integration}", "${classes.source}")
 
+-- 初始化本次运行的模拟数据。
+-- @param owner table 编辑器提供的组件宿主，传递给父类
 function ${classes.integration}:Ctor(owner)
     ${classes.integration}.Super.Ctor(self, owner)
     self.Config = {}
     self.State = {}
 end
 
+-- 提供展示配置，业务标识与文案分开保存。
+-- @return table 界面配置
 function ${classes.integration}:GetUIConfig()
     return self.Config
 end
 
+-- 提供模拟状态，不能作为真实发奖依据。
+-- @return table 当前显示状态
 function ${classes.integration}:GetUIState()
     return self.State
 end
 
+-- 数据就绪后触发首帧展示。
 function ${classes.integration}:BindUIData()
     self:RefreshUI()
 end
 
+-- 处理展示层动作；只更新模拟数据，再调用 RefreshUI。
+-- @param action string 动作名称
+-- @param payload table 动作必要参数，例如稳定奖励 ID
 function ${classes.integration}:OnUIAction(action, payload)
 end
 

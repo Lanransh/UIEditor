@@ -79,6 +79,12 @@ function nodes.setProperties(id, properties)
     end
     changed()
 end
+function nodes.setPreviewImage(id, previewImage)
+    local node = required(id)
+    assert(node.className == "ImageLabel" or node.className == "ImageButton", "Preview images require an image node")
+    node.previewImage = previewImage and clone(previewImage) or nil
+    changed()
+end
 function nodes.create(className, options)
     options = options or {}
     local definition = assert(definitions[className], "Unsupported node type")
@@ -88,6 +94,7 @@ function nodes.create(className, options)
     for key, property in pairs(definition.properties) do node.properties[key] = clone(property.value) end
     table.insert(parent.children, node)
     if options.properties then nodes.setProperties(node.id, options.properties) end
+    if options.previewImage then nodes.setPreviewImage(node.id, options.previewImage) end
     changed()
     return snapshot(node)
 end

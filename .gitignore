@@ -11,6 +11,9 @@ ToolRuntime/AgentWorkspace/UIEditor_Roblox/*
 !ToolRuntime/AgentWorkspace/UIEditor_Roblox/README.md
 !ToolRuntime/AgentWorkspace/UIEditor_Roblox/references/
 !ToolRuntime/AgentWorkspace/UIEditor_Roblox/examples/
+!ToolRuntime/AgentWorkspace/UIEditor_Roblox/.agents/
+!ToolRuntime/AgentWorkspace/UIEditor_Roblox/assets/
+!ToolRuntime/AgentWorkspace/UIEditor_Roblox/Game-DESIGN.md
 !ToolRuntime/README.md
 Editor/.cache/
 Editor/native-bin/

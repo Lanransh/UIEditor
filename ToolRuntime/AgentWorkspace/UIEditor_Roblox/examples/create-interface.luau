@@ -1,4 +1,5 @@
 -- On a new OnlineReward document. Use current session/revision in uie.code.execute.
+ui.nodes.rename(ui.root.id, "OnlineRewardUI")
 for index, spec in ipairs({
     { "TextLabel", "StatusText" },
     { "TextButton", "ClaimButton" },
