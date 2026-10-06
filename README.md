@@ -44,6 +44,7 @@ npm run dev
 | `npm run build` | 检查并生成界面和 Electron 代码 |
 | `npm start` | 启动已构建代码 |
 | `npm run test:smoke` | 构建并启动真实 Electron，验证 Hub、节点编辑、画布拖动、保存重开和关闭提示 |
+| `npm run test:display` | 使用源码启动隔离显示样例，检查节点渲染与字号约束并保存截图；Studio 对比另行执行，见[显示测试记录](Editor/tests/roblox-display-report.md) |
 | `npm run test:packaged` | 启动已打包 exe，检查 Hub、IPC、运行目录和沙箱配置 |
 | `npm run package` | 构建 Windows x64 应用到 ToolRuntime |
 

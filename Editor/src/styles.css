@@ -144,6 +144,8 @@ svg { flex-shrink: 0; }
 .preview-image-missing small { font-size: 12px; }
 .node-selection { position: absolute; inset: 0; outline: 2px solid #168b85; outline-offset: 2px; pointer-events: none; }
 .node-resize { position: absolute; width: 12px; height: 12px; bottom: -6px; right: -6px; padding: 0; border: 2px solid #168b85; background: white; cursor: nwse-resize; pointer-events: auto; }
-.preview-scrollbar { position: absolute; right: 0; top: 0; background: #71818188; pointer-events: none; }
+.preview-scrollbar { position: absolute; pointer-events: none; }
+.preview-scrollbar.vertical { right: 0; }
+.preview-scrollbar.horizontal { bottom: 0; }
 .canvas-hint { position: absolute; bottom: 8px; left: 8px; padding: 4px 8px; border-radius: 4px; background: #ffffffd9; color: var(--muted); font-size: 10px; pointer-events: none; }
 .editor-error { padding: 7px 16px; color: #a44338; background: #fff4f2; border-bottom: 1px solid #edc2bd; font-size: 12px; }

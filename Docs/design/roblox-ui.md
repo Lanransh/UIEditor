@@ -53,6 +53,10 @@ Ctrl+D 直接复制当前节点到同级末尾，Delete 删除当前节点。根
 列表按 LayoutOrder 或名称排序，跳过不可见条目；网格支持换行、方向、单行/列数量
 上限和间距。布局控制的子节点禁止直接编辑位置、旋转或通过画布拖动；网格也禁止
 直接编辑尺寸。兄弟上下移改变文档顺序，LayoutOrder 不相同时按布局排序规则显示。
+网格依据最小尺寸预留跨格区域；尺寸约束超出单元时采用完整边界尺寸，缩放后
+在预留区域中居中，其他条目绕开已占用的格子。
+宽高比约束遵循 Roblox 默认的 `FitWithinMaxSize`，在原始宽高内收敛，不扩大尺寸。
+`UITextSizeConstraint` 仅在 `TextScaled=true` 时约束预览字号。
 
 位置与尺寸使用 UDim2：`{ x: { scale, offset }, y: { scale, offset } }`。
 UDim 为 `{ scale, offset }`，Vector2 为 `{ x, y }`，颜色使用 `#RRGGBB`。
@@ -91,10 +95,18 @@ Image 保存 Roblox 资源标识；节点的 previewImage 分别保存本地文�
 图片只能通过主进程选择并读取，不自动上传或访问远程资源。缺失预览图显示占位提示。
 
 按钮和输入框在画布上只用于选择，不执行交互。字体使用本机替代字体，TextScaled
-使用静态估算，GroupColor3 和 ImageColor3 使用浏览器混合近似展示。UIStroke 首版
-预览为边框，UIGradient 首版预览为背景双关键点渐变。ScrollingFrame 通过 CanvasSize
-与 CanvasPosition 展示静态滚动区域，未实现运行时滚动输入。
+使用静态估算，GroupColor3 使用浏览器混合近似展示。ImageColor3 只乘入实际图片
+像素，保留透明度和 Fit 留白；Tile 按 Roblox 默认 TileSize（1×1 Scale）展示，
+当前不提供自定义 TileSize。UIStroke 在文本节点上描画文字，在其他节点上画外边框。
+UIGradient 分别插值颜色和透明度，并与背景、文字或图片的颜色及透明度相乘；
+旋转渐变的中心线控制点落在节点边界上。
+ScrollingFrame 通过 CanvasSize 与 CanvasPosition 展示静态滚动区域，位置按原生规则
+归整并限制到窗口范围，遵循 ClipsDescendants。横纵滚动条会因对方占用窗口而联动，
+长度、端帽和位置采用默认纹理展示，绘制在子节点下方；未实现运行时滚动输入。
 这些差异不能作为 Roblox 的精确排版或颜色保证，后续需在 Studio 和设备上验证。
+已通过 Studio 对比修复上述渐变、描边、图片、滚动条与网格组合差异；本轮未处理
+字体排版、自动字号和 CanvasGroup 复杂混色，也不宣称所有组合逐像素一致。测试范围和证据见
+[显示对比测试记录](../../Editor/tests/roblox-display-report.md)。
 
 ## 配置数据
 

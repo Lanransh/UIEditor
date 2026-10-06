@@ -7,8 +7,9 @@ const align = (value: unknown) => value === 'Center' ? .5 : value === 'Right' ||
 export function constrainedSize(node: UINode, width: number, height: number) {
   const ratio = auxiliary(node, 'UIAspectRatioConstraint')?.properties;
   if (ratio) {
-    if (ratio.DominantAxis === 'Height') width = height * (ratio.AspectRatio as number);
-    else height = width / (ratio.AspectRatio as number);
+    // Roblox's default AspectType is FitWithinMaxSize.
+    width = Math.min(width, height * (ratio.AspectRatio as number));
+    height = width / (ratio.AspectRatio as number);
   }
   const limit = auxiliary(node, 'UISizeConstraint')?.properties;
   if (limit) {
@@ -53,14 +54,41 @@ export function layoutChildren(parent: UINode, width: number, height: number): M
     const gx = pixels(spacing.x, innerWidth), gy = pixels(spacing.y, innerHeight);
     const fit = Math.max(1, Math.floor(((horizontal ? innerWidth : innerHeight) + (horizontal ? gx : gy)) / Math.max(1, (horizontal ? cw + gx : ch + gy))));
     const max = p.FillDirectionMaxCells as number;
-    const count = Math.min(max || fit, fit, Math.max(1, visible.length));
-    const rows = horizontal ? Math.ceil(visible.length / count) : count;
-    const cols = horizontal ? count : Math.ceil(visible.length / count);
+    const cells = visible.map(child => {
+      const limit = auxiliary(child, 'UISizeConstraint')?.properties;
+      const min = limit?.MinSize as Vector2 | undefined, max = limit?.MaxSize as Vector2 | undefined;
+      // Grid constraints replace the whole cell size with the violating bound.
+      const size = min && (min.x > cw || min.y > ch) ? { width: min.x, height: min.y }
+        : max && (max.x < cw || max.y < ch) ? { width: max.x, height: max.y } : { width: cw, height: ch };
+      const cols = Math.max(1, Math.ceil(((min?.x ?? 0) + gx) / Math.max(1, cw + gx)));
+      const rows = Math.max(1, Math.ceil(((min?.y ?? 0) + gy) / Math.max(1, ch + gy)));
+      return { child, size: constrainedSize(child, size.width, size.height), cols, rows, col: 0, row: 0 };
+    });
+    const count = Math.max(Math.min(max || fit, fit, Math.max(1, visible.length)), ...cells.map(c => horizontal ? c.cols : c.rows));
+    let major = 0, minor = 0;
+    const placed: typeof cells = [];
+    for (const cell of cells) {
+      const span = horizontal ? cell.cols : cell.rows;
+      while (true) {
+        if (major + span > count) { major = 0; minor++; }
+        cell.col = horizontal ? major : minor; cell.row = horizontal ? minor : major;
+        const blocked = placed.find(c => cell.col < c.col + c.cols && cell.col + cell.cols > c.col && cell.row < c.row + c.rows && cell.row + cell.rows > c.row);
+        if (!blocked) break;
+        if ((horizontal ? blocked.cols : blocked.rows) === count) { major = 0; minor = (horizontal ? blocked.row + blocked.rows : blocked.col + blocked.cols); }
+        else major = horizontal ? blocked.col + blocked.cols : blocked.row + blocked.rows;
+      }
+      placed.push(cell); major += span;
+    }
+    const rows = Math.max(0, ...cells.map(c => c.row + c.rows));
+    const cols = Math.max(0, ...cells.map(c => c.col + c.cols));
     const originX = left + (innerWidth - cols * cw - Math.max(0, cols - 1) * gx) * align(p.HorizontalAlignment);
     const originY = top + (innerHeight - rows * ch - Math.max(0, rows - 1) * gy) * align(p.VerticalAlignment);
-    visible.forEach((child, i) => {
-      const rect = result.get(child.id)!;
-      Object.assign(rect, constrainedSize(child, cw, ch), { x: originX + (horizontal ? i % count : Math.floor(i / count)) * (cw + gx), y: originY + (horizontal ? Math.floor(i / count) : i % count) * (ch + gy) });
+    cells.forEach(cell => {
+      const rect = result.get(cell.child.id)!;
+      Object.assign(rect, cell.size, {
+        x: originX + cell.col * (cw + gx) + (cell.cols * cw + (cell.cols - 1) * gx - cell.size.width * rect.scale) / 2,
+        y: originY + cell.row * (ch + gy) + (cell.rows * ch + (cell.rows - 1) * gy - cell.size.height * rect.scale) / 2,
+      });
     });
   }
   return result;

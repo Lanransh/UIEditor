@@ -4,8 +4,11 @@ import type { DocumentEditor } from './useDocumentEditor';
 import type { PreviewRect } from './strategy';
 import { auxiliary, isObject, layoutComponent } from './roblox';
 import { pixels } from './layout';
+import { channels, gradientStyle, imageGradient, rgba, scrollGeometry } from './appearance';
+import scrollTop from '../assets/roblox-scrollbars/scroll-top.png';
+import scrollMiddle from '../assets/roblox-scrollbars/scroll-middle.png';
+import scrollBottom from '../assets/roblox-scrollbars/scroll-bottom.png';
 
-const rgba = (color: string, transparency: number) => `${color}${Math.round(255 * (1 - transparency)).toString(16).padStart(2, '0')}`;
 interface Gesture {
   pointerId: number; x: number; y: number; kind: 'pan' | 'move' | 'resize';
   pan: { x: number; y: number }; node?: UINode; document: UIDocument; scale: number; rotation: number;
@@ -97,6 +100,7 @@ export function DocumentCanvas({ editor }: { editor: DocumentEditor }) {
     const corner = auxiliary(node, 'UICorner')?.properties.CornerRadius as UDim | undefined;
     const stroke = auxiliary(node, 'UIStroke')?.properties;
     const gradient = auxiliary(node, 'UIGradient')?.properties;
+    const textNode = node.className.startsWith('Text');
     const selected = editor.selected.id === node.id || (editor.strategy.nodes[editor.selected.className].category === 'component' && findParent(shown.root, editor.selected.id)?.id === node.id);
     const resizeLocked = layoutComponent(findParent(shown.root, node.id)!)?.className === 'UIGridLayout';
     const radius = corner ? Math.max(0, pixels(corner, Math.min(rect.width, rect.height))) : 0;
@@ -104,28 +108,43 @@ export function DocumentCanvas({ editor }: { editor: DocumentEditor }) {
       position: 'absolute', left: rect.x, top: rect.y, width: rect.width, height: rect.height,
       transform: `translate(${rect.width * rect.scale / 2}px, ${rect.height * rect.scale / 2}px) rotate(${p.Rotation}deg) translate(${-rect.width * rect.scale / 2}px, ${-rect.height * rect.scale / 2}px) scale(${rect.scale})`, transformOrigin: '0 0',
       zIndex: p.ZIndex as number, borderRadius: radius,
-      backgroundColor: rgba(p.BackgroundColor3 as string, p.BackgroundTransparency as number),
-      outline: stroke?.Enabled ? `${stroke.Thickness}px solid ${rgba(stroke.Color as string, stroke.Transparency as number)}` : undefined,
-      outlineOffset: stroke?.Enabled ? -(stroke.Thickness as number) / 2 : undefined,
+      backgroundColor: gradient?.Enabled ? 'transparent' : rgba(p.BackgroundColor3 as string, p.BackgroundTransparency as number),
+      outline: stroke?.Enabled && !textNode ? `${stroke.Thickness}px solid ${rgba(stroke.Color as string, stroke.Transparency as number)}` : undefined,
       opacity: node.className === 'CanvasGroup' ? 1 - (p.GroupTransparency as number) : 1,
     };
-    if (gradient?.Enabled) style.backgroundImage = `linear-gradient(${90 + (gradient.Rotation as number)}deg, ${rgba(gradient.ColorStart as string, gradient.TransparencyStart as number)}, ${rgba(gradient.ColorEnd as string, gradient.TransparencyEnd as number)})`;
     const scroll = node.className === 'ScrollingFrame';
     const canvas = p.CanvasSize as UDim2 | undefined;
     const contentWidth = scroll ? Math.max(rect.width, pixels(canvas!.x, rect.width)) : rect.width;
     const contentHeight = scroll ? Math.max(rect.height, pixels(canvas!.y, rect.height)) : rect.height;
+    const scrollPosition = scroll ? p.CanvasPosition as Vector2 : { x: 0, y: 0 };
+    const scrollbar = scrollGeometry(rect.width, rect.height, contentWidth, contentHeight, scroll ? p.ScrollBarThickness as number : 0, scrollPosition.x, scrollPosition.y);
     const childRects = editor.strategy.layout(node, contentWidth, contentHeight);
-    const textSize = auxiliary(node, 'UITextSizeConstraint')?.properties;
+    const textSize = p.TextScaled ? auxiliary(node, 'UITextSizeConstraint')?.properties : undefined;
     const fontSize = Math.min(textSize ? textSize.MaxTextSize as number : 100, Math.max(textSize ? textSize.MinTextSize as number : 1, p.TextScaled ? Math.min(rect.height * .7, rect.width / Math.max(1, String(p.Text).length) * 1.5) : p.TextSize as number));
-    const contentStyle: CSSProperties = { position: 'absolute', inset: 0, overflow: scroll || p.ClipsDescendants || node.className === 'CanvasGroup' ? 'hidden' : 'visible', borderRadius: radius };
+    const contentStyle: CSSProperties = { position: 'absolute', inset: 0, overflow: p.ClipsDescendants || node.className === 'CanvasGroup' ? 'hidden' : 'visible', borderRadius: radius };
+    const textStyle: CSSProperties = { fontSize, fontFamily: p.Font === 'Arial' ? 'Arial, sans-serif' : p.Font === 'Gotham' ? 'Segoe UI, sans-serif' : 'Segoe UI, Microsoft YaHei, sans-serif', whiteSpace: p.TextWrapped ? 'pre-wrap' : 'pre', textAlign: String(p.TextXAlignment).toLowerCase() as CSSProperties['textAlign'], justifyContent: p.TextYAlignment === 'Top' ? 'flex-start' : p.TextYAlignment === 'Bottom' ? 'flex-end' : 'center' };
+    const text = (p.Text as string) || (node.className === 'TextBox' ? p.PlaceholderText as string : '');
+    const imageFilterId = `image-${node.id}`;
+    const tint = node.className.startsWith('Image') ? channels(p.ImageColor3 as string) : [1, 1, 1];
+    const thickness = scroll ? p.ScrollBarThickness as number : 0;
+    const scrollTexture = (length: number, horizontal = false) => <div style={{ position: 'absolute', width: thickness, height: length, top: horizontal ? thickness : 0, transform: horizontal ? 'rotate(-90deg)' : undefined, transformOrigin: '0 0', backgroundImage: `url("${scrollTop}"), url("${scrollBottom}"), url("${scrollMiddle}")`, backgroundSize: `100% ${thickness}px, 100% ${thickness}px, 100% ${Math.max(0, length - 2 * thickness)}px`, backgroundPosition: 'top, bottom, center', backgroundRepeat: 'no-repeat' }} />;
     return <div key={node.id} data-node-id={node.id} data-class-name={node.className} className="preview-node" style={style} onPointerDown={event => start(event, space || event.button === 1 ? 'pan' : 'move', space || event.button === 1 ? undefined : node)}>
       <div style={contentStyle}>
-        {node.className.startsWith('Text') && <div className="preview-text" style={{ color: rgba(p.TextColor3 as string, p.TextTransparency as number), fontSize, fontFamily: p.Font === 'Arial' ? 'Arial, sans-serif' : p.Font === 'Gotham' ? 'Segoe UI, sans-serif' : 'Segoe UI, Microsoft YaHei, sans-serif', whiteSpace: p.TextWrapped ? 'pre-wrap' : 'pre', textAlign: String(p.TextXAlignment).toLowerCase() as CSSProperties['textAlign'], justifyContent: p.TextYAlignment === 'Top' ? 'flex-start' : p.TextYAlignment === 'Bottom' ? 'flex-end' : 'center' }}>{(p.Text as string) || (node.className === 'TextBox' ? p.PlaceholderText as string : '')}</div>}
-        {node.className.startsWith('Image') && (node.previewImage ? <div className="preview-image" style={{ opacity: 1 - (p.ImageTransparency as number), backgroundImage: `url("${node.previewImage.dataUrl}")`, backgroundSize: p.ScaleType === 'Tile' ? 'auto' : p.ScaleType === 'Crop' ? 'cover' : p.ScaleType === 'Stretch' ? '100% 100%' : 'contain', backgroundRepeat: p.ScaleType === 'Tile' ? 'repeat' : 'no-repeat' }}><div style={{ position: 'absolute', inset: 0, backgroundColor: p.ImageColor3 as string, mixBlendMode: 'multiply' }} /></div> : <div className="preview-image-missing">▧<small>缺少预览图片</small></div>)}
-        <div style={{ position: 'absolute', width: contentWidth, height: contentHeight, left: scroll ? -(p.CanvasPosition as Vector2).x : 0, top: scroll ? -(p.CanvasPosition as Vector2).y : 0 }}>
+        {gradient?.Enabled && <div className="preview-background" style={{ position: 'absolute', inset: 0, borderRadius: radius, pointerEvents: 'none', ...gradientStyle(gradient, p.BackgroundColor3 as string, p.BackgroundTransparency as number, rect.width, rect.height) }} />}
+        {textNode && stroke?.Enabled && <div className="preview-text preview-text-stroke" style={{ ...textStyle, color: 'transparent', WebkitTextStroke: `${2 * (stroke.Thickness as number)}px ${rgba(stroke.Color as string, stroke.Transparency as number)}` }}>{text}</div>}
+        {textNode && <div className="preview-text preview-text-fill" style={{ ...textStyle, color: rgba(p.TextColor3 as string, p.TextTransparency as number), ...(gradient?.Enabled ? { ...gradientStyle(gradient, p.TextColor3 as string, p.TextTransparency as number, rect.width, rect.height), backgroundClip: 'text', color: 'transparent' } : {}) }}>{text}</div>}
+        {node.className.startsWith('Image') && (node.previewImage ? <>
+          <svg width="0" height="0" aria-hidden="true" style={{ position: 'absolute' }}><defs><filter id={imageFilterId} colorInterpolationFilters="sRGB" x="0" y="0" width="100%" height="100%">
+            <feColorMatrix type="matrix" values={`${tint[0]} 0 0 0 0 0 ${tint[1]} 0 0 0 0 0 ${tint[2]} 0 0 0 0 0 1 0`} result="tinted" />
+            {gradient?.Enabled && <><feImage href={imageGradient(gradient, rect.width, rect.height)} result="gradient" preserveAspectRatio="none" /><feComposite in="tinted" in2="gradient" operator="arithmetic" k1="1" k2="0" k3="0" k4="0" /></>}
+          </filter></defs></svg>
+          <div className="preview-image" style={{ opacity: 1 - (p.ImageTransparency as number), filter: `url("#${imageFilterId}")`, backgroundImage: `url("${node.previewImage.dataUrl}")`, backgroundSize: ['Tile', 'Stretch'].includes(p.ScaleType as string) ? '100% 100%' : p.ScaleType === 'Crop' ? 'cover' : 'contain', backgroundRepeat: p.ScaleType === 'Tile' ? 'repeat' : 'no-repeat' }} />
+        </> : <div className="preview-image-missing">▧<small>缺少预览图片</small></div>)}
+        {scroll && scrollbar.vertical && <div className="preview-scrollbar vertical" style={{ width: thickness, height: scrollbar.thumbHeight, top: scrollbar.top }}>{scrollTexture(scrollbar.thumbHeight)}</div>}
+        {scroll && scrollbar.horizontal && <div className="preview-scrollbar horizontal" style={{ height: thickness, width: scrollbar.thumbWidth, left: scrollbar.left }}>{scrollTexture(scrollbar.thumbWidth, true)}</div>}
+        <div style={{ position: 'absolute', width: contentWidth, height: contentHeight, left: scroll ? -scrollbar.x : 0, top: scroll ? -scrollbar.y : 0 }}>
           {node.children.filter(isObject).map(child => renderNode(child, childRects.get(child.id)!))}
         </div>
-        {scroll && contentHeight > rect.height && <div className="preview-scrollbar" style={{ width: p.ScrollBarThickness as number, height: Math.max(12, rect.height * rect.height / contentHeight) }} />}
         {node.className === 'CanvasGroup' && p.GroupColor3 !== '#ffffff' && <div style={{ position: 'absolute', inset: 0, backgroundColor: p.GroupColor3 as string, mixBlendMode: 'multiply', pointerEvents: 'none' }} />}
       </div>
       {selected && <div className="node-selection">{!resizeLocked && <button className="node-resize" aria-label="拖动调整尺寸" onPointerDown={event => start(event, 'resize', node)} />}</div>}

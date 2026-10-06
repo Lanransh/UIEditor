@@ -175,3 +175,16 @@ test('网格换行、间距、UIScale 与尺寸约束', () => {
   assert.equal(strategy.layout(parent, 220, 300).get(child.id)?.width, 120);
   assert.equal(strategy.layout(parent, 220, 300).get(child.id)?.scale, 2);
 });
+
+test('宽高比遵循 Studio 默认 FitWithinMaxSize，不放大原始尺寸', () => {
+  const parent = strategy.createNode('Frame'), child = strategy.createNode('Frame'), ratio = strategy.createNode('UIAspectRatioConstraint');
+  child.properties.Size = dim2(240, 140); child.children.push(ratio); parent.children.push(child);
+  for (const axis of ['Width', 'Height']) {
+    ratio.properties.DominantAxis = axis;
+    assert.deepEqual(strategy.layout(parent, 400, 240).get(child.id), { x: 0, y: 0, width: 140, height: 140, scale: 1 });
+    ratio.properties.AspectRatio = .5;
+    assert.equal(strategy.layout(parent, 400, 240).get(child.id)?.width, 70);
+    assert.equal(strategy.layout(parent, 400, 240).get(child.id)?.height, 140);
+    ratio.properties.AspectRatio = 1;
+  }
+});

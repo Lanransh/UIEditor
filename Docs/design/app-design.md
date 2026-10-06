@@ -59,4 +59,5 @@ React 负责 Hub 和工作台显示；主进程负责系统对话框、文件校
 
 Electron 与 TypeScript 用于尽快交付桌面工程管理；本轮接受 Electron 运行时体积，不引入 Rust 构建链。
 ToolRuntime 延续用户参考工程的本地运行方式，需要应用所在目录可写。不增加安装器、签名或自动更新。
-仅支持 Roblox 模式，不验证 Roblox 实际渲染；App 冒烟测试不能代替 Studio 或设备验收。
+仅支持 Roblox 模式。已有静态节点的 Studio 显示对比测试；App 冒烟测试不能代替
+Studio 或设备验收，测试覆盖和已知差异见 [显示对比测试记录](../../Editor/tests/roblox-display-report.md)。
