@@ -1,0 +1,8 @@
+node_modules/
+dist/
+dist-electron/
+ToolRuntime/*
+!ToolRuntime/README.md
+.cache/
+test-results/
+*.log
