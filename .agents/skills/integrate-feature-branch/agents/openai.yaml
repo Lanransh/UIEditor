@@ -1,0 +1,7 @@
+interface:
+  display_name: "Integrate Feature Branch"
+  short_description: "提醒先移交，再自动提交、解决冲突并快进集成到默认分支"
+  default_prompt: "使用 $integrate-feature-branch 将当前 feature 集成到当前仓库的默认分支。"
+
+policy:
+  allow_implicit_invocation: false

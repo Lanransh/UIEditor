@@ -1,0 +1,4 @@
+interface:
+  display_name: "Maintain Design Docs"
+  short_description: "维护当前 App 的设计文档与索引"
+  default_prompt: "Use $maintain-design-docs to update Docs/design for the current App design change."
