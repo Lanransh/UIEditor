@@ -34,6 +34,17 @@ async function clickReady(name) {
   const button = page.getByRole('button', { name, exact: true });
   await button.click();
 }
+async function checkWorkspaceLayout() {
+  const tree = await page.getByRole('complementary', { name: '节点树', exact: true }).boundingBox();
+  const canvas = await page.getByRole('region', { name: '空画布', exact: true }).boundingBox();
+  const properties = await page.getByRole('complementary', { name: '属性面板', exact: true }).boundingBox();
+  const assets = await page.getByRole('region', { name: '资产目录', exact: true }).boundingBox();
+  assert.ok(tree && canvas && properties && assets);
+  assert.ok(tree.x + tree.width <= canvas.x);
+  assert.ok(canvas.x + canvas.width <= properties.x);
+  assert.ok(assets.y >= Math.max(tree.y + tree.height, canvas.y + canvas.height, properties.y + properties.height));
+  assert.equal(assets.width, await page.evaluate(() => innerWidth));
+}
 try {
   await launch();
   await page.getByText('还没有打开过工程，创建你的第一个 Roblox 工程吧。').waitFor();
@@ -45,7 +56,8 @@ try {
   await clickReady('创建工程');
   await page.getByRole('heading', { name: '从这里开始设计' }).waitFor();
   assert.ok(await page.getByText('未选择节点', { exact: true }).isVisible());
-  await page.getByRole('heading', { name: '工程目录', exact: true }).waitFor();
+  await page.getByRole('heading', { name: '资产目录', exact: true }).waitFor();
+  await checkWorkspaceLayout();
   assert.ok(await page.getByRole('button', { name: '编辑', exact: true }).isDisabled());
   assert.equal(await page.getByRole('button', { name: '返回 Hub', exact: true }).isVisible(), false);
   await clickReady('文件');
@@ -58,6 +70,7 @@ try {
   await page.screenshot({ path: join(output, 'workspace.png') });
   await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(900, 600));
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await checkWorkspaceLayout();
   await page.screenshot({ path: join(output, 'workspace-small.png') });
   await clickReady('返回 Hub');
   await page.getByRole('button', { name: '打开 中文 工程', exact: true }).waitFor();

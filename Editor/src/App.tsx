@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { AlertTriangle, ArrowLeft, Clock3, Folder, FolderOpen, FolderPlus, MousePointer2, PanelTop, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Clock3, Folder, FolderOpen, FolderPlus, Layers3, MousePointer2, PanelTop, Trash2 } from 'lucide-react';
 import type { Project, ProjectAPI, RecentProjectView, Result } from './shared/project';
 
 declare global { interface Window { projects: ProjectAPI } }
@@ -110,10 +110,17 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
       <button className="workspace-menu-label" disabled>编辑</button>
     </header>
     <div className="workspace-body">
-      <aside className="panel" aria-label="工程目录"><h2><FolderOpen size={16} />工程目录</h2><div className="project-directory"><div><Folder size={16} /><strong>{project.name}</strong></div><span title={project.path}>{project.path}</span></div></aside>
+      <aside className="panel" aria-label="节点树"><h2><Layers3 size={16} />节点树</h2><div className="panel-empty"><Layers3 size={28} /><p>暂无节点</p><span>当前工程尚未创建界面</span></div></aside>
       <section className="canvas" aria-label="空画布"><div className="canvas-heading">画布<span>空工作台</span></div><div className="canvas-surface"><div className="canvas-empty"><PanelTop size={38} strokeWidth={1.3} /><h1>从这里开始设计</h1><p>工程已就绪</p><span>基础版提供工程管理，界面编辑能力将在后续加入。</span></div></div></section>
-      <aside className="panel properties" aria-label="属性"><h2>属性</h2><div className="panel-empty"><MousePointer2 size={28} /><p>未选择节点</p><span>节点属性将显示在这里</span></div></aside>
+      <aside className="panel properties" aria-label="属性面板"><h2>属性面板</h2><div className="panel-empty"><MousePointer2 size={28} /><p>未选择节点</p><span>节点属性将显示在这里</span></div></aside>
     </div>
+    <section className="panel assets" aria-label="资产目录">
+      <h2><FolderOpen size={16} />资产目录</h2>
+      <div className="assets-body">
+        <div className="project-directory"><div><Folder size={16} /><strong>{project.name}</strong></div><span title={project.path}>{project.path}</span></div>
+        <div className="assets-empty">暂无资产</div>
+      </div>
+    </section>
     <footer className="workspace-status"><span><i />工程已保存</span><span>Roblox · 本地工程</span></footer>
   </main>;
 }
