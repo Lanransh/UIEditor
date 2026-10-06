@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { AlertTriangle, ArrowLeft, Clock3, Folder, FolderOpen, FolderPlus, Layers3, MousePointer2, PanelTop, Trash2 } from 'lucide-react';
 import type { Project, ProjectAPI, RecentProjectView, Result } from './shared/project';
+import { useEditorHistory } from './history/useEditorHistory';
+import { useHistoryShortcuts } from './history/useHistoryShortcuts';
 
 declare global { interface Window { projects: ProjectAPI } }
 
 export function App() {
   const [project, setProject] = useState<Project | null>(null);
   useEffect(() => { document.title = project ? `${project.name} · Roblox — UI 编辑器` : 'UI 编辑器'; }, [project]);
-  return project ? <Workspace project={project} onBack={() => setProject(null)} /> : <ProjectHub onOpen={setProject} />;
+  return project ? <Workspace key={project.path} project={project} onBack={() => setProject(null)} /> : <ProjectHub onOpen={setProject} />;
 }
 
 function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
@@ -94,6 +96,9 @@ function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
 }
 
 function Workspace({ project, onBack }: { project: Project; onBack: () => void }) {
+  // Replace null with the document state when node editing is introduced.
+  const history = useEditorHistory<null>(null);
+  useHistoryShortcuts(history);
   const [assetLibrary, setAssetLibrary] = useState('项目资产');
   const content = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState({ width: window.innerWidth, height: window.innerHeight - 63 });
@@ -162,7 +167,20 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
         <summary role="button">文件</summary>
         <div className="workspace-menu-items"><button onClick={onBack}><ArrowLeft size={15} />返回 Hub</button></div>
       </details>
-      <button className="workspace-menu-label" disabled>编辑</button>
+      <details className="workspace-menu" onBlur={event => {
+        if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
+      }} onKeyDown={event => {
+        if (event.key === 'Escape') {
+          event.currentTarget.open = false;
+          event.currentTarget.querySelector('summary')?.focus();
+        }
+      }}>
+        <summary role="button">编辑</summary>
+        <div className="workspace-menu-items">
+          <button disabled={!history.canUndo} title={history.undoLabel ?? undefined} onClick={history.undo}>撤销 <span>Ctrl+Z</span></button>
+          <button disabled={!history.canRedo} title={history.redoLabel ?? undefined} onClick={history.redo}>重做 <span>Ctrl+Y / Ctrl+Shift+Z</span></button>
+        </div>
+      </details>
     </header>
     <div className="workspace-content" ref={content}>
     <div className="workspace-body">

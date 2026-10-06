@@ -36,7 +36,7 @@ npm run dev
 | 命令 | 用途 |
 | --- | --- |
 | `npm run typecheck` | TypeScript 静态检查 |
-| `npm test` | 工程存储、校验、历史与非覆盖行为测试 |
+| `npm test` | 工程存储、校验、最近记录、命令撤销重做与非覆盖行为测试 |
 | `npm run build` | 检查并生成界面和 Electron 代码 |
 | `npm start` | 启动已构建代码 |
 | `npm run test:smoke` | 构建并启动真实 Electron，验证主要操作和重启恢复 |
@@ -54,5 +54,7 @@ npm run dev
 - `Editor/scripts/`、`Editor/tests/`：开发、打包脚本及自动化验证。
 - `ToolRuntime/`：打包应用和运行数据，详见[运行目录说明](ToolRuntime/README.md)。
 - `Docs/`：[设计文档](Docs/design/README.md)，记录当前行为、数据格式与职责边界。
+
+后续编辑功能通过 `Editor/src/history/useEditorHistory.ts` 接入命令历史，约定见[撤销与重做接入](Docs/design/app-design.md#撤销与重做接入)。当前“编辑”菜单已提供撤销/重做入口，空工作台两项均禁用。
 
 工程数据存放在用户选择的目录。最近记录及 Electron 数据集中保存在 `ToolRuntime/Runtime/`，构建不会清除该目录；应用所在位置需可写。
