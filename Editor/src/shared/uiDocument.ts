@@ -20,37 +20,55 @@ export interface UIDocument {
   scripts: UIScripts;
 }
 export type JSONValue = null | boolean | number | string | JSONValue[] | { [key: string]: JSONValue };
-export const defaultSource = `local FX = _G.FX
-local UI = FX.Class("UIInteraction", "FCUICompClass")
+const reservedNames = new Set('and break do else elseif end false for function if in local nil not or repeat return then true until while continue type export const'.split(' '));
+export function interfaceNameError(name: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name.trim())) return '名称只能包含英文字母、数字和下划线，且不能以数字开头。';
+  if (reservedNames.has(name.trim())) return '名称不能使用 Luau 关键字。';
+  return '';
+}
+export function scriptClassNames(name: string) {
+  const error = interfaceNameError(name);
+  if (error) throw new Error(error);
+  return { source: `C${name.trim()}UIBaseCompClass`, integration: `C${name.trim()}UIPreviewCompClass` };
+}
+export interface UIScripts { source: string; integration: string }
+export function emptyScripts(name = 'Untitled'): UIScripts {
+  const classes = scriptClassNames(name);
+  return { source: `local FX = _G.FX
+local ${classes.source} = FX.Class("${classes.source}", "FCUICompClass")
 
-function UI:OnReady()
-    -- 使用 FX.Loader:Here(self:GetRootNode(), "节点路径") 获取节点。
+function ${classes.source}:OnReady()
 end
 
-function UI:Render(state)
-    -- 根据接入类提供的数据更新界面。
+function ${classes.source}:Render(state)
 end
 
-return UI`;
-export const defaultIntegration = `local FX = _G.FX
-local Preview = FX.Class("UIPreview", "UIInteraction")
+return ${classes.source}`, integration: `local FX = _G.FX
+local ${classes.integration} = FX.Class("${classes.integration}", "${classes.source}")
 
-function Preview:Ctor(owner)
-    Preview.Super.Ctor(self, owner)
+function ${classes.integration}:Ctor(owner)
+    ${classes.integration}.Super.Ctor(self, owner)
     self.Config = {}
     self.State = {}
 end
 
-function Preview:GetUIConfig() return self.Config end
-function Preview:GetUIState() return self.State end
-function Preview:BindUIData() self:RefreshUI() end
-function Preview:OnUIAction(action, payload)
-    print("模拟动作", action)
+function ${classes.integration}:GetUIConfig()
+    return self.Config
 end
 
-return Preview`;
-export interface UIScripts { source: string; integration: string }
-export const emptyScripts = (): UIScripts => ({ source: defaultSource, integration: defaultIntegration });
+function ${classes.integration}:GetUIState()
+    return self.State
+end
+
+function ${classes.integration}:BindUIData()
+    self:RefreshUI()
+end
+
+function ${classes.integration}:OnUIAction(action, payload)
+end
+
+return ${classes.integration}` };
+}
 export const dim = (scale = 0, offset = 0): UDim => ({ scale, offset });
 export const dim2 = (width = 200, height = 100): UDim2 => ({ x: dim(0, width), y: dim(0, height) });
 export function findNode(root: UINode, id: string): UINode | undefined {

@@ -65,7 +65,7 @@ UIGradient 首版使用 ColorStart/ColorEnd 和 TransparencyStart/TransparencyEn
 
 ## 保存与加载
 
-新建默认创建名为“未命名界面”的空 ScreenGui 文档。一个工程可保存多个界面。
+进入工程先显示名为 `Untitled` 的空 ScreenGui 文档。“新建界面”先输入名称，实时显示交互类与接入类名称；取消或未保存提示被取消时保留当前文档。名称按脚本标识符校验，规则见 [交互脚本与接入运行时](ui-runtime.md)。一个工程可保存多个界面。
 默认保存位置为 `UIEditorWorkspace/interfaces/<自定义名称>.rbxui.json`，首次保存和
 另存为使用原生文件对话框，允许选择其他位置。打开界面使用原生文件选择器，或在
 项目资产卡片上右键选择“打开”；卡片名称来自文件名。工程外保存的文件可通过原生

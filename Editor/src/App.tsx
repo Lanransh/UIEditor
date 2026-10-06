@@ -6,6 +6,7 @@ import { NodeTree, NodeProperties } from './editor/NodePanels';
 import { DocumentCanvas } from './editor/Canvas';
 import { DocumentAssets } from './editor/DocumentAssets';
 import { ScriptPanel, RuntimeOutput } from './editor/ScriptPanel';
+import { NewInterfaceDialog } from './editor/NewInterfaceDialog';
 
 declare global { interface Window { projects: ProjectAPI } }
 
@@ -101,6 +102,7 @@ function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
 function Workspace({ project, onBack }: { project: Project; onBack: () => void }) {
   const editor = useDocumentEditor(project, onBack);
   const history = editor.history;
+  const [creatingInterface, setCreatingInterface] = useState(false);
   const [assetLibrary, setAssetLibrary] = useState('项目资产');
   const [bottomTab, setBottomTab] = useState<'assets' | 'output'>('assets');
   const [workspaceTab, setWorkspaceTab] = useState<'design' | 'source' | 'integration'>('design');
@@ -170,7 +172,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
       }}>
         <summary role="button">文件</summary>
         <div className="workspace-menu-items" onClick={event => event.currentTarget.parentElement?.removeAttribute('open')}>
-          <button disabled={editor.busy} onClick={() => void editor.newDocument()}>新建界面</button>
+          <button disabled={editor.busy} onClick={() => setCreatingInterface(true)}>新建界面</button>
           <button disabled={editor.busy} onClick={() => void editor.openDocument()}>打开界面</button>
           <button aria-label="保存" disabled={editor.busy} onClick={() => void editor.save()}>保存 <span>Ctrl+S</span></button>
           <button aria-label="另存为" disabled={editor.busy} onClick={() => void editor.save(true)}>另存为 <span>Ctrl+Shift+S</span></button>
@@ -197,6 +199,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
         <button disabled={!editor.runtime.ready} onClick={() => void editor.runtime.reset()}>重置</button>
       </div>
     </header>
+    {creatingInterface && <NewInterfaceDialog onCancel={() => setCreatingInterface(false)} onCreate={name => { setCreatingInterface(false); void editor.newDocument(name); }} />}
     {editor.error && <div className="editor-error" role="alert">{editor.error}</div>}
     <div className="workspace-content" ref={content}>
     <div className="workspace-body">

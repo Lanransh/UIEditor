@@ -2,7 +2,7 @@
 
 ## 当前能力与边界
 
-中央工作区只有“界面 / 交互脚本 / 接入脚本”三个一级页签。界面页编辑节点和布局；另外两页直接编辑 Luau 源码，没有二级代码、配置、节点引用或模拟状态页签。右侧保留属性面板，底部输出显示打印、警告、动作和错误。
+中央工作区只有“界面 / 交互脚本 / 接入脚本”三个一级页签。界面页编辑节点和布局；另外两页使用本地打包的 Monaco 编辑 Luau 源码，提供关键字、字符串、注释、数字与函数名称高亮，行号、Tab 缩进、自动缩进与括号配对；没有二级代码、配置、节点引用或模拟状态页签。右侧保留属性面板，底部输出显示打印、警告、动作和错误。
 
 交互类负责供游戏复用的展示、事件和通用交互；测试接入类继承交互类，在自身 Ctor 中定义临时配置、初始化并维护状态，在动作处理中模拟业务结果。配置和状态不再作为独立编辑数据保存。App 运行时支持这些类的预览，尚未实现 Roblox 导入导出，也没有真实协议或发奖。
 
@@ -12,11 +12,15 @@
 
 version=3 的 scripts 只包含 source（交互源码）和 integration（接入源码）。两份脚本都返回自己的类，每份最多 256 KiB 字符。允许带语法错误保存，运行前必须编译成功。已有 version=2 文件加载时，将配置、模拟状态和节点引用转为两份类脚本中的代码，后续保存为 version=3；不支持 version=1。
 
-类写法参照游戏仓库中的 FXClass 和 FCUICompClass：
+新建名称去除首尾空格后必须满足 `^[A-Za-z_][A-Za-z0-9_]*$`，并排除 Luau 保留字及编辑器保留的上下文关键字。输入 `OnlineReward` 时，交互类和变量名为 `COnlineRewardUIBaseCompClass`，接入类和变量名为 `COnlineRewardUIPreviewCompClass`。接入类继承对应交互基类；初始 Config/State 为空，函数与条件语句采用四空格缩进的多行写法，不包含示例业务和打印。模板仅在创建时生成；后续修改文档名称不重写源码，加载旧文件也不套用新命名。
+
+键盘及菜单撤销重做统一使用文档历史；程序同步源码不记录额外编辑，切换文档清理编辑器实例与模型。运行时两份源码只读。语法高亮不提供类型诊断，编译错误仍由运行时反馈。
+
+类写法参照游戏仓库中的 FXClass 和 FCUICompClass。下面用 `UI` / `Preview` 作为局部别名说明接口：
 
 ```lua
 local FX = _G.FX
-local UI = FX.Class("UIInteraction", "FCUICompClass")
+local UI = FX.Class("COnlineRewardUIBaseCompClass", "FCUICompClass")
 
 function UI:OnReady()
     self.Button = FX.Loader:Here(self:GetRootNode(), "Panel/Button")
@@ -32,7 +36,7 @@ end
 return UI
 ```
 
-接入源码使用 `FX.Class("UIPreview", "UIInteraction")`，返回 Preview 类。在 `Preview:Ctor(owner)` 中先调用 `Preview.Super.Ctor(self, owner)`，再赋值 `self.Config` 和 `self.State`。接入类可覆盖 GetUIConfig/GetUIState/BindUIData/OnUIAction 和生命周期，也可定义自有方法；覆盖生命周期时用 Super 显式调用父类。临时配置和状态可直接修改；修改后调用 RefreshUI 驱动展示。
+接入源码使用 `FX.Class("COnlineRewardUIPreviewCompClass", "COnlineRewardUIBaseCompClass")`，返回 Preview 类。在 `Preview:Ctor(owner)` 中先调用 `Preview.Super.Ctor(self, owner)`，再赋值 `self.Config` 和 `self.State`。接入类可覆盖 GetUIConfig/GetUIState/BindUIData/OnUIAction 和生命周期，也可定义自有方法；覆盖生命周期时用 Super 显式调用父类。临时配置和状态可直接修改；修改后调用 RefreshUI 驱动展示。
 
 App 提供 FX.Class、FX.GetClass、Super、New、IsA、GetClassName 的兼容实现，只注册预览所需的 FCUICompClass 基类；没有加载完整游戏框架。基类提供 Ctor、Dtor、GetOwner、GetRootNode、TrackConnection、Show、Hide，以及数据与动作接口。游戏参考类原有的网络、组件管理及动画服务不在 App 模拟范围内；数据与动作接口属于当前编辑器的交互合同，实际游戏接入仍需提供对应实现。
 

@@ -171,7 +171,7 @@ try {
   assert.deepEqual(await savedDocument(), saved);
   // Invalid component paste reports an error without entering history.
   await select('UICorner'); await page.keyboard.press('Control+c'); await page.keyboard.press('Control+v');
-  await page.getByRole('alert').waitFor(); await dirty(false);
+  await page.locator('.editor-error[role="alert"]').waitFor(); await dirty(false);
   assert.deepEqual(await savedDocument(), saved);
   // Root shortcuts cannot create siblings or delete the document root.
   await select('ScreenGui'); await page.keyboard.press('Control+v'); await page.keyboard.press('Control+d'); await page.keyboard.press('Delete');
@@ -195,22 +195,22 @@ try {
   // Cancelled open, corrupt open, and failed save preserve the document.
   await dialogs(null); await menu('打开界面'); await select('领取');
   const corrupt = join(root, '坏文件.rbxui.json'); await writeFile(corrupt, '{bad');
-  await dialogs(corrupt); await menu('打开界面'); await page.getByRole('alert').filter({ hasText: 'JSON' }).waitFor();
+  await dialogs(corrupt); await menu('打开界面'); await page.locator('.editor-error[role="alert"]').filter({ hasText: 'JSON' }).waitFor();
   assert.equal(await page.getByLabel('节点名称', { exact: true }).inputValue(), '领取');
   await input('Text', '测试保存失败');
   // Force write failure with an actual directory using a complete extension.
   const blocked = join(root, 'blocked.rbxui.json'); await mkdir(blocked);
-  await dialogs(null, blocked); await menu('另存为'); await page.getByRole('alert').waitFor();
+  await dialogs(null, blocked); await menu('另存为'); await page.locator('.editor-error[role="alert"]').waitFor();
   await dirty(true);
   assert.equal(JSON.parse(await readFile(file, 'utf8')).root.children[0].children[3].properties.Text, '领取奖励');
   await undo(); await dirty(false);
 
   // Unsaved change prompts: cancellation, save cancellation, then save and switch.
-  await input('Text', '领取金币'); await dialogs(null, file, 2); await menu('新建界面');
+  await input('Text', '领取金币'); await dialogs(null, file, 2); await menu('新建界面'); await page.getByRole('textbox', { name: '新界面名称', exact: true }).fill('SecondInterface'); await page.getByRole('button', { name: '创建', exact: true }).click();
   assert.equal(await page.getByLabel('节点名称', { exact: true }).inputValue(), '领取');
   await dialogs(null, null, 0); await menu('另存为'); await dirty(true);
-  await dialogs(null, file, 0); await menu('新建界面');
-  await page.waitForFunction(() => document.querySelector('[aria-label="界面名称"]')?.value === '未命名界面');
+  await dialogs(null, file, 0); await menu('新建界面'); await page.getByRole('textbox', { name: '新界面名称', exact: true }).fill('SecondInterface'); await page.getByRole('button', { name: '创建', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('[aria-label="界面名称"]')?.value === 'SecondInterface');
   await input('界面名称', '第二个界面');
   await dialogs(null, null, 0); await menu('返回 Hub');
   await page.waitForFunction(() => !document.querySelector('fieldset')?.disabled);

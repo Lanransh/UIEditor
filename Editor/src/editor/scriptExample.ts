@@ -2,7 +2,8 @@ import { robloxStrategy } from './roblox';
 import { dim2 } from '../shared/uiDocument';
 
 export function rewardExample() {
-  const document = robloxStrategy.createDocument('在线奖励脚本示例');
+  const document = robloxStrategy.createDocument('OnlineReward');
+  document.name = '在线奖励脚本示例';
   const title = robloxStrategy.createNode('TextLabel');
   const status = robloxStrategy.createNode('TextLabel');
   const button = robloxStrategy.createNode('TextButton');
@@ -22,9 +23,18 @@ function Preview:Ctor(owner)
     self.State = { Status = "Claimable", RemainingSeconds = 0, Pending = false }
 end
 
-function Preview:GetUIConfig() return self.Config end
-function Preview:GetUIState() return self.State end
-function Preview:BindUIData() self:RefreshUI() end
+function Preview:GetUIConfig()
+    return self.Config
+end
+
+function Preview:GetUIState()
+    return self.State
+end
+
+function Preview:BindUIData()
+    self:RefreshUI()
+end
+
 function Preview:OnUIAction(action, payload)
     if action == "ClaimReward" then
         print("模拟领取", payload.RewardId)

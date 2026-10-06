@@ -44,7 +44,9 @@ local UI = FX.Class("UIInteraction", "FCUICompClass")
 UI._References = ${luauData(scripts.references as JSONValue)}
 ${scripts.source}
 function UI:OnReady()
-    if self.OnMount then self:OnMount() end
+    if self.OnMount then
+        self:OnMount()
+    end
 end
 return UI`,
       integration: `local FX = _G.FX

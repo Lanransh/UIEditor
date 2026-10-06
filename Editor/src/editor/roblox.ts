@@ -78,8 +78,8 @@ export class RobloxProjectStrategy implements ProjectStrategy {
     if (!Object.hasOwn(this.nodes, className)) throw new Error(`不支持节点类型 ${className}`);
     return { id: crypto.randomUUID(), className, name: className, properties: Object.fromEntries(Object.entries(definition.properties).map(([key, property]) => [key, structuredClone(property.value)])), children: [] };
   }
-  createDocument(name = '未命名界面'): UIDocument {
-    return { format: 'roblox-ui', version: 3, id: crypto.randomUUID(), name, canvas: { width: 1280, height: 720 }, root: this.createNode('ScreenGui'), scripts: emptyScripts() };
+  createDocument(name = 'Untitled'): UIDocument {
+    return { format: 'roblox-ui', version: 3, id: crypto.randomUUID(), name: name.trim(), canvas: { width: 1280, height: 720 }, root: this.createNode('ScreenGui'), scripts: emptyScripts(name) };
   }
   canParent(parent: UINode, child: UINode, excludingId?: string) {
     if (!Object.hasOwn(this.nodes, parent.className) || !Object.hasOwn(this.nodes, child.className) || child.className === 'ScreenGui' || this.nodes[parent.className].category === 'component') return false;

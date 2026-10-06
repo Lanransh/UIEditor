@@ -44,7 +44,7 @@ test('树拖拽拒绝根、自身、后代、无父级落点和非法组件关�
 });
 
 test('所有支持节点可序列化，Scale/Offset 和节点身份往返保持一致', () => {
-  let document = strategy.createDocument('在线奖励');
+  let document = strategy.createDocument('OnlineReward');
   const frame = strategy.createNode('Frame');
   frame.properties.Position = { x: dim(.5, -120), y: dim(.5, -90) };
   document = insertNode(document, document.root.id, frame, strategy);

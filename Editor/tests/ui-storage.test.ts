@@ -10,7 +10,8 @@ test('工程资产列出界面文件，打开校验文档并拒绝工程外路�
   const project = await mkdtemp(join(tmpdir(), 'ui-assets-'));
   assert.deepEqual(await listDocumentAssets(project), []);
   const path = join(project, 'interfaces', '在线奖励.rbxui.json');
-  const document = robloxStrategy.createDocument('在线奖励');
+  const document = robloxStrategy.createDocument('OnlineReward');
+  document.name = '在线奖励';
   await writeDocument(path, document);
   await writeFile(join(project, 'interfaces', '说明.txt'), '说明');
   await mkdir(join(project, 'interfaces', '目录.rbxui.json'));
@@ -27,7 +28,8 @@ test('工程资产列出界面文件，打开校验文档并拒绝工程外路�
 test('中文界面原子保存、重新打开与覆盖，不保存会话字段', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'ui-document-'));
   const path = join(directory, 'interfaces', '在线奖励.rbxui.json');
-  const document = robloxStrategy.createDocument('在线奖励');
+  const document = robloxStrategy.createDocument('OnlineReward');
+  document.name = '在线奖励';
   await writeDocument(path, document);
   assert.deepEqual(await readDocument(path), document);
   document.root.name = 'Rewards'; await writeDocument(path, document);

@@ -180,7 +180,7 @@ function UI:Render() self:EmitUIAction("data", { nested = { value = true }, null
 });
 
 test('static documents run with default class templates', async () => {
-  const document = robloxStrategy.createDocument();
+  const document = robloxStrategy.createDocument('OnlineReward');
   const { session, frame } = await LuauSession.start(directory, document);
   try { assert.deepEqual(frame.document, document); } finally { await session.stop(); }
 });

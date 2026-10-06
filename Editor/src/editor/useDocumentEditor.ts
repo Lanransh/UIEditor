@@ -59,11 +59,12 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   function reset(value: UIDocument, file: string | null) {
     history.reset(value); setSaved(JSON.stringify(value)); setPath(file); select(value.root.id); setError('');
   }
-  const newDocument = () => run(async () => {
+  const newDocument = (name: string) => run(async () => {
+    const value = strategy.createDocument(name);
     if (!await consent()) return;
     const result = await window.documents.newDocument();
     if (!result.ok) { setError(result.error); return; }
-    reset(strategy.createDocument(), null);
+    reset(value, null);
   });
   const openDocument = (path?: string) => run(async () => {
     if (!await consent()) return;
