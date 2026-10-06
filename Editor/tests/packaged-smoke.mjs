@@ -6,7 +6,7 @@ import { mkdir } from 'node:fs/promises';
 await mkdir(resolve('test-results'), { recursive: true });
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
-const app = await electron.launch({ executablePath: resolve('ToolRuntime/UIEditor-win32-x64/UIEditor.exe'), args: [], env });
+const app = await electron.launch({ executablePath: resolve('../ToolRuntime/UIEditor-win32-x64/UIEditor.exe'), args: [], env });
 try {
   const page = await app.firstWindow();
   await page.getByRole('heading', { name: '选择工程', exact: true }).waitFor();
@@ -19,7 +19,7 @@ try {
     preferences: BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences(),
   }));
   assert.equal(runtime.packaged, true);
-  assert.equal(runtime.userData, resolve('ToolRuntime/Runtime/userData'));
+  assert.equal(runtime.userData, resolve('../ToolRuntime/Runtime/userData'));
   assert.equal(runtime.preferences.contextIsolation, true);
   assert.equal(runtime.preferences.nodeIntegration, false);
   assert.equal(runtime.preferences.sandbox, true);

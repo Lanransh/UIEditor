@@ -7,7 +7,7 @@ import type { Project, Result, RecentProjectView } from '../src/shared/project';
 
 const runtime = !app.isPackaged && process.env.UI_EDITOR_USER_DATA
   ? process.env.UI_EDITOR_USER_DATA
-  : join(app.isPackaged ? dirname(dirname(process.execPath)) : join(__dirname, '..', 'ToolRuntime'), 'Runtime');
+  : join(app.isPackaged ? dirname(dirname(process.execPath)) : join(__dirname, '..', '..', 'ToolRuntime'), 'Runtime');
 for (const name of ['userData', 'sessionData', 'logs', 'crashDumps'] as const) {
   const directory = join(runtime, name);
   mkdirSync(directory, { recursive: true });

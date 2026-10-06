@@ -1,8 +1,8 @@
-node_modules/
-dist/
-dist-electron/
+Editor/node_modules/
+Editor/dist/
+Editor/dist-electron/
 ToolRuntime/*
 !ToolRuntime/README.md
-.cache/
-test-results/
+Editor/.cache/
+Editor/test-results/
 *.log

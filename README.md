@@ -25,6 +25,7 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 ## 开发与验证
 
 ```powershell
+cd Editor
 npm ci
 node node_modules/electron/install.js
 npm run dev
@@ -43,14 +44,15 @@ npm run dev
 | `npm run package` | 构建 Windows x64 应用到 ToolRuntime |
 
 冒烟测试通过 Electron 主进程替代原生目录对话框的返回值，实际执行 UI、IPC 和文件读写；不验证操作系统目录选择器的鼠标交互。
-截图与隔离测试工程保存在忽略的 `test-results/` 下。测试不写入实际最近工程记录。
+以上命令均在 `Editor/` 下执行。截图与隔离测试工程保存在忽略的 `Editor/test-results/` 下。测试不写入实际最近工程记录。
 
 ## 目录
 
-- `src/`：React Hub、空工作台和共享接口类型。
-- `electron/`：文件管理、原生目录选择、受限 IPC 和应用生命周期。
-- `scripts/`、`tests/`：开发、打包脚本及自动化验证。
+- `Editor/`：开发工程，包含 package.json、锁定依赖和构建配置。
+- `Editor/src/`：React Hub、空工作台和共享接口类型。
+- `Editor/electron/`：文件管理、原生目录选择、受限 IPC 和应用生命周期。
+- `Editor/scripts/`、`Editor/tests/`：开发、打包脚本及自动化验证。
 - `ToolRuntime/`：打包应用和运行数据，详见[运行目录说明](ToolRuntime/README.md)。
-- [设计文档](docs/design/README.md)：当前行为、数据格式与职责边界。
+- `Docs/`：[设计文档](Docs/design/README.md)，记录当前行为、数据格式与职责边界。
 
 工程数据存放在用户选择的目录。最近记录及 Electron 数据集中保存在 `ToolRuntime/Runtime/`，构建不会清除该目录；应用所在位置需可写。

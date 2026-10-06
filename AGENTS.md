@@ -43,11 +43,11 @@
 当前应用入口：
 
 - `README.md`：项目介绍、安装、启动与验证命令。
-- `docs/design/README.md`：设计文档索引。
-- `docs/design/app-design.md`：核心体验、模块边界、数据流和关键取舍。
-- `scripts/`：可重复执行的自动化。
-- `tests/`：按功能或模块组织的自动化验证。
-- `src/`、`electron/`：界面、共享类型与桌面主进程。
+- `Docs/design/README.md`：设计文档索引。
+- `Docs/design/app-design.md`：核心体验、模块边界、数据流和关键取舍。
+- `Editor/scripts/`：可重复执行的自动化。
+- `Editor/tests/`：按功能或模块组织的自动化验证。
+- `Editor/src/`、`Editor/electron/`：界面、共享类型与桌面主进程。
 - `Run.bat`、`BuildAndRun.bat`：运行已有构建、构建并运行。
 - `ToolRuntime/`：打包应用与本地运行数据，生成内容不纳入 Git。
 
@@ -97,7 +97,7 @@
 - PowerShell 读取文本显式使用 `Get-Content -Encoding UTF8`；Python 涉及
   中文输入输出时使用 `python -X utf8`，避免默认编码造成误判。
 - 涉及外部 API 或平台行为时，查阅官方文档或源码。
-- `AGENTS.md` 保持简短；当前 App 的设计知识放入 `docs/design/`，维护时
+- `AGENTS.md` 保持简短；当前 App 的设计知识放入 `Docs/design/`，维护时
   使用仓库内 `maintain-design-docs` skill。
 - 新增、重命名或删除设计子文档时同步更新索引。临时实施计划、任务流水和
   原始外部资料不直接堆入设计文档。

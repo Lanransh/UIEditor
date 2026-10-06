@@ -31,7 +31,8 @@ Windows 桌面应用，使用 Electron、React、TypeScript 和 Vite。采用中
 不提前定义节点、绑定或业务数据。创建目录和文件均采用非覆盖操作；失败时仅清理本次创建的文件及空目录。
 工程不依赖最近列表，可独立移动后重新打开。
 
-`ToolRuntime/UIEditor-win32-x64/` 保存打包应用；`ToolRuntime/Runtime/` 保存历史、Electron 用户数据、会话、日志和缓存。
+仓库根目录保留启动批处理与说明；`Editor/` 集中源码、依赖、开发脚本、测试和构建产物；`Docs/design/` 保存设计文档。
+`ToolRuntime/UIEditor-win32-x64/` 保存打包应用；开发模式与打包应用均使用根目录的 `ToolRuntime/Runtime/` 保存历史、Electron 用户数据、会话、日志和缓存。
 `Runtime/recent-projects.json` 保存路径及最近打开时间，Windows 路径去重忽略大小写。名称和可用状态读取时计算，不写入工程。
 历史使用临时文件加重命名保存，损坏记录报错而非覆盖；记录写入失败时告知用户，仍允许打开有效工程。
 重新打包只替换应用目录，保留 Runtime；Run.bat 启动现有构建，BuildAndRun.bat 安装锁定依赖并构建后启动。
