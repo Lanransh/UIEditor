@@ -123,12 +123,17 @@ static void hostCall(lua_State* L, int host, const char* name, int arguments) {
     lua_getref(L, host); lua_getfield(L, -1, name); lua_remove(L, -2); lua_insert(L, base + 1);
     call(L, arguments, 1);
 }
-static int environment(lua_State* L, int host, int ui = 0) {
+static int environment(lua_State* L, int host, int ui = 0, const char* className = "UI") {
     lua_newtable(L);
     int env = lua_gettop(L);
-    if (ui) { lua_getref(L, ui); lua_setfield(L, env, "UI"); }
+    if (ui) { lua_getref(L, ui); lua_setfield(L, env, className); }
     lua_pushlightuserdata(L, &nullValue); lua_setfield(L, env, "JSONNull");
     lua_getref(L, host); lua_getfield(L, -1, "print"); lua_remove(L, -2); lua_setfield(L, env, "print");
+    lua_getref(L, host); lua_getfield(L, -1, "warn"); lua_remove(L, -2); lua_setfield(L, env, "warn");
+    lua_getref(L, host); lua_getfield(L, -1, "globals"); lua_remove(L, -2);
+    lua_pushnil(L);
+    while (lua_next(L, -2)) { lua_pushvalue(L, -2); lua_pushvalue(L, -2); lua_rawset(L, env); lua_pop(L, 1); }
+    lua_pop(L, 1);
     lua_newtable(L); lua_pushvalue(L, LUA_GLOBALSINDEX); lua_setfield(L, -2, "__index"); lua_setreadonly(L, -1, true); lua_setmetatable(L, env);
     lua_setreadonly(L, env, true);
     return env;
@@ -155,14 +160,19 @@ int main() {
             ctx.values = ctx.bytes = 0;
             if (input["type"] == "start") {
                 load(L, input["bootstrap"], "=host"); call(L, 0, 1); host = lua_ref(L, -1); lua_pop(L, 1);
+                push(L, input, ctx); hostCall(L, host, "initialize", 1); lua_settop(L, 0);
                 int env = environment(L, host);
                 load(L, input["config"], "=config", env); call(L, 0, 1);
                 if (!lua_istable(L, -1)) throw std::runtime_error("Config must return a table");
-                Json config = read(L, -1, ctx); lua_settop(L, 0);
-                push(L, input, ctx); push(L, config, ctx, true); hostCall(L, host, "prepare", 2);
+                hostCall(L, host, "configure", 1);
+                read(L, -1, ctx); lua_settop(L, 0);
+                push(L, input, ctx); hostCall(L, host, "prepare", 1);
                 int ui = lua_ref(L, -1); lua_settop(L, 0);
                 env = environment(L, host, ui);
                 load(L, input["source"], "=interface", env); call(L, 0, 0); lua_settop(L, 0);
+                hostCall(L, host, "preview", 0); int preview = lua_ref(L, -1); lua_settop(L, 0);
+                env = environment(L, host, preview, "Preview");
+                load(L, input["integration"], "=integration", env); call(L, 0, 0); lua_settop(L, 0);
                 hostCall(L, host, "start", 0); lua_settop(L, 0);
             } else if (input["type"] == "stop") {
                 hostCall(L, host, "dispose", 0); lua_settop(L, 0);
@@ -176,7 +186,16 @@ int main() {
             std::cout << response << std::endl;
             if (input["type"] == "stop") break;
         } catch (const std::exception& error) {
-            std::cout << Json({ { "ok", false }, { "error", error.what() } }).dump(-1, ' ', false, Json::error_handler_t::replace) << std::endl;
+            Json logs = Json::array();
+            if (host) {
+                try {
+                    lua_settop(L, 0);
+                    hostCall(L, host, "output", 0);
+                    Json output = read(L, -1, ctx);
+                    if (output["logs"].is_array()) logs = output["logs"];
+                } catch (...) { /* Preserve the original error if diagnostic collection fails. */ }
+            }
+            std::cout << Json({ { "ok", false }, { "error", error.what() }, { "logs", logs } }).dump(-1, ' ', false, Json::error_handler_t::replace) << std::endl;
             break;
         }
     }

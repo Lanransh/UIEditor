@@ -7,7 +7,7 @@ import { createProject, describeError, openProject, RecentProjects } from './pro
 import type { Project, Result, RecentProjectView } from '../src/shared/project';
 import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset } from './documents';
 import { robloxStrategy } from '../src/editor/roblox';
-import { LuauSession } from './runtime';
+import { LuauSession, RuntimeError } from './runtime';
 
 const runtime = process.env.UI_EDITOR_USER_DATA
   ? process.env.UI_EDITOR_USER_DATA
@@ -54,20 +54,20 @@ if (!app.requestSingleInstanceLock()) {
         if (revision !== runtimeRevision || window.isDestroyed()) { started.session.abort(); return { ok: false, error: '运行启动已取消。' }; }
         runtimeSession = started.session;
         const session = runtimeSession;
-        session.onEnded = error => {
+        session.onEnded = (error, logs) => {
           if (runtimeSession === session) {
             runtimeSession = null;
-            if (!window.isDestroyed()) window.webContents.send('runtime:ended', { session: session.id, error });
+            if (!window.isDestroyed()) window.webContents.send('runtime:ended', { session: session.id, error, logs });
           }
         };
         return { ok: true, value: { session: runtimeSession.id, frame: started.frame } };
-      } catch (error) { return { ok: false, error: describeError(error) }; }
+      } catch (error) { return { ok: false, error: describeError(error), logs: error instanceof RuntimeError ? error.logs : [] }; }
     });
     ipcMain.handle('runtime:command', async (event, argument) => {
       if (!trusted(event) || !runtimeSession || argument?.session !== runtimeSession.id || !['state', 'event'].includes(argument?.command?.type)) return { ok: false, error: '运行会话已结束。' };
       const session = runtimeSession;
       try { return { ok: true, value: await session.command(argument.command) }; }
-      catch (error) { if (runtimeSession === session) stopRuntime(); return { ok: false, error: describeError(error) }; }
+      catch (error) { if (runtimeSession === session) stopRuntime(); return { ok: false, error: describeError(error), logs: error instanceof RuntimeError ? error.logs : [] }; }
     });
     ipcMain.handle('runtime:stop', async (event, id) => {
       if (!trusted(event)) return { ok: false, error: '无效的运行来源。' };

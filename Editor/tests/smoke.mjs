@@ -39,7 +39,7 @@ async function checkWorkspaceLayout() {
   const tree = await page.getByRole('complementary', { name: '节点树', exact: true }).boundingBox();
   const canvas = await page.getByRole('region', { name: 'Roblox 画布', exact: true }).boundingBox();
   const properties = await page.getByRole('complementary', { name: '属性面板', exact: true }).boundingBox();
-  const assets = await page.getByRole('region', { name: '资产目录', exact: true }).boundingBox();
+  const assets = await page.getByRole('region', { name: '底部面板', exact: true }).boundingBox();
   assert.ok(tree && canvas && properties && assets);
   assert.ok(tree.x + tree.width <= canvas.x);
   assert.ok(canvas.x + canvas.width <= properties.x);
@@ -50,7 +50,7 @@ async function checkWorkspaceResize() {
   const cases = [
     ['调整节点树宽度', page.getByRole('complementary', { name: '节点树', exact: true }), 'width', 80, 0],
     ['调整属性面板宽度', page.getByRole('complementary', { name: '属性面板', exact: true }), 'width', -80, 0],
-    ['调整资产目录高度', page.getByRole('region', { name: '资产目录', exact: true }), 'height', 0, -60],
+    ['调整资产目录高度', page.getByRole('region', { name: '底部面板', exact: true }), 'height', 0, -60],
   ];
   for (const [name, panel, dimension, dx, dy] of cases) {
     const divider = page.getByRole('separator', { name, exact: true });
@@ -98,7 +98,7 @@ try {
   await clickReady('创建工程');
   await page.getByRole('tree', { name: 'Roblox 节点' }).waitFor();
   assert.equal(await page.getByLabel('节点名称', { exact: true }).inputValue(), 'ScreenGui');
-  await page.getByRole('heading', { name: '资产目录', exact: true }).waitFor();
+  await page.getByRole('button', { name: '资产目录', exact: true }).waitFor();
   await checkWorkspaceLayout();
   const libraries = page.getByRole('navigation', { name: '资产库', exact: true });
   assert.equal(await libraries.getByRole('button', { name: '项目资产', exact: true }).getAttribute('aria-pressed'), 'true');

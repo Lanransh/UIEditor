@@ -32,7 +32,7 @@ export function useRuntime(document: UIDocument) {
       if (token !== generation.current) return;
       const result = await window.runtime.start(source);
       if (token !== generation.current) { if (result.ok) await window.runtime.stop(result.value.session); return; }
-      if (!result.ok) throw new Error(result.error);
+      if (!result.ok) { append(result.logs ?? []); throw new Error(result.error); }
       session.current = result.value.session;
       setFrame(result.value.frame); append(result.value.frame.logs);
     } catch (error) {
@@ -45,7 +45,7 @@ export function useRuntime(document: UIDocument) {
     try {
       const result = await window.runtime.command(id, input);
       if (token !== generation.current) return;
-      if (!result.ok) throw new Error(result.error);
+      if (!result.ok) { append(result.logs ?? []); throw new Error(result.error); }
       setFrame(result.value); append(result.value.logs);
     } catch (error) {
       if (token === generation.current) {
@@ -68,7 +68,7 @@ export function useRuntime(document: UIDocument) {
     if (session.current !== event.session) return;
     ++generation.current; session.current = null;
     setActive(false); setFrame(null);
-    append([{ kind: 'error', message: event.error }]);
+    append([...(event.logs ?? []), { kind: 'error', message: event.error }]);
   }), []);
   return { active, ready: !!frame, frame, logs, start: () => start(), stop, reset: () => start(snapshot.current ?? document), applyState, activate: (node: string) => command({ type: 'event', node }) };
 }

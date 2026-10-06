@@ -20,8 +20,15 @@ export interface UIDocument {
   scripts: UIScripts;
 }
 export type JSONValue = null | boolean | number | string | JSONValue[] | { [key: string]: JSONValue };
-export interface UIScripts { config: string; source: string; references: Record<string, string>; state: JSONValue }
-export const emptyScripts = (): UIScripts => ({ config: 'return {}', source: '', references: {}, state: {} });
+export const defaultIntegration = `-- 模拟接入类继承界面脚本；可重写下面四个业务入口。
+function Preview:GetUIConfig() return self.Config end
+function Preview:GetUIState() return self.State end
+function Preview:BindUIData() self:RefreshUI() end
+function Preview:OnUIAction(action, payload)
+    print("模拟动作", action)
+end`;
+export interface UIScripts { config: string; source: string; integration: string; references: Record<string, string>; state: JSONValue }
+export const emptyScripts = (): UIScripts => ({ config: 'return {}', source: '', integration: defaultIntegration, references: {}, state: {} });
 export const dim = (scale = 0, offset = 0): UDim => ({ scale, offset });
 export const dim2 = (width = 200, height = 100): UDim2 => ({ x: dim(0, width), y: dim(0, height) });
 export function findNode(root: UINode, id: string): UINode | undefined {

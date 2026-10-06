@@ -13,7 +13,7 @@ interface Gesture {
   pointerId: number; x: number; y: number; kind: 'pan' | 'move' | 'resize';
   pan: { x: number; y: number }; node?: UINode; document: UIDocument; scale: number; rotation: number;
 }
-export function DocumentCanvas({ editor }: { editor: DocumentEditor }) {
+export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEditor; visible?: boolean }) {
   const viewport = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(.5);
   const [pan, setPan] = useState({ x: 24, y: 24 });
@@ -34,8 +34,8 @@ export function DocumentCanvas({ editor }: { editor: DocumentEditor }) {
     const scale = Math.max(.1, Math.min(2, (area.clientWidth - 48) / 1280, (area.clientHeight - 48) / 720));
     setZoom(scale); setPan({ x: (area.clientWidth - 1280 * scale) / 2, y: (area.clientHeight - 720 * scale) / 2 });
   }
-  useEffect(() => { fit(); }, [editor.document.id]);
-  useEffect(() => { if (editor.runtime.ready) fit(); }, [editor.runtime.ready]);
+  useEffect(() => { if (visible) fit(); }, [editor.document.id, visible]);
+  useEffect(() => { if (visible && editor.runtime.ready) fit(); }, [editor.runtime.ready, visible]);
   function start(event: PointerEvent, kind: Gesture['kind'], node?: UINode) {
     if ((editor.busy && !editor.runtime.active) || (editor.runtime.active && kind !== 'pan') || gesture.current || ![0, 1].includes(event.button)) return;
     event.preventDefault(); event.stopPropagation();

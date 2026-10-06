@@ -74,7 +74,7 @@ UIGradient 首版使用 ColorStart/ColorEnd 和 TransparencyStart/TransparencyEn
 
 文档保存 format=`roblox-ui`、version=2、稳定文档 ID、名称、固定 canvas、root 和 scripts。首版没有在用项目，不提供 version=1 迁移。
 节点保存稳定 ID、className、name、完整 properties 与有序 children。
-scripts 保存配置源码、界面基类源码、稳定节点引用和初始模拟状态，格式见 [界面脚本与运行时](ui-runtime.md)。不保存选中状态、视图变换、撤销历史或运行会话。
+scripts 保存配置源码、界面基类源码、模拟接入源码、稳定节点引用和初始模拟状态，格式见 [界面脚本与运行时](ui-runtime.md)。不保存选中状态、视图变换、撤销历史或运行会话。
 
 读取和写入均校验文档与节点字段、属性类型/取值、ID 唯一性、辅助节点关系以及尺寸
 约束的上下界。最多 5000 个节点、64 层，文件最多 32 MiB；不支持版本拒绝加载。
@@ -118,7 +118,7 @@ ScrollingFrame 通过 CanvasSize 与 CanvasPosition 展示静态滚动区域，�
 
 ## Luau 展示与交互
 
-界面基类负责展示与交互，App 模拟子类提供配置、状态及动作入口，见 [运行规范](ui-runtime.md)。不提供 Controller、任意 Roblox 服务、动态节点或热更新。
+界面基类负责展示与交互，用户编写的模拟接入子类提供配置、状态及动作入口，见 [运行规范](ui-runtime.md)。不提供 Controller、任意 Roblox 服务、动态节点或热更新。
 
 ## Roblox 导出与 Rojo
 

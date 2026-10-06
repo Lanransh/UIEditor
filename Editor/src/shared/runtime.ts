@@ -1,13 +1,14 @@
 import type { Result } from './project';
-import { allNodes, type UIDocument, type UIScripts, type JSONValue } from './uiDocument';
+import { allNodes, defaultIntegration, type UIDocument, type UIScripts, type JSONValue } from './uiDocument';
 
-export interface RuntimeLog { kind: 'output' | 'action' | 'error'; message: string }
+export interface RuntimeLog { kind: 'output' | 'warning' | 'action' | 'error'; message: string }
 export interface RuntimeFrame { document: UIDocument; disabled: string[]; logs: RuntimeLog[] }
+type RuntimeResult<T> = Result<T> & { logs?: RuntimeLog[] };
 export interface RuntimeAPI {
-  start(document: UIDocument): Promise<Result<{ session: string; frame: RuntimeFrame }>>;
-  command(session: string, command: { type: 'event'; node: string } | { type: 'state'; state: JSONValue }): Promise<Result<RuntimeFrame>>;
+  start(document: UIDocument): Promise<RuntimeResult<{ session: string; frame: RuntimeFrame }>>;
+  command(session: string, command: { type: 'event'; node: string } | { type: 'state'; state: JSONValue }): Promise<RuntimeResult<RuntimeFrame>>;
   stop(session: string): Promise<Result<null>>;
-  onEnded(callback: (event: { session: string; error: string }) => void): () => void;
+  onEnded(callback: (event: { session: string; error: string; logs?: RuntimeLog[] }) => void): () => void;
 }
 export function validateJSON(value: unknown, depth = 0): JSONValue {
   if (depth > 64) throw new Error('数据嵌套超过 64 层。');
@@ -24,8 +25,8 @@ export function validateJSON(value: unknown, depth = 0): JSONValue {
 }
 export function validateScripts(value: unknown): UIScripts {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('脚本定义无效。');
-  const scripts = value as UIScripts;
-  if (Object.keys(value).sort().join(',') !== 'config,references,source,state' || typeof scripts.config !== 'string' || typeof scripts.source !== 'string' || scripts.config.length > 262144 || scripts.source.length > 262144) throw new Error('脚本字段无效，单份源码最多 256 KiB 字符。');
+  const scripts = { integration: defaultIntegration, ...value } as UIScripts;
+  if (Object.keys(scripts).sort().join(',') !== 'config,integration,references,source,state' || [scripts.config, scripts.source, scripts.integration].some(source => typeof source !== 'string' || source.length > 262144)) throw new Error('脚本字段无效，单份源码最多 256 KiB 字符。');
   if (!scripts.references || typeof scripts.references !== 'object' || Array.isArray(scripts.references)) throw new Error('节点引用必须是对象。');
   for (const [name, id] of Object.entries(scripts.references)) if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(name) || typeof id !== 'string' || !id) throw new Error('引用名必须是英文标识符，引用值必须是节点 ID。');
   validateJSON(scripts.references);

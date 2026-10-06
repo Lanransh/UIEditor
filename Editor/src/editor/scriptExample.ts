@@ -13,6 +13,16 @@ export function rewardExample() {
     document.root.children.push(node);
   });
   document.scripts = {
+    integration: `function Preview:GetUIConfig() return self.Config end
+function Preview:GetUIState() return self.State end
+function Preview:BindUIData() self:RefreshUI() end
+function Preview:OnUIAction(action, payload)
+    if action == "ClaimReward" then
+        print("模拟领取", payload.RewardId)
+        self.State = { Status = "Claimed", RemainingSeconds = 0, Pending = false }
+        self:RefreshUI()
+    end
+end`,
     config: 'return { Reward = { Id = "online_5min", Title = "5-minute reward", Amount = 500 } }',
     references: { RewardTitle: title.id, StatusText: status.id, ClaimButton: button.id },
     state: { Status: 'Locked', RemainingSeconds: 120, Pending: false },

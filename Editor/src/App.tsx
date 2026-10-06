@@ -5,7 +5,7 @@ import { useDocumentEditor } from './editor/useDocumentEditor';
 import { NodeTree, NodeProperties } from './editor/NodePanels';
 import { DocumentCanvas } from './editor/Canvas';
 import { DocumentAssets } from './editor/DocumentAssets';
-import { ScriptPanel } from './editor/ScriptPanel';
+import { ScriptPanel, RuntimeOutput } from './editor/ScriptPanel';
 
 declare global { interface Window { projects: ProjectAPI } }
 
@@ -102,7 +102,8 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
   const editor = useDocumentEditor(project, onBack);
   const history = editor.history;
   const [assetLibrary, setAssetLibrary] = useState('项目资产');
-  const [scriptsOpen, setScriptsOpen] = useState(false);
+  const [bottomTab, setBottomTab] = useState<'assets' | 'output'>('assets');
+  const [workspaceTab, setWorkspaceTab] = useState<'design' | 'source' | 'integration'>('design');
   const content = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState({ width: window.innerWidth, height: window.innerHeight - 63 });
   const [sizes, setSizes] = useState({ tree: window.innerWidth <= 1000 ? 180 : 210, properties: window.innerWidth <= 1000 ? 190 : 230, assets: Math.min(240, Math.max(150, window.innerHeight * .25)) });
@@ -111,9 +112,9 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
   const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
   const tree = clamp(sizes.tree, 160, bounds.width - 180 - 240 - 12);
   const properties = clamp(sizes.properties, 180, bounds.width - tree - 240 - 12);
-  const assets = clamp(sizes.assets, 120, bounds.height - 180 - 6);
+  const assets = clamp(sizes.assets, 120, bounds.height - 260 - 6);
   const current = { tree, properties, assets };
-  const limits = { tree: [160, bounds.width - properties - 240 - 12], properties: [180, bounds.width - tree - 240 - 12], assets: [120, bounds.height - 180 - 6] };
+  const limits = { tree: [160, bounds.width - properties - 240 - 12], properties: [180, bounds.width - tree - 240 - 12], assets: [120, bounds.height - 260 - 6] };
 
   useEffect(() => {
     const observer = new ResizeObserver(([entry]) => setBounds({ width: entry.contentRect.width, height: entry.contentRect.height }));
@@ -191,8 +192,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
         </div>
       </details>
       <div className="runtime-toolbar">
-        <button aria-pressed={scriptsOpen} onClick={() => { if (!scriptsOpen) resize('properties', Math.max(properties, 460)); setScriptsOpen(!scriptsOpen); }}>脚本</button>
-        <button disabled={editor.busy} onClick={() => { resize('properties', Math.max(properties, 460)); setScriptsOpen(true); void editor.runtime.start(); }}>运行</button>
+        <button disabled={editor.busy} onClick={() => { setWorkspaceTab('design'); void editor.runtime.start(); }}>运行</button>
         <button disabled={!editor.runtime.active} onClick={() => void editor.runtime.stop()}>停止</button>
         <button disabled={!editor.runtime.ready} onClick={() => void editor.runtime.reset()}>重置</button>
       </div>
@@ -202,19 +202,30 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
     <div className="workspace-body">
       <aside className="panel" aria-label="节点树"><h2><Layers3 size={16} />节点树</h2><NodeTree editor={editor} /></aside>
       {separator('tree', '调整节点树宽度')}
-      <DocumentCanvas editor={editor} />
+      <section className="workspace-editor" aria-label="界面工作区">
+        <nav className="workspace-tabs" aria-label="工作区页签">{(['design', 'source', 'integration'] as const).map((tab, index) => <button key={tab} aria-pressed={workspaceTab === tab} onClick={() => setWorkspaceTab(tab)}>{['编辑界面', '界面脚本', '模拟接入脚本'][index]}</button>)}</nav>
+        <div className="workspace-editor-content">
+          <div hidden={workspaceTab !== 'design'} className="workspace-canvas"><DocumentCanvas editor={editor} visible={workspaceTab === 'design'} /></div>
+          {(['source', 'integration'] as const).map(mode => <div key={mode} hidden={workspaceTab !== mode} className="workspace-script"><ScriptPanel editor={editor} mode={mode} /></div>)}
+        </div>
+      </section>
       {separator('properties', '调整属性面板宽度')}
-      <aside className={`panel properties${scriptsOpen ? ' script-properties' : ''}`} aria-label={scriptsOpen ? '脚本面板' : '属性面板'}><h2>{scriptsOpen ? '界面脚本' : '属性面板'}</h2>{scriptsOpen ? <ScriptPanel editor={editor} /> : <NodeProperties editor={editor} />}</aside>
+      <aside className="panel properties" aria-label="属性面板"><h2>属性面板</h2><NodeProperties editor={editor} /></aside>
     </div>
     {separator('assets', '调整资产目录高度')}
-    <section className="panel assets" aria-label="资产目录">
-      <h2 aria-label="资产目录"><FolderOpen size={16} />资产目录<span className="assets-location">{assetLibrary}</span></h2>
-      <div className="assets-body">
+    <section className="panel assets" aria-label="底部面板">
+      <nav className="bottom-tabs" aria-label="底部页签">
+        <button aria-pressed={bottomTab === 'assets'} onClick={() => setBottomTab('assets')}><FolderOpen size={16} />资产目录</button>
+        <button aria-pressed={bottomTab === 'output'} onClick={() => setBottomTab('output')}>输出</button>
+        <span className="assets-location">{bottomTab === 'assets' ? assetLibrary : editor.runtime.active ? '运行中' : '已停止'}</span>
+      </nav>
+      <div className="assets-body" hidden={bottomTab !== 'assets'}>
         <nav className="asset-libraries" aria-label="资产库">
           {['永久资产', '项目资产'].map(library => <button key={library} className={assetLibrary === library ? 'selected' : ''} aria-pressed={assetLibrary === library} title={library === '项目资产' ? project.path : '跨项目复用的资产'} onClick={() => setAssetLibrary(library)}><Folder size={16} />{library}</button>)}
         </nav>
         <DocumentAssets editor={editor} library={assetLibrary} />
       </div>
+      <div className="bottom-output" hidden={bottomTab !== 'output'}><RuntimeOutput editor={editor} /></div>
     </section>
     </div>
     <footer className="workspace-status"><span><i />{editor.dirty ? '界面有未保存修改' : editor.path ? '界面已保存' : '新界面尚未保存'}</span><span title={editor.path ?? project.path}>Roblox · {editor.path?.split(/[\\/]/).at(-1) ?? '1280 × 720'}</span></footer>

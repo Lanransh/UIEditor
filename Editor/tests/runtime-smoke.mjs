@@ -24,7 +24,9 @@ try {
     dialog.showMessageBox = async () => ({ response: 0 });
   }, { parent, file });
   await page.getByRole('button', { name: '创建工程', exact: true }).click();
-  await page.getByRole('button', { name: '脚本', exact: true }).click();
+  assert.equal(await page.getByRole('button', { name: '资产目录', exact: true }).getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.getByRole('log').isVisible(), false);
+  await page.getByRole('button', { name: '界面脚本', exact: true }).click();
   await page.getByRole('button', { name: '载入奖励示例', exact: true }).click();
   await page.getByRole('button', { name: '文件', exact: true }).click();
   await page.getByRole('button', { name: '保存', exact: true }).click();
@@ -33,6 +35,7 @@ try {
   const original = await readFile(file, 'utf8');
   assert.equal(saved.version, 2);
   assert.match(saved.scripts.source, /function UI:Render/);
+  assert.match(saved.scripts.integration, /function Preview:OnUIAction/);
   for (let cycle = 0; cycle < 2; cycle++) {
     await page.getByRole('button', { name: '运行', exact: true }).click();
     const button = page.getByRole('button', { name: '领取奖励', exact: true });
@@ -43,24 +46,41 @@ try {
     assert.equal(await page.getByRole('button', { name: '适应窗口', exact: true }).isEnabled(), true);
     await page.getByRole('button', { name: '界面脚本', exact: true }).click();
     assert.equal(await page.getByRole('textbox', { name: '界面基类脚本', exact: true }).getAttribute('readonly'), '');
+    await page.getByRole('button', { name: '模拟接入脚本', exact: true }).click();
+    await page.getByRole('button', { name: '代码', exact: true }).click();
+    assert.equal(await page.getByRole('textbox', { name: '模拟接入脚本代码', exact: true }).getAttribute('readonly'), '');
     await page.getByRole('button', { name: '模拟状态', exact: true }).click();
     const state = page.getByRole('textbox', { name: '模拟状态 JSON' });
     await state.fill('{broken');
+    await page.getByRole('button', { name: '界面脚本', exact: true }).click();
+    await page.getByRole('button', { name: '模拟接入脚本', exact: true }).click();
+    assert.equal(await state.inputValue(), '{broken');
     await page.getByRole('button', { name: '应用到运行会话' }).click();
     await page.getByRole('alert').waitFor();
     assert.equal(await page.getByRole('button', { name: '停止', exact: true }).isEnabled(), true);
     await state.fill(JSON.stringify({ Status: 'Claimable', RemainingSeconds: 0, Pending: false }));
     await page.getByRole('button', { name: '应用到运行会话' }).click();
     await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="领取奖励"]')?.getAttribute('aria-disabled') === 'false');
+    await page.getByRole('button', { name: '编辑界面', exact: true }).click();
     try { await button.click(); } catch (error) {
       console.log('Runtime click geometry', await button.boundingBox(), await page.locator('.canvas-viewport').boundingBox(), await page.evaluate(() => ({ width: innerWidth, height: innerHeight })));
       await page.screenshot({ path: resolve('test-results/runtime-click-failure.png') });
       throw error;
     }
-    await page.getByRole('button', { name: '运行日志' }).click();
+    await page.getByRole('button', { name: '输出', exact: true }).click();
     await page.getByRole('log').getByText(/ClaimReward.*online_5min/).waitFor();
     assert.equal(await page.getByRole('log').locator('.action').count(), 1);
+    await page.getByRole('log').getByText(/模拟领取.*online_5min/).waitFor();
+    await page.getByRole('button', { name: '资产目录', exact: true }).click();
+    assert.equal(await page.getByRole('log').isVisible(), false);
+    await page.getByRole('navigation', { name: '资产库', exact: true }).waitFor();
+    await page.getByRole('button', { name: '输出', exact: true }).click();
+    assert.equal(await page.getByRole('log').locator('.action').count(), 1);
+    await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="领取奖励"]')?.textContent === 'Claimed');
+    await page.getByRole('button', { name: '模拟接入脚本', exact: true }).click();
     await page.getByRole('button', { name: '重置', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="领取奖励"]')?.getAttribute('aria-disabled') === 'true');
+    await page.getByRole('button', { name: '编辑界面', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="领取奖励"]')?.getAttribute('aria-disabled') === 'true');
     await page.getByRole('button', { name: '停止', exact: true }).click();
     await page.getByRole('button', { name: '运行', exact: true }).waitFor({ state: 'visible' });
@@ -69,9 +89,11 @@ try {
   }
   await page.getByRole('button', { name: '界面脚本', exact: true }).click();
   const source = page.getByRole('textbox', { name: '界面基类脚本', exact: true });
-  await source.fill('function UI:Render(state)\n error("smoke-error")\nend');
+  await source.fill('function UI:Render(state)\n print("before-error"); warn("before-warning"); error("smoke-error")\nend');
   await page.getByRole('button', { name: '运行', exact: true }).click();
   await page.getByRole('log').getByText(/interface:2.*smoke-error/).waitFor();
+  await page.getByRole('log').locator('.output').getByText(/before-error/).waitFor();
+  await page.getByRole('log').locator('.warning').getByText(/before-warning/).waitFor();
   assert.equal(await page.getByRole('button', { name: '运行', exact: true }).isEnabled(), true);
   await page.getByRole('button', { name: '界面脚本', exact: true }).click();
   assert.equal(await source.getAttribute('readonly'), null);
@@ -80,6 +102,9 @@ try {
   await page.getByRole('button', { name: '领取奖励', exact: true }).waitFor();
   await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="领取奖励"]')?.getAttribute('aria-disabled') === 'true');
   await page.screenshot({ path: resolve(`test-results/${packaged ? 'packaged-' : ''}runtime.png`) });
+  await page.getByRole('button', { name: '模拟接入脚本', exact: true }).click();
+  await page.getByRole('button', { name: '代码', exact: true }).click();
+  await page.screenshot({ path: resolve(`test-results/${packaged ? 'packaged-' : ''}integration.png`) });
   await page.getByRole('button', { name: '停止', exact: true }).click();
   assert.deepEqual(errors, []);
   console.log(`PASS: ${packaged ? 'packaged offline' : 'development'} Luau, button action, live data, invalid JSON, reset, errors, read-only design, clean stop.`);

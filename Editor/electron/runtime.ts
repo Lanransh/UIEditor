@@ -5,11 +5,23 @@ import { createInterface } from 'node:readline';
 import { randomUUID } from 'node:crypto';
 import { robloxStrategy } from '../src/editor/roblox';
 import { allNodes, findNode, type UIDocument } from '../src/shared/uiDocument';
-import { validateJSON, validateReferences, type RuntimeFrame } from '../src/shared/runtime';
+import { validateJSON, validateReferences, type RuntimeFrame, type RuntimeLog } from '../src/shared/runtime';
+
+export class RuntimeError extends Error {
+  constructor(message: string, readonly logs: RuntimeLog[]) { super(message); }
+}
+function readLogs(source: unknown): RuntimeLog[] {
+  validateJSON(source);
+  if (!Array.isArray(source)) throw new Error('无效的运行日志。');
+  return source.map(log => {
+    if (!['output', 'warning', 'action'].includes(log.kind) || typeof log.message !== 'string') throw new Error('无效的运行日志。');
+    return { kind: log.kind, message: log.payload === undefined ? log.message : `${log.message} ${JSON.stringify(log.payload)}` };
+  });
+}
 
 export class LuauSession {
   readonly id = randomUUID();
-  onEnded?: (error: string) => void;
+  onEnded?: (error: string, logs: RuntimeLog[]) => void;
   private process: ChildProcessWithoutNullStreams;
   private pending: { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> } | null = null;
   private closed = false;
@@ -26,7 +38,7 @@ export class LuauSession {
       clearTimeout(pending.timer); this.pending = null;
       try {
         const result = JSON.parse(line);
-        if (!result.ok) throw new Error(result.error);
+        if (!result.ok) throw new RuntimeError(result.error, readLogs(result.logs ?? []));
         pending.resolve(result.value);
       } catch (error) { pending.reject(error as Error); this.abort(error as Error); }
     });
@@ -46,9 +58,10 @@ export class LuauSession {
       throw error;
     }
     const session = new LuauSession(directory, document);
-    const nodes = Object.fromEntries(allNodes(document.root).map(node => [node.id, { className: node.className, properties: node.properties }]));
+    const nodes = Object.fromEntries(allNodes(document.root).map(node => [node.id, { className: node.className, properties: node.properties, definitions: robloxStrategy.nodes[node.className].properties }]));
+    const enums = Object.fromEntries(Object.values(robloxStrategy.nodes).flatMap(node => Object.entries(node.properties).filter(([, definition]) => definition.kind === 'enum').map(([name, definition]) => [name, definition.choices])));
     try {
-      const frame = await session.command({ type: 'start', bootstrap, config: document.scripts.config, source: document.scripts.source, nodes, references: document.scripts.references, state: document.scripts.state });
+      const frame = await session.command({ type: 'start', bootstrap, config: document.scripts.config, source: document.scripts.source, integration: document.scripts.integration, enums, nodes, references: document.scripts.references, state: document.scripts.state });
       return { session, frame };
     } catch (error) { session.abort(error as Error); throw error; }
   }
@@ -94,10 +107,7 @@ export class LuauSession {
     }
     const validated = robloxStrategy.validate(document);
     for (const id of result.disabled) if (typeof id !== 'string' || !findNode(document.root, id)) throw new Error('无效的禁用节点。');
-    const logs = result.logs.map(log => {
-      if (!['output', 'action'].includes(log.kind) || typeof log.message !== 'string') throw new Error('无效的运行日志。');
-      return { kind: log.kind as 'output' | 'action', message: log.payload === undefined ? log.message : `${log.message} ${JSON.stringify(log.payload)}` };
-    });
+    const logs = readLogs(result.logs);
     this.document = validated; this.disabled = result.disabled;
     return { document: validated, disabled: result.disabled, logs };
   }
@@ -110,6 +120,6 @@ export class LuauSession {
     this.closed = true;
     if (this.pending) { clearTimeout(this.pending.timer); this.pending.reject(error); this.pending = null; }
     this.process.kill();
-    this.onEnded?.(error.message);
+    this.onEnded?.(error.message, error instanceof RuntimeError ? error.logs : []);
   }
 }
