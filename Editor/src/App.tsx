@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { AlertTriangle, ArrowLeft, Clock3, Folder, FolderOpen, FolderPlus, Layers3, MousePointer2, PanelTop, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Clock3, Folder, FolderOpen, FolderPlus, Layers3, PanelTop, Trash2 } from 'lucide-react';
 import type { Project, ProjectAPI, RecentProjectView, Result } from './shared/project';
-import { useEditorHistory } from './history/useEditorHistory';
-import { useHistoryShortcuts } from './history/useHistoryShortcuts';
+import { useDocumentEditor } from './editor/useDocumentEditor';
+import { NodeTree, NodeProperties } from './editor/NodePanels';
+import { DocumentCanvas } from './editor/Canvas';
 
 declare global { interface Window { projects: ProjectAPI } }
 
@@ -96,9 +97,8 @@ function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
 }
 
 function Workspace({ project, onBack }: { project: Project; onBack: () => void }) {
-  // Replace null with the document state when node editing is introduced.
-  const history = useEditorHistory<null>(null);
-  useHistoryShortcuts(history);
+  const editor = useDocumentEditor(project, onBack);
+  const history = editor.history;
   const [assetLibrary, setAssetLibrary] = useState('项目资产');
   const content = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState({ width: window.innerWidth, height: window.innerHeight - 63 });
@@ -165,7 +165,13 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
         }
       }}>
         <summary role="button">文件</summary>
-        <div className="workspace-menu-items"><button onClick={onBack}><ArrowLeft size={15} />返回 Hub</button></div>
+        <div className="workspace-menu-items" onClick={event => event.currentTarget.parentElement?.removeAttribute('open')}>
+          <button disabled={editor.busy} onClick={() => void editor.newDocument()}>新建界面</button>
+          <button disabled={editor.busy} onClick={() => void editor.openDocument()}>打开界面</button>
+          <button aria-label="保存" disabled={editor.busy} onClick={() => void editor.save()}>保存 <span>Ctrl+S</span></button>
+          <button aria-label="另存为" disabled={editor.busy} onClick={() => void editor.save(true)}>另存为 <span>Ctrl+Shift+S</span></button>
+          <button disabled={editor.busy} onClick={() => void editor.back()}><ArrowLeft size={15} />返回 Hub</button>
+        </div>
       </details>
       <details className="workspace-menu" onBlur={event => {
         if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
@@ -176,19 +182,20 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
         }
       }}>
         <summary role="button">编辑</summary>
-        <div className="workspace-menu-items">
-          <button disabled={!history.canUndo} title={history.undoLabel ?? undefined} onClick={history.undo}>撤销 <span>Ctrl+Z</span></button>
-          <button disabled={!history.canRedo} title={history.redoLabel ?? undefined} onClick={history.redo}>重做 <span>Ctrl+Y / Ctrl+Shift+Z</span></button>
+        <div className="workspace-menu-items" onClick={event => event.currentTarget.parentElement?.removeAttribute('open')}>
+          <button disabled={editor.busy || !history.canUndo} title={history.undoLabel ?? undefined} onClick={history.undo}>撤销 <span>Ctrl+Z</span></button>
+          <button disabled={editor.busy || !history.canRedo} title={history.redoLabel ?? undefined} onClick={history.redo}>重做 <span>Ctrl+Y / Ctrl+Shift+Z</span></button>
         </div>
       </details>
     </header>
+    {editor.error && <div className="editor-error" role="alert">{editor.error}</div>}
     <div className="workspace-content" ref={content}>
     <div className="workspace-body">
-      <aside className="panel" aria-label="节点树"><h2><Layers3 size={16} />节点树</h2><div className="panel-empty"><Layers3 size={28} /><p>暂无节点</p><span>当前工程尚未创建界面</span></div></aside>
+      <aside className="panel" aria-label="节点树"><h2><Layers3 size={16} />节点树</h2><NodeTree editor={editor} /></aside>
       {separator('tree', '调整节点树宽度')}
-      <section className="canvas" aria-label="空画布"><div className="canvas-heading">画布<span>空工作台</span></div><div className="canvas-surface"><div className="canvas-empty"><PanelTop size={38} strokeWidth={1.3} /><h1>从这里开始设计</h1><p>工程已就绪</p><span>基础版提供工程管理，界面编辑能力将在后续加入。</span></div></div></section>
+      <DocumentCanvas editor={editor} />
       {separator('properties', '调整属性面板宽度')}
-      <aside className="panel properties" aria-label="属性面板"><h2>属性面板</h2><div className="panel-empty"><MousePointer2 size={28} /><p>未选择节点</p><span>节点属性将显示在这里</span></div></aside>
+      <aside className="panel properties" aria-label="属性面板"><h2>属性面板</h2><NodeProperties editor={editor} /></aside>
     </div>
     {separator('assets', '调整资产目录高度')}
     <section className="panel assets" aria-label="资产目录">
@@ -201,6 +208,6 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
       </div>
     </section>
     </div>
-    <footer className="workspace-status"><span><i />工程已保存</span><span>Roblox · 本地工程</span></footer>
+    <footer className="workspace-status"><span><i />{editor.dirty ? '界面有未保存修改' : editor.path ? '界面已保存' : '新界面尚未保存'}</span><span title={editor.path ?? project.path}>Roblox · {editor.path?.split(/[\\/]/).at(-1) ?? '1280 × 720'}</span></footer>
   </main>;
 }

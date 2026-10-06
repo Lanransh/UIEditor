@@ -12,7 +12,7 @@
     "build": "npm run typecheck && vite build && node scripts/build-electron.mjs",
     "start": "electron .",
     "test": "tsx --test tests/*.test.ts",
-    "test:smoke": "npm run build && node tests/smoke.mjs",
+    "test:smoke": "npm run build && node tests/smoke.mjs && node tests/ui-smoke.mjs",
     "test:packaged": "node tests/packaged-smoke.mjs",
     "package": "npm run build && node scripts/package.mjs"
   },
