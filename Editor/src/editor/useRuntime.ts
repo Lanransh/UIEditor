@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { UIDocument } from '../shared/uiDocument';
-import { type RuntimeAPI, type RuntimeFrame, type RuntimeLog } from '../shared/runtime';
+import { type RuntimeAPI, type RuntimeCommand, type RuntimeFrame, type RuntimeLog } from '../shared/runtime';
 
 declare global { interface Window { runtime: RuntimeAPI } }
 export function useRuntime(document: UIDocument) {
@@ -44,7 +44,7 @@ export function useRuntime(document: UIDocument) {
       return { ok: false, error: String(error) };
     }
   }
-  async function command(input: { type: 'event'; node: string }) {
+  async function command(input: RuntimeCommand) {
     const id = session.current, token = generation.current;
     if (!id) return { ok: false, error: '运行会话不存在。' };
     try {
@@ -73,5 +73,5 @@ export function useRuntime(document: UIDocument) {
     setActive(false); frameChanged(null);
     append([...(event.logs ?? []), { kind: 'error', message: event.error }]);
   }), []);
-  return { active, ready: !!frame, frame, logs, start: (source = document) => start(source), stop, reset: () => start(snapshot.current ?? document), activate: (node: string) => command({ type: 'event', node }), inspect: () => ({ ...current.current, sessionId: session.current }) };
+  return { active, ready: !!frame, frame, logs, start: (source = document) => start(source), stop, reset: () => start(snapshot.current ?? document), show: () => command({ type: 'show' }), hide: () => command({ type: 'hide' }), activate: (node: string) => command({ type: 'event', node }), inspect: () => ({ ...current.current, sessionId: session.current }) };
 }

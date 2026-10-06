@@ -4,9 +4,10 @@ import type { UIDocument, UIScripts, JSONValue } from './uiDocument';
 export interface RuntimeLog { kind: 'output' | 'warning' | 'action' | 'error'; message: string }
 export interface RuntimeFrame { document: UIDocument; disabled: string[]; logs: RuntimeLog[] }
 type RuntimeResult<T> = Result<T> & { logs?: RuntimeLog[] };
+export type RuntimeCommand = { type: 'event'; node: string } | { type: 'show' | 'hide' };
 export interface RuntimeAPI {
   start(document: UIDocument): Promise<RuntimeResult<{ session: string; frame: RuntimeFrame }>>;
-  command(session: string, command: { type: 'event'; node: string }): Promise<RuntimeResult<RuntimeFrame>>;
+  command(session: string, command: RuntimeCommand): Promise<RuntimeResult<RuntimeFrame>>;
   stop(session: string): Promise<Result<null>>;
   onEnded(callback: (event: { session: string; error: string; logs?: RuntimeLog[] }) => void): () => void;
 }

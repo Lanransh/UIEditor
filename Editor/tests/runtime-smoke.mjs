@@ -95,6 +95,13 @@ try {
     await button.waitFor();
     await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="ClaimButton"]')?.getAttribute('aria-disabled') === 'false');
     assert.equal(await button.getAttribute('aria-disabled'), 'false');
+    const controls = await page.locator('.runtime-toolbar').boundingBox();
+    assert.ok(controls && controls.x < 200, '运行控制应位于左上方');
+    await page.getByRole('button', { name: '关闭', exact: true }).click();
+    await button.waitFor({ state: 'hidden' });
+    assert.equal(await page.getByRole('button', { name: '停止', exact: true }).isEnabled(), true);
+    await page.getByRole('button', { name: '打开', exact: true }).click();
+    await button.waitFor({ state: 'visible' });
     assert.equal(await page.locator('.node-selection').count(), 0);
     assert.equal(await page.getByRole('button', { name: '适应窗口', exact: true }).isEnabled(), true);
     await page.getByRole('button', { name: '交互脚本', exact: true }).click();
@@ -117,6 +124,11 @@ try {
     await page.getByRole('button', { name: '输出', exact: true }).click();
     assert.equal(await page.getByRole('log').locator('.action').count(), 1);
     await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="ClaimButton"]')?.textContent === 'Claimed');
+    await page.getByRole('button', { name: '关闭', exact: true }).click();
+    await button.waitFor({ state: 'hidden' });
+    await page.getByRole('button', { name: '打开', exact: true }).click();
+    await button.waitFor({ state: 'visible' });
+    assert.equal(await button.textContent(), 'Claimed');
     await page.getByRole('button', { name: '接入脚本', exact: true }).click();
     await page.getByRole('button', { name: '重置', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="ClaimButton"]')?.getAttribute('aria-disabled') === 'false');

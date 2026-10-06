@@ -276,7 +276,11 @@ function host.start()
     instance:Show()
 end
 function host.command(input)
-    if input.type == "event" and not disabled[input.node] then
+    if input.type == "show" then
+        instance:Show()
+    elseif input.type == "hide" then
+        instance:Hide()
+    elseif input.type == "event" and not disabled[input.node] then
         for _, handler in ipairs(handlers[input.node] or {}) do
             if handler.connection.Connected then handler.callback() end
         end

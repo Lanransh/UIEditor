@@ -52,6 +52,35 @@ test('preview owns configuration and mutable state; inherited interaction dispat
   await assert.rejects(session.command({ type: 'event', node: button }), /结束/);
 });
 
+test('external show and hide invoke lifecycle hooks without recreating state or connections', async () => {
+  const document = rewardExample();
+  document.scripts.source = document.scripts.source.replace('return UI', `function UI:OnShow() print("shown", self:GetUIState().Status) end
+function UI:OnHide() print("hidden", self:GetUIState().Status) end
+return UI`);
+  const original = JSON.stringify(document);
+  const { session, frame } = await LuauSession.start(directory, document);
+  const button = buttonId(document);
+  try {
+    assert.equal(frame.document.root.properties.Enabled, true);
+    assert.match(frame.logs.at(-1)!.message, /shown.*Claimable/);
+    const hidden = await session.command({ type: 'hide' });
+    assert.equal(hidden.document.root.properties.Enabled, false);
+    assert.match(hidden.logs[0].message, /hidden.*Claimable/);
+    assert.equal((await session.command({ type: 'event', node: button })).logs.length, 0);
+    const shown = await session.command({ type: 'show' });
+    assert.equal(shown.document.root.properties.Enabled, true);
+    assert.match(shown.logs[0].message, /shown.*Claimable/);
+    const claimed = await session.command({ type: 'event', node: button });
+    assert.equal(claimed.logs.filter(log => log.kind === 'action').length, 1);
+    await session.command({ type: 'hide' });
+    const reopened = await session.command({ type: 'show' });
+    assert.match(reopened.logs[0].message, /shown.*Claimed/);
+    assert.equal(findNode(reopened.document.root, button)?.properties.Text, 'Claimed');
+    assert.equal((await session.command({ type: 'event', node: button })).logs.length, 0);
+    assert.equal(JSON.stringify(document), original);
+  } finally { await session.stop(); }
+});
+
 test('locked and claimed states come from the integration constructor', async () => {
   for (const status of ['Locked', 'Claimed']) {
     const document = rewardExample();

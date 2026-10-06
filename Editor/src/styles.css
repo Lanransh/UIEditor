@@ -151,7 +151,7 @@ svg { flex-shrink: 0; }
 .canvas-hint { position: absolute; bottom: 8px; left: 8px; padding: 4px 8px; border-radius: 4px; background: #ffffffd9; color: var(--muted); font-size: 10px; pointer-events: none; }
 .editor-error { padding: 7px 16px; color: #a44338; background: #fff4f2; border-bottom: 1px solid #edc2bd; font-size: 12px; }
 /* Luau editing uses the existing property panel without changing workspace layout. */
-.runtime-toolbar { display: flex; gap: 5px; margin-left: auto; }
+.runtime-toolbar { display: flex; gap: 5px; margin-left: 12px; }
 .workspace-editor { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .workspace-tabs { display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid #dfe5e5; background: #fcfdfd; }
 .workspace-tabs button { padding: 6px 14px; border: 0; border-radius: 4px; background: transparent; color: inherit; }

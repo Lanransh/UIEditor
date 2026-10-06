@@ -208,6 +208,8 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
         <button disabled={editor.busy} onClick={() => { setWorkspaceTab('design'); void editor.runtime.start(); }}>运行</button>
         <button disabled={!editor.runtime.active} onClick={() => void editor.runtime.stop()}>停止</button>
         <button disabled={!editor.runtime.ready} onClick={() => void editor.runtime.reset()}>重置</button>
+        <button disabled={!editor.runtime.ready} onClick={() => void editor.runtime.show()}>打开</button>
+        <button disabled={!editor.runtime.ready} onClick={() => void editor.runtime.hide()}>关闭</button>
       </div>
     </header>
     {creatingInterface && <NewInterfaceDialog onCancel={() => setCreatingInterface(false)} onCreate={name => { setCreatingInterface(false); void editor.newDocument(name); }} />}

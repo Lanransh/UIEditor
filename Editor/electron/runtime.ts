@@ -78,7 +78,7 @@ export class LuauSession {
           return node.children.some(child => visible(child, enabled));
         };
         if (!visible(this.document.root, true) || this.disabled.includes(target.id)) return { document: this.document, disabled: this.disabled, logs: [] };
-      } else if (!['start', 'stop'].includes(input.type as string)) throw new Error('不支持的运行命令。');
+      } else if (!['start', 'stop', 'show', 'hide'].includes(input.type as string)) throw new Error('不支持的运行命令。');
       const line = JSON.stringify(command);
       if (Buffer.byteLength(line) > 8 * 1024 * 1024) throw new Error('运行消息超过 8 MiB。');
       try {
