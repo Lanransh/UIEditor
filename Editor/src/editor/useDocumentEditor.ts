@@ -5,7 +5,7 @@ import { findNode, updateNode, type UIDocument, type UINode } from '../shared/ui
 import { useEditorHistory } from '../history/useEditorHistory';
 import { useHistoryShortcuts } from '../history/useHistoryShortcuts';
 import { projectStrategy } from './roblox';
-import { deleteNode, documentCommand, duplicateNode, insertNode, reparentNode, reorderNode } from './commands';
+import { deleteNode, documentCommand, duplicateNode, insertNode, pasteNode, reparentNode } from './commands';
 
 declare global { interface Window { documents: DocumentAPI } }
 
@@ -19,6 +19,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const operating = useRef(false);
+  const clipboard = useRef<UINode | null>(null);
   useHistoryShortcuts({ ...history, canUndo: !busy && history.canUndo, canRedo: !busy && history.canRedo });
   const document = history.state;
   const dirty = JSON.stringify(document) !== saved;
@@ -76,6 +77,27 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
     };
     window.addEventListener('keydown', listener); return () => window.removeEventListener('keydown', listener);
   });
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => {
+      if (operating.current || event.defaultPrevented || event.isComposing || event.repeat || event.altKey || event.shiftKey) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.closest('input, textarea, select') || target.isContentEditable)) return;
+      if (event.key === 'Delete' && !event.ctrlKey && !event.metaKey) {
+        event.preventDefault(); remove(); return;
+      }
+      if (!(event.ctrlKey || event.metaKey)) return;
+      const key = event.key.toLowerCase();
+      if (!['c', 'v', 'd'].includes(key)) return;
+      event.preventDefault();
+      if (key === 'c') {
+        if (selected.id !== document.root.id) clipboard.current = structuredClone(selected);
+      } else if (key === 'v') {
+        const node = clipboard.current;
+        if (node) execute('粘贴节点', value => pasteNode(value, selected.id, node, strategy));
+      } else duplicate();
+    };
+    window.addEventListener('keydown', listener); return () => window.removeEventListener('keydown', listener);
+  });
   function add(className: string, parentId: string) {
     const node = strategy.createNode(className);
     const parent = findNode(document.root, parentId);
@@ -86,7 +108,6 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   function remove() { execute('删除节点', value => deleteNode(value, selected.id)); }
   function duplicate() { execute('复制节点', value => duplicateNode(value, selected.id, strategy)); }
   function reparent(parentId: string) { execute('调整父节点', value => reparentNode(value, selected.id, parentId, strategy)); }
-  function reorder(direction: -1 | 1) { execute('调整节点顺序', value => reorderNode(value, selected.id, direction)); }
   const pickImage = () => run(async () => {
     const result = await window.documents.pickImage();
     if (!result.ok) { setError(result.error); return; }
@@ -95,7 +116,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
       history.execute(documentCommand('设置预览图片', value => ({ ...value, root: updateNode(value.root, selected.id, node => ({ ...node, previewImage: image })) }), strategy));
     }
   });
-  return { strategy, document, history, selected, select, editNode, execute, add, remove, duplicate, reparent, reorder, pickImage,
+  return { strategy, document, history, selected, select, editNode, execute, add, reparent, pickImage,
     newDocument, openDocument, save: (saveAs = false) => run(async () => { await save(saveAs); }), back, dirty, path, error, busy };
 }
 export type DocumentEditor = ReturnType<typeof useDocumentEditor>;

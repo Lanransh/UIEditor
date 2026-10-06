@@ -107,7 +107,6 @@ svg { flex-shrink: 0; }
 .editor-fields input:focus, .editor-fields select:focus { outline: 2px solid #76bab6; }
 .editor-fields input[type=checkbox] { width: auto; justify-self: start; }
 .editor-fields input[type=color] { padding: 2px; height: 28px; }
-.node-actions { display: flex; gap: 4px; margin-bottom: 10px; }
 .node-row { position: relative; display: flex; align-items: center; border-radius: 4px; min-width: 0; height: 24px; user-select: none; }
 .node-row:hover { background: #edf3f2; }
 .node-row.selected { background: #dff2ef; }

@@ -151,11 +151,36 @@ try {
   await undo(); await undo();
   await undo(); await dirty(false);
 
-  await select('主面板'); await page.getByRole('button', { name: '复制', exact: true }).click();
+  assert.equal(await page.locator('.node-actions').count(), 0);
+  await select('主面板'); await page.keyboard.press('Control+c'); await dirty(false);
+  await select('领取'); await page.keyboard.press('Control+v');
+  await page.getByRole('button', { name: '选择节点 主面板 副本', exact: true }).waitFor();
+  let pasted = await savedDocument();
+  assert.equal(pasted.root.children.length, 1);
+  assert.equal(pasted.root.children[0].children[4].name, '主面板 副本');
+  assert.notEqual(pasted.root.children[0].children[4].children[0].id, saved.root.children[0].children[0].id);
+  await undo(); assert.deepEqual(await savedDocument(), saved);
+  await page.keyboard.press('Control+y');
+  assert.deepEqual(await savedDocument(), pasted);
+  await undo(); assert.deepEqual(await savedDocument(), saved);
+  // Input shortcuts must keep native text behavior and leave the node tree unchanged.
+  await select('领取'); await page.getByLabel('Text', { exact: true }).focus();
+  await page.keyboard.press('Control+d');
+  await page.keyboard.press('Control+a'); await page.keyboard.press('Control+c'); await page.keyboard.press('Control+v');
+  await page.locator('.canvas-heading').click();
+  assert.deepEqual(await savedDocument(), saved);
+  // Invalid component paste reports an error without entering history.
+  await select('UICorner'); await page.keyboard.press('Control+c'); await page.keyboard.press('Control+v');
+  await page.getByRole('alert').waitFor(); await dirty(false);
+  assert.deepEqual(await savedDocument(), saved);
+  // Root shortcuts cannot create siblings or delete the document root.
+  await select('ScreenGui'); await page.keyboard.press('Control+v'); await page.keyboard.press('Control+d'); await page.keyboard.press('Delete');
+  assert.deepEqual(await savedDocument(), saved);
+  await select('主面板'); await page.keyboard.press('Control+d');
   await page.getByRole('button', { name: '选择节点 主面板 副本', exact: true }).waitFor();
   await select('主面板 副本');
   await page.getByLabel('父节点').selectOption(saved.root.children[0].id);
-  await page.getByRole('button', { name: '删除', exact: true }).click();
+  await page.locator('.canvas-heading').click(); await page.keyboard.press('Delete');
   assert.equal(await page.getByRole('button', { name: '选择节点 主面板 副本', exact: true }).count(), 0);
   await undo(); await select('主面板 副本'); await undo(); await undo(); await dirty(false);
 

@@ -77,9 +77,7 @@ export function NodeTree({ editor }: { editor: DocumentEditor }) {
       {!closed && node.children.length > 0 && <div role="group">{node.children.map(child => branch(child, depth + 1))}</div>}
     </div>;
   }
-  const root = editor.selected.id === editor.document.root.id;
   return <fieldset className="editor-fields" disabled={editor.busy}>
-    <div className="node-actions"><button disabled={root} onClick={editor.duplicate}>复制</button><button disabled={root} onClick={editor.remove}>删除</button><button disabled={root} aria-label="上移节点" onClick={() => editor.reorder(-1)}>↑</button><button disabled={root} aria-label="下移节点" onClick={() => editor.reorder(1)}>↓</button></div>
     <div role="tree" aria-label="Roblox 节点">{branch(editor.document.root, 0)}</div>
     {menu && <div ref={menuElement} className="node-add-menu" role="menu" aria-label="添加子节点" style={{ left: menu.x, top: menu.y }}
       onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setMenu(null); } }}

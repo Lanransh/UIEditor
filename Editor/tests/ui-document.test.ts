@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { robloxStrategy as strategy } from '../src/editor/roblox';
 import { allNodes, dim, dim2, findNode, findParent } from '../src/shared/uiDocument';
-import { deleteNode, documentCommand, duplicateNode, insertNode, moveNode, nodeDropParent, reparentNode, reorderNode } from '../src/editor/commands';
+import { deleteNode, documentCommand, duplicateNode, insertNode, moveNode, nodeDropParent, pasteNode, reparentNode, reorderNode } from '../src/editor/commands';
 import { CommandHistory } from '../src/history/CommandHistory';
 
 test('树拖拽支持前后排序、移入和跨父级移动，整个子树一次撤销重做', () => {
@@ -102,6 +102,38 @@ test('子树复制全部生成新 ID；移动、删除及多步历史可逆，�
   state = history.redo(state); state = history.redo(state); state = history.redo(state);
   assert.equal(findParent(state.root, text.id)?.id, b.id);
   assert.equal(initial.root.children.length, 0);
+});
+
+test('粘贴快照到当前节点同级，每次生成独立子树，撤销重做保持 ID', () => {
+  const source = strategy.createNode('Frame'), parent = strategy.createNode('Frame'), target = strategy.createNode('TextLabel');
+  source.children.push(strategy.createNode('TextButton')); parent.children.push(target);
+  const clipboard = structuredClone(source);
+  source.name = '已修改';
+  const initial = strategy.createDocument(); initial.root.children.push(source, parent);
+  const history = new CommandHistory<typeof initial>();
+  let state = history.execute(documentCommand('粘贴', d => pasteNode(d, target.id, clipboard, strategy), strategy), initial);
+  const copy = state.root.children[1].children[1];
+  assert.equal(copy.name, 'Frame 副本');
+  assert.equal(findParent(state.root, copy.id)?.id, parent.id);
+  assert.notEqual(copy.id, source.id); assert.notEqual(copy.children[0].id, source.children[0].id);
+  const once = state;
+  state = history.execute(documentCommand('粘贴', d => pasteNode(d, target.id, clipboard, strategy), strategy), state);
+  const second = state.root.children[1].children[2];
+  assert.notEqual(second.id, copy.id); assert.notEqual(second.children[0].id, copy.children[0].id);
+  assert.equal(history.undo(state), once);
+  assert.equal(history.redo(once), state);
+  assert.equal(pasteNode(state, state.root.id, clipboard, strategy), state);
+  assert.equal(initial.root.children[1].children.length, 1);
+});
+
+test('非法粘贴不改变文档或历史', () => {
+  const initial = strategy.createDocument(), frame = strategy.createNode('Frame'), corner = strategy.createNode('UICorner');
+  frame.children.push(corner); initial.root.children.push(frame);
+  const history = new CommandHistory<typeof initial>();
+  assert.throws(() => history.execute(documentCommand('粘贴', d => pasteNode(d, corner.id, corner, strategy), strategy), initial));
+  assert.throws(() => pasteNode(initial, frame.id, corner, strategy));
+  assert.equal(history.canUndo, false);
+  assert.equal(frame.children.length, 1);
 });
 
 test('顺序与无变化命令，撤销返回已保存内容', () => {

@@ -30,8 +30,12 @@ export function cloneNode(node: UINode): UINode {
   return { ...structuredClone(node), id: crypto.randomUUID(), children: node.children.map(cloneNode) };
 }
 export function duplicateNode(document: UIDocument, id: string, strategy: ProjectStrategy): UIDocument {
-  const node = findNode(document.root, id), parent = findParent(document.root, id);
-  if (!node || !parent) return document;
+  const node = findNode(document.root, id);
+  return node ? pasteNode(document, id, node, strategy) : document;
+}
+export function pasteNode(document: UIDocument, targetId: string, node: UINode, strategy: ProjectStrategy): UIDocument {
+  const parent = findParent(document.root, targetId);
+  if (!parent) return document;
   const copy = cloneNode(node); copy.name += ' 副本';
   return insertNode(document, parent.id, copy, strategy);
 }
