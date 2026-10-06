@@ -52,18 +52,17 @@ svg { flex-shrink: 0; }
 .workspace-menu-items { position: absolute; top: calc(100% + 3px); left: 0; z-index: 1; min-width: 160px; padding: 4px; border: 1px solid #dfe5e5; border-radius: 4px; background: white; box-shadow: 0 5px 15px rgb(29 55 53 / 12%); }
 .workspace-menu-items button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0; border-radius: 3px; background: transparent; color: inherit; text-align: left; font-size: 13px; }
 .workspace-menu-items button:hover { background: #e4f4f2; }
-.project-directory { display: grid; gap: 8px; padding: 14px 17px; }
-.project-directory > div { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; }
-.project-directory svg { color: var(--accent); }
-.project-directory strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-.project-directory > span { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
 .workspace-body { display: grid; grid-template-columns: 210px minmax(0, 1fr) 230px; flex: 1; min-height: 0; }
 .panel { background: #fcfdfd; border-right: 1px solid #dfe5e5; }
 .panel.properties { border-right: 0; border-left: 1px solid #dfe5e5; }
 .panel.assets { display: flex; flex-direction: column; height: clamp(150px, 25vh, 240px); flex-shrink: 0; border-right: 0; border-top: 1px solid #dfe5e5; }
 .assets h2 { flex-shrink: 0; }
 .assets-body { display: grid; grid-template-columns: 210px minmax(0, 1fr); flex: 1; min-height: 0; overflow: auto; }
-.assets .project-directory { align-content: start; border-right: 1px solid #dfe5e5; }
+.assets-location { margin-left: auto; color: var(--muted); font-weight: 400; }
+.asset-libraries { padding-top: 4px; border-right: 1px solid #dfe5e5; }
+.asset-libraries button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 17px; border: 0; background: transparent; color: inherit; text-align: left; font-size: 12px; }
+.asset-libraries button:hover { background: #edf4f3; }
+.asset-libraries button.selected { background: #e4f4f2; color: var(--accent); }
 .assets-empty { display: grid; place-items: center; color: var(--muted); font-size: 12px; }
 .panel h2 { display: flex; align-items: center; gap: 8px; height: 43px; margin: 0; padding: 0 17px; border-bottom: 1px solid #e5eaea; font-size: 12px; font-weight: 600; }
 .panel-empty { display: grid; justify-items: center; margin-top: 62px; color: #acb9b8; }

@@ -94,6 +94,7 @@ function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
 }
 
 function Workspace({ project, onBack }: { project: Project; onBack: () => void }) {
+  const [assetLibrary, setAssetLibrary] = useState('项目资产');
   return <main className="workspace">
     <header className="workspace-toolbar">
       <details className="workspace-menu" onBlur={event => {
@@ -115,10 +116,12 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
       <aside className="panel properties" aria-label="属性面板"><h2>属性面板</h2><div className="panel-empty"><MousePointer2 size={28} /><p>未选择节点</p><span>节点属性将显示在这里</span></div></aside>
     </div>
     <section className="panel assets" aria-label="资产目录">
-      <h2><FolderOpen size={16} />资产目录</h2>
+      <h2 aria-label="资产目录"><FolderOpen size={16} />资产目录<span className="assets-location">{assetLibrary}</span></h2>
       <div className="assets-body">
-        <div className="project-directory"><div><Folder size={16} /><strong>{project.name}</strong></div><span title={project.path}>{project.path}</span></div>
-        <div className="assets-empty">暂无资产</div>
+        <nav className="asset-libraries" aria-label="资产库">
+          {['永久资产', '项目资产'].map(library => <button key={library} className={assetLibrary === library ? 'selected' : ''} aria-pressed={assetLibrary === library} title={library === '项目资产' ? project.path : '跨项目复用的资产'} onClick={() => setAssetLibrary(library)}><Folder size={16} />{library}</button>)}
+        </nav>
+        <div className="assets-empty" role="status">暂无{assetLibrary}</div>
       </div>
     </section>
     <footer className="workspace-status"><span><i />工程已保存</span><span>Roblox · 本地工程</span></footer>
