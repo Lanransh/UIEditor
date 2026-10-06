@@ -9,9 +9,29 @@ const nodeIcons = import.meta.glob<string>('../assets/roblox-node-icons/*.png', 
 
 export function NodeTree({ editor }: { editor: DocumentEditor }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [type, setType] = useState('Frame');
+  const [menu, setMenu] = useState<{ parent: UINode; x: number; y: number } | null>(null);
+  const menuElement = useRef<HTMLDivElement>(null);
   const draggedId = useRef<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; position: NodeDropPosition } | null>(null);
+  useEffect(() => { setMenu(null); }, [editor.document.root, editor.busy]);
+  useEffect(() => {
+    if (!menu) return;
+    function dismiss(event: PointerEvent) {
+      if (!menuElement.current?.contains(event.target as Node)) setMenu(null);
+    }
+    function scroll(event: Event) {
+      if (!menuElement.current?.contains(event.target as Node)) setMenu(null);
+    }
+    const close = () => setMenu(null);
+    window.addEventListener('pointerdown', dismiss);
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', scroll, true);
+    return () => {
+      window.removeEventListener('pointerdown', dismiss);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', scroll, true);
+    };
+  }, [menu]);
   function dropPosition(event: DragEvent<HTMLDivElement>): NodeDropPosition {
     const bounds = event.currentTarget.getBoundingClientRect(), offset = event.clientY - bounds.top;
     return offset < bounds.height / 3 ? 'before' : offset > bounds.height * 2 / 3 ? 'after' : 'inside';
@@ -49,15 +69,25 @@ export function NodeTree({ editor }: { editor: DocumentEditor }) {
         }}>
         <button className="node-expand" disabled={!node.children.length} aria-label={`${closed ? '展开' : '折叠'} ${node.name}`} onClick={() => setCollapsed(previous => { const next = new Set(previous); if (closed) next.delete(node.id); else next.add(node.id); return next; })}>{node.children.length ? closed ? '▸' : '▾' : ''}</button>
         <button className="node-select" aria-label={`选择节点 ${node.name}`} onClick={() => editor.select(node.id)}><img className="node-icon" src={nodeIcons[`../assets/roblox-node-icons/${node.className}.png`]} width={16} height={16} alt="" draggable={false} /><span>{node.name}</span></button>
+        {editor.strategy.nodes[node.className].category !== 'component' && <button className="node-add-child" aria-label={`为 ${node.name} 添加子节点`} title="添加子节点" aria-haspopup="menu" aria-expanded={menu?.parent.id === node.id} onClick={event => {
+          const bounds = event.currentTarget.getBoundingClientRect();
+          setMenu({ parent: node, x: Math.max(8, Math.min(bounds.right, window.innerWidth - 208)), y: Math.max(8, Math.min(bounds.bottom, window.innerHeight - 288)) });
+        }}>+</button>}
       </div>
       {!closed && node.children.length > 0 && <div role="group">{node.children.map(child => branch(child, depth + 1))}</div>}
     </div>;
   }
   const root = editor.selected.id === editor.document.root.id;
   return <fieldset className="editor-fields" disabled={editor.busy}>
-    <div className="node-add"><select aria-label="新增节点类型" value={type} onChange={event => setType(event.target.value)}>{Object.keys(editor.strategy.nodes).filter(name => name !== 'ScreenGui').map(name => <option key={name}>{name}</option>)}</select><button onClick={() => editor.add(type)}>新增</button></div>
     <div className="node-actions"><button disabled={root} onClick={editor.duplicate}>复制</button><button disabled={root} onClick={editor.remove}>删除</button><button disabled={root} aria-label="上移节点" onClick={() => editor.reorder(-1)}>↑</button><button disabled={root} aria-label="下移节点" onClick={() => editor.reorder(1)}>↓</button></div>
     <div role="tree" aria-label="Roblox 节点">{branch(editor.document.root, 0)}</div>
+    {menu && <div ref={menuElement} className="node-add-menu" role="menu" aria-label="添加子节点" style={{ left: menu.x, top: menu.y }}
+      onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setMenu(null); } }}
+      onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setMenu(null); }}>
+      {Object.keys(editor.strategy.nodes).filter(name => editor.strategy.canParent(menu.parent, editor.strategy.createNode(name))).map((name, index) => <button key={name} role="menuitem" autoFocus={index === 0} onClick={() => {
+        editor.add(name, menu.parent.id); setMenu(null);
+      }}><img className="node-icon" src={nodeIcons[`../assets/roblox-node-icons/${name}.png`]} width={16} height={16} alt="" />{name}</button>)}
+    </div>}
   </fieldset>;
 }
 

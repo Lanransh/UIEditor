@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Project } from '../shared/project';
 import type { DocumentAPI } from '../shared/documents';
-import { findNode, findParent, updateNode, type UIDocument, type UINode } from '../shared/uiDocument';
+import { findNode, updateNode, type UIDocument, type UINode } from '../shared/uiDocument';
 import { useEditorHistory } from '../history/useEditorHistory';
 import { useHistoryShortcuts } from '../history/useHistoryShortcuts';
 import { projectStrategy } from './roblox';
@@ -76,12 +76,12 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
     };
     window.addEventListener('keydown', listener); return () => window.removeEventListener('keydown', listener);
   });
-  function add(className: string) {
+  function add(className: string, parentId: string) {
     const node = strategy.createNode(className);
-    const parent = strategy.nodes[selected.className].category === 'component' ? findParent(document.root, selected.id)! : selected;
-    execute(`新增 ${className}`, value => insertNode(value, parent.id, node, strategy));
+    const parent = findNode(document.root, parentId);
+    execute(`新增 ${className}`, value => insertNode(value, parentId, node, strategy));
     // Select only if insertion is valid.
-    if (strategy.canParent(parent, node)) select(node.id);
+    if (parent && strategy.canParent(parent, node)) select(node.id);
   }
   function remove() { execute('删除节点', value => deleteNode(value, selected.id)); }
   function duplicate() { execute('复制节点', value => duplicateNode(value, selected.id, strategy)); }

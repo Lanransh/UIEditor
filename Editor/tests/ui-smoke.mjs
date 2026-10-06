@@ -21,7 +21,16 @@ async function dialogs(open, save = file, response = 0) {
   }, { open, save, response });
 }
 async function menu(name) { await page.getByRole('button', { name: '文件', exact: true }).click(); await page.getByRole('button', { name, exact: true }).click(); }
-async function add(type) { await page.getByLabel('新增节点类型').selectOption(type); await page.getByRole('button', { name: '新增', exact: true }).click(); await page.waitForFunction(type => document.querySelector('[aria-label="节点名称"]')?.value === type, type); }
+async function childMenu(parent) {
+  const row = page.getByRole('button', { name: `选择节点 ${parent}`, exact: true }).locator('..');
+  await row.hover();
+  await row.getByRole('button', { name: `为 ${parent} 添加子节点`, exact: true }).click();
+}
+async function add(type, parent) {
+  await childMenu(parent ?? await page.getByLabel('节点名称', { exact: true }).inputValue());
+  await page.getByRole('menuitem', { name: type, exact: true }).click();
+  await page.waitForFunction(type => document.querySelector('[aria-label="节点名称"]')?.value === type, type);
+}
 async function input(label, value) { const field = page.getByLabel(label, { exact: true }); await field.fill(String(value)); await field.press('Tab'); }
 async function select(name) { await page.getByRole('button', { name: `选择节点 ${name}`, exact: true }).click(); }
 async function openAsset(name) {
@@ -48,12 +57,36 @@ try {
   await page.getByRole('tree', { name: 'Roblox 节点' }).waitFor();
   assert.deepEqual(await page.getByTestId('ui-artboard').evaluate(element => ({ width: element.offsetWidth, height: element.offsetHeight })), { width: 1280, height: 720 });
   await input('界面名称', '在线奖励');
+  assert.equal(await page.getByLabel('新增节点类型').count(), 0);
+  const rootAdd = page.getByRole('button', { name: '为 ScreenGui 添加子节点', exact: true });
+  await page.locator('.canvas-heading').hover();
+  assert.equal(await rootAdd.evaluate(button => getComputedStyle(button).opacity), '0');
+  await childMenu('ScreenGui');
+  assert.equal(await page.getByRole('menuitem', { name: 'UICorner', exact: true }).count(), 0);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.getByRole('menu', { name: '添加子节点', exact: true }).count(), 0);
+  await childMenu('ScreenGui');
+  await page.locator('.canvas-heading').click();
+  assert.equal(await page.getByRole('menu', { name: '添加子节点', exact: true }).count(), 0);
   await add('Frame'); await input('节点名称', '主面板');
   await input('Size.x.offset', 600); await input('Size.y.offset', 400);
   await input('Position.x.offset', 200); await input('Position.y.offset', 120);
   await add('UICorner');
   assert.equal(await page.locator('[data-class-name="Frame"]').evaluate(element => getComputedStyle(element).borderRadius), '8px');
-  await select('主面板'); await add('TextLabel'); await input('节点名称', '标题'); await input('Text', '在线奖励');
+  assert.equal(await page.getByRole('button', { name: '为 UICorner 添加子节点', exact: true }).count(), 0);
+  await childMenu('主面板');
+  assert.equal(await page.getByRole('menuitem', { name: 'UICorner', exact: true }).count(), 0);
+  assert.equal(await page.getByRole('menuitem', { name: 'UITextSizeConstraint', exact: true }).count(), 0);
+  await page.screenshot({ path: join(output, 'node-add-menu.png') });
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: '折叠 主面板', exact: true }).click();
+  // Adding targets the hovered row even while a different node is selected, and expands it.
+  await add('TextLabel', '主面板'); await input('节点名称', '标题'); await input('Text', '在线奖励');
+  await page.getByRole('button', { name: '选择节点 UICorner', exact: true }).waitFor();
+  await undo(); await undo(); await undo();
+  assert.equal(await page.getByRole('button', { name: '选择节点 TextLabel', exact: true }).count(), 0);
+  await page.keyboard.press('Control+y');
+  await select('TextLabel'); await input('节点名称', '标题'); await input('Text', '在线奖励');
   await select('主面板'); await add('ImageLabel'); await input('节点名称', '奖励图标'); await input('Position.y.offset', 100);
   assert.ok(await page.getByText('缺少预览图片', { exact: true }).isVisible());
   const imageFile = join(root, '图标.png');
