@@ -4,6 +4,7 @@ import type { Project, ProjectAPI, RecentProjectView, Result } from './shared/pr
 import { useDocumentEditor } from './editor/useDocumentEditor';
 import { NodeTree, NodeProperties } from './editor/NodePanels';
 import { DocumentCanvas } from './editor/Canvas';
+import { DocumentAssets } from './editor/DocumentAssets';
 
 declare global { interface Window { projects: ProjectAPI } }
 
@@ -204,7 +205,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
         <nav className="asset-libraries" aria-label="资产库">
           {['永久资产', '项目资产'].map(library => <button key={library} className={assetLibrary === library ? 'selected' : ''} aria-pressed={assetLibrary === library} title={library === '项目资产' ? project.path : '跨项目复用的资产'} onClick={() => setAssetLibrary(library)}><Folder size={16} />{library}</button>)}
         </nav>
-        <div className="assets-empty" role="status">暂无{assetLibrary}</div>
+        <DocumentAssets editor={editor} library={assetLibrary} />
       </div>
     </section>
     </div>

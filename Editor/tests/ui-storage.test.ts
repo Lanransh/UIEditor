@@ -3,8 +3,26 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, writeFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { readDocument, writeDocument, readPreviewImage, safeFileName } from '../electron/documents';
+import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset } from '../electron/documents';
 import { robloxStrategy } from '../src/editor/roblox';
+
+test('工程资产列出界面文件，打开校验文档并拒绝工程外路径', async () => {
+  const project = await mkdtemp(join(tmpdir(), 'ui-assets-'));
+  assert.deepEqual(await listDocumentAssets(project), []);
+  const path = join(project, 'interfaces', '在线奖励.rbxui.json');
+  const document = robloxStrategy.createDocument('在线奖励');
+  await writeDocument(path, document);
+  await writeFile(join(project, 'interfaces', '说明.txt'), '说明');
+  await mkdir(join(project, 'interfaces', '目录.rbxui.json'));
+  assert.deepEqual(await listDocumentAssets(project), [{ name: '在线奖励', path }]);
+  assert.deepEqual(await openDocumentAsset(project, path), { path, document });
+  const outside = join(project, '外部.rbxui.json');
+  await writeDocument(outside, document);
+  await assert.rejects(openDocumentAsset(project, outside), /当前工程/);
+  await assert.rejects(openDocumentAsset(project, {}), /当前工程/);
+  await writeFile(path, '{bad');
+  await assert.rejects(openDocumentAsset(project, path), /JSON/);
+});
 
 test('中文界面原子保存、重新打开与覆盖，不保存会话字段', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'ui-document-'));

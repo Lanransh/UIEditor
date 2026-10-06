@@ -1,8 +1,26 @@
-import { readFile, writeFile, mkdir, rename, unlink, stat } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rename, unlink, stat, readdir } from 'node:fs/promises';
 import { dirname, basename, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { robloxStrategy } from '../src/editor/roblox';
 import type { UIDocument } from '../src/shared/uiDocument';
+import type { DocumentAsset } from '../src/shared/documents';
+
+export async function listDocumentAssets(projectPath: string): Promise<DocumentAsset[]> {
+  const directory = join(projectPath, 'interfaces');
+  const entries = await readdir(directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  });
+  return entries.filter(entry => entry.isFile() && entry.name.toLowerCase().endsWith('.rbxui.json'))
+    .map(entry => ({ name: entry.name.slice(0, -11), path: join(directory, entry.name) }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+}
+
+export async function openDocumentAsset(projectPath: string, path: unknown) {
+  const asset = (await listDocumentAssets(projectPath)).find(item => item.path === path);
+  if (!asset) throw new Error('界面资产不在当前工程中，请刷新后重试。');
+  return { path: asset.path, document: await readDocument(asset.path) };
+}
 
 export function safeFileName(name: string): string {
   const clean = name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/g, '').slice(0, 100) || '未命名界面';

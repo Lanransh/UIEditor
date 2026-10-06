@@ -12,7 +12,8 @@ const api: ProjectAPI = {
 contextBridge.exposeInMainWorld('projects', api);
 const documents: DocumentAPI = {
   newDocument: () => ipcRenderer.invoke('document:new'),
-  open: () => ipcRenderer.invoke('document:open'),
+  open: path => ipcRenderer.invoke('document:open', path),
+  listAssets: () => ipcRenderer.invoke('document:list-assets'),
   save: (document, saveAs = false) => ipcRenderer.invoke('document:save', { document, saveAs }),
   pickImage: () => ipcRenderer.invoke('document:image'),
   confirmChanges: () => ipcRenderer.invoke('document:confirm'),

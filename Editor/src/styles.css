@@ -74,6 +74,18 @@ svg { flex-shrink: 0; }
 .asset-libraries button:hover { background: #edf4f3; }
 .asset-libraries button.selected { background: #e4f4f2; color: var(--accent); }
 .assets-empty { display: grid; place-items: center; color: var(--muted); font-size: 12px; }
+.document-assets { min-width: 0; overflow: auto; padding: 16px 20px; font-size: 12px; }
+.asset-grid { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 20px; }
+.ui-asset { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 124px; padding: 0; border: 0; background: transparent; color: inherit; }
+.ui-asset-preview { display: grid; place-items: center; width: 100%; height: 76px; border: 1px solid #cedbda; border-radius: 4px; background: #f3f6f6; color: #718181; }
+.ui-asset:hover .ui-asset-preview, .ui-asset.current .ui-asset-preview { border-color: var(--accent); background: #e4f4f2; }
+.ui-asset-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-asset small, .document-assets > p { color: var(--muted); }
+.asset-error { margin-bottom: 10px; color: #a44338; }
+.asset-error button { margin-left: 10px; }
+.asset-context-menu { position: fixed; z-index: 110; width: 140px; padding: 4px; border: 1px solid #dfe5e5; border-radius: 4px; background: white; box-shadow: 0 5px 15px rgb(29 55 53 / 12%); }
+.asset-context-menu button { width: 100%; padding: 8px 10px; border: 0; background: transparent; color: inherit; text-align: left; }
+.asset-context-menu button:hover { background: #e4f4f2; }
 .panel h2 { display: flex; align-items: center; gap: 8px; height: 43px; margin: 0; padding: 0 17px; border-bottom: 1px solid #e5eaea; font-size: 12px; font-weight: 600; }
 .panel-empty { display: grid; justify-items: center; margin-top: 62px; color: #acb9b8; }
 .panel-empty p { margin: 14px 0 7px; color: #778887; font-size: 13px; }

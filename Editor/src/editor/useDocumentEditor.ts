@@ -62,9 +62,9 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
     if (!result.ok) { setError(result.error); return; }
     reset(strategy.createDocument(), null);
   });
-  const openDocument = () => run(async () => {
+  const openDocument = (path?: string) => run(async () => {
     if (!await consent()) return;
-    const result = await window.documents.open();
+    const result = await window.documents.open(path);
     if (!result.ok) { setError(result.error); return; }
     if (result.value) reset(strategy.validate(result.value.document), result.value.path);
   });

@@ -102,13 +102,13 @@ try {
   await checkWorkspaceLayout();
   const libraries = page.getByRole('navigation', { name: '资产库', exact: true });
   assert.equal(await libraries.getByRole('button', { name: '项目资产', exact: true }).getAttribute('aria-pressed'), 'true');
-  await page.getByRole('status').filter({ hasText: '暂无项目资产' }).waitFor();
+  await page.getByRole('button', { name: 'UI 资产 未命名界面（未保存）', exact: true }).waitFor();
   await libraries.getByRole('button', { name: '永久资产', exact: true }).click();
   await page.getByRole('status').filter({ hasText: '暂无永久资产' }).waitFor();
   assert.equal(await libraries.getByRole('button', { name: '项目资产', exact: true }).getAttribute('aria-pressed'), 'false');
   assert.equal(await libraries.getByRole('button', { name: '永久资产', exact: true }).getAttribute('aria-pressed'), 'true');
   await libraries.getByRole('button', { name: '项目资产', exact: true }).click();
-  await page.getByRole('status').filter({ hasText: '暂无项目资产' }).waitFor();
+  await page.getByRole('button', { name: 'UI 资产 未命名界面（未保存）', exact: true }).waitFor();
   await clickReady('编辑');
   assert.ok(await page.getByRole('button', { name: /^撤销/ }).isDisabled());
   assert.ok(await page.getByRole('button', { name: /^重做/ }).isDisabled());

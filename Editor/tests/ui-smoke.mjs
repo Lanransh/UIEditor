@@ -24,6 +24,10 @@ async function menu(name) { await page.getByRole('button', { name: '文件', exa
 async function add(type) { await page.getByLabel('新增节点类型').selectOption(type); await page.getByRole('button', { name: '新增', exact: true }).click(); await page.waitForFunction(type => document.querySelector('[aria-label="节点名称"]')?.value === type, type); }
 async function input(label, value) { const field = page.getByLabel(label, { exact: true }); await field.fill(String(value)); await field.press('Tab'); }
 async function select(name) { await page.getByRole('button', { name: `选择节点 ${name}`, exact: true }).click(); }
+async function openAsset(name) {
+  await page.getByRole('button', { name: `UI 资产 ${name}`, exact: true }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '打开', exact: true }).click();
+}
 async function dirty(value) { await page.getByText(value ? '界面有未保存修改' : '界面已保存', { exact: true }).waitFor(); }
 async function undo() { await page.locator('.canvas-heading').click(); await page.keyboard.press('Control+z'); }
 async function savedDocument() { await menu('保存'); await dirty(false); return JSON.parse(await readFile(file, 'utf8')); }
@@ -48,6 +52,7 @@ try {
   await page.getByText('图标.png', { exact: true }).waitFor();
   await select('主面板'); await add('TextButton'); await input('节点名称', '领取'); await input('Text', '领取奖励'); await input('Position.y.offset', 260);
   const saved = await savedDocument();
+  await page.getByRole('button', { name: 'UI 资产 在线奖励', exact: true }).waitFor();
   assert.equal(saved.root.children[0].children.length, 4);
   assert.equal(saved.root.children[0].children[2].previewImage.name, '图标.png');
   assert.equal('state' in saved, false); assert.equal('config' in saved, false);
@@ -121,7 +126,15 @@ try {
   const secondFile = join(parent, 'UIEditorWorkspace', 'interfaces', '第二个界面.rbxui.json');
   await dialogs(null, secondFile); await menu('保存'); await dirty(false);
   assert.notEqual(JSON.parse(await readFile(secondFile, 'utf8')).id, saved.id);
-  await dialogs(file); await menu('打开界面'); await select('领取');
+  await input('界面名称', '第二个界面修改');
+  await dialogs(null, secondFile, 2); await openAsset('在线奖励');
+  assert.equal(await page.getByLabel('界面名称', { exact: true }).inputValue(), '第二个界面修改');
+  await dialogs(null, secondFile, 1); await openAsset('在线奖励'); await select('领取');
+  assert.equal(await page.getByLabel('Text', { exact: true }).inputValue(), '领取金币');
+  // Reopening the project rebuilds the asset list from disk.
+  await menu('返回 Hub');
+  await page.getByRole('button', { name: '打开 中文 工程', exact: true }).click();
+  await openAsset('在线奖励'); await select('领取');
   assert.equal(await page.getByLabel('Text', { exact: true }).inputValue(), '领取金币');
   await page.getByRole('button', { name: '适应窗口', exact: true }).click();
   await page.screenshot({ path: join(output, 'roblox-static-ui.png') });

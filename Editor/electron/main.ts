@@ -5,7 +5,7 @@ import { mkdir, stat } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { createProject, describeError, openProject, RecentProjects } from './projects';
 import type { Project, Result, RecentProjectView } from '../src/shared/project';
-import { readDocument, writeDocument, readPreviewImage, safeFileName } from './documents';
+import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset } from './documents';
 import { robloxStrategy } from '../src/editor/roblox';
 
 const runtime = !app.isPackaged && process.env.UI_EDITOR_USER_DATA
@@ -93,8 +93,14 @@ if (!app.requestSingleInstanceLock()) {
     handle('project:remove-recent', async path => { await recent.remove(await recent.resolveRecent(path)); return recentViews(); });
     const requireProject = () => { if (!activeProject) throw new Error('请先打开工程。'); return activeProject; };
     handle('document:new', async () => { requireProject(); documentPath = null; return null; });
-    handle('document:open', async () => {
+    handle('document:list-assets', async () => listDocumentAssets(requireProject().path));
+    handle('document:open', async assetPath => {
       const project = requireProject();
+      if (assetPath !== undefined) {
+        const file = await openDocumentAsset(project.path, assetPath);
+        documentPath = file.path;
+        return file;
+      }
       const result = await dialog.showOpenDialog(window, { title: '打开界面', defaultPath: join(project.path, 'interfaces'), properties: ['openFile'], filters: [{ name: 'Roblox UI', extensions: ['rbxui.json'] }] });
       if (result.canceled || !result.filePaths[0]) return null;
       const path = result.filePaths[0], document = await readDocument(path);
