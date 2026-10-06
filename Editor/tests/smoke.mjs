@@ -30,6 +30,7 @@ async function dialogResult(path, response = 0) {
   }, { path, response });
 }
 async function clickReady(name) {
+  if (name === '返回 Hub') await page.getByRole('button', { name: '文件', exact: true }).click();
   const button = page.getByRole('button', { name, exact: true });
   await button.click();
 }
@@ -44,6 +45,13 @@ try {
   await clickReady('创建工程');
   await page.getByRole('heading', { name: '从这里开始设计' }).waitFor();
   assert.ok(await page.getByText('未选择节点', { exact: true }).isVisible());
+  await page.getByRole('heading', { name: '工程目录', exact: true }).waitFor();
+  assert.ok(await page.getByRole('button', { name: '编辑', exact: true }).isDisabled());
+  assert.equal(await page.getByRole('button', { name: '返回 Hub', exact: true }).isVisible(), false);
+  await clickReady('文件');
+  await page.getByRole('button', { name: '返回 Hub', exact: true }).waitFor();
+  await page.getByRole('button', { name: '文件', exact: true }).press('Escape');
+  assert.equal(await page.getByRole('button', { name: '返回 Hub', exact: true }).isVisible(), false);
   const workspace = join(parent, 'UIEditorWorkspace');
   const manifest = JSON.parse(await readFile(join(workspace, 'project.json'), 'utf8'));
   assert.equal(manifest.mode, 'roblox');

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { AlertTriangle, ArrowLeft, Clock3, Folder, FolderOpen, FolderPlus, Layers3, MousePointer2, PanelTop, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Clock3, Folder, FolderOpen, FolderPlus, MousePointer2, PanelTop, Trash2 } from 'lucide-react';
 import type { Project, ProjectAPI, RecentProjectView, Result } from './shared/project';
 
 declare global { interface Window { projects: ProjectAPI } }
@@ -96,12 +96,21 @@ function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
 function Workspace({ project, onBack }: { project: Project; onBack: () => void }) {
   return <main className="workspace">
     <header className="workspace-toolbar">
-      <button className="back" onClick={onBack}><ArrowLeft size={17} />返回 Hub</button>
-      <div className="workspace-name"><strong>{project.name}</strong><span title={project.path}>{project.path}</span></div>
-      <span className="mode-badge">Roblox</span>
+      <details className="workspace-menu" onBlur={event => {
+        if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
+      }} onKeyDown={event => {
+        if (event.key === 'Escape') {
+          event.currentTarget.open = false;
+          event.currentTarget.querySelector('summary')?.focus();
+        }
+      }}>
+        <summary role="button">文件</summary>
+        <div className="workspace-menu-items"><button onClick={onBack}><ArrowLeft size={15} />返回 Hub</button></div>
+      </details>
+      <button className="workspace-menu-label" disabled>编辑</button>
     </header>
     <div className="workspace-body">
-      <aside className="panel" aria-label="节点树"><h2><Layers3 size={16} />节点树</h2><div className="panel-empty"><Layers3 size={28} /><p>暂无节点</p><span>当前工程尚未创建界面</span></div></aside>
+      <aside className="panel" aria-label="工程目录"><h2><FolderOpen size={16} />工程目录</h2><div className="project-directory"><div><Folder size={16} /><strong>{project.name}</strong></div><span title={project.path}>{project.path}</span></div></aside>
       <section className="canvas" aria-label="空画布"><div className="canvas-heading">画布<span>空工作台</span></div><div className="canvas-surface"><div className="canvas-empty"><PanelTop size={38} strokeWidth={1.3} /><h1>从这里开始设计</h1><p>工程已就绪</p><span>基础版提供工程管理，界面编辑能力将在后续加入。</span></div></div></section>
       <aside className="panel properties" aria-label="属性"><h2>属性</h2><div className="panel-empty"><MousePointer2 size={28} /><p>未选择节点</p><span>节点属性将显示在这里</span></div></aside>
     </div>
