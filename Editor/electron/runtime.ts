@@ -5,7 +5,7 @@ import { createInterface } from 'node:readline';
 import { randomUUID } from 'node:crypto';
 import { robloxStrategy } from '../src/editor/roblox';
 import { allNodes, findNode, type UIDocument } from '../src/shared/uiDocument';
-import { validateJSON, validateReferences, type RuntimeFrame, type RuntimeLog } from '../src/shared/runtime';
+import { validateJSON, type RuntimeFrame, type RuntimeLog } from '../src/shared/runtime';
 
 export class RuntimeError extends Error {
   constructor(message: string, readonly logs: RuntimeLog[]) { super(message); }
@@ -48,7 +48,6 @@ export class LuauSession {
   }
   static async start(directory: string, source: unknown) {
     const document = robloxStrategy.validate(source);
-    validateReferences(document);
     let bootstrap: string;
     try {
       await access(join(directory, 'ui-luau.exe'));
@@ -58,10 +57,10 @@ export class LuauSession {
       throw error;
     }
     const session = new LuauSession(directory, document);
-    const nodes = Object.fromEntries(allNodes(document.root).map(node => [node.id, { className: node.className, properties: node.properties, definitions: robloxStrategy.nodes[node.className].properties }]));
+    const nodes = Object.fromEntries(allNodes(document.root).map(node => [node.id, { name: node.name, children: node.children.map(child => child.id), className: node.className, properties: node.properties, definitions: robloxStrategy.nodes[node.className].properties }]));
     const enums = Object.fromEntries(Object.values(robloxStrategy.nodes).flatMap(node => Object.entries(node.properties).filter(([, definition]) => definition.kind === 'enum').map(([name, definition]) => [name, definition.choices])));
     try {
-      const frame = await session.command({ type: 'start', bootstrap, config: document.scripts.config, source: document.scripts.source, integration: document.scripts.integration, enums, nodes, references: document.scripts.references, state: document.scripts.state });
+      const frame = await session.command({ type: 'start', bootstrap, source: document.scripts.source, integration: document.scripts.integration, enums, nodes, root: document.root.id });
       return { session, frame };
     } catch (error) { session.abort(error as Error); throw error; }
   }
@@ -70,8 +69,7 @@ export class LuauSession {
       if (this.closed) throw new Error('运行会话已结束。');
       if (!command || typeof command !== 'object') throw new Error('运行命令无效。');
       const input = command as Record<string, unknown>;
-      if (input.type === 'state') validateJSON(input.state);
-      else if (input.type === 'event') {
+      if (input.type === 'event') {
         const target = allNodes(this.document.root).find(node => node.id === input.node);
         if (!target || !['TextButton', 'ImageButton'].includes(target.className)) throw new Error('无效的按钮事件。');
         const visible = (node: typeof target, shown: boolean): boolean => {

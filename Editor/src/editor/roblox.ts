@@ -79,7 +79,7 @@ export class RobloxProjectStrategy implements ProjectStrategy {
     return { id: crypto.randomUUID(), className, name: className, properties: Object.fromEntries(Object.entries(definition.properties).map(([key, property]) => [key, structuredClone(property.value)])), children: [] };
   }
   createDocument(name = '未命名界面'): UIDocument {
-    return { format: 'roblox-ui', version: 2, id: crypto.randomUUID(), name, canvas: { width: 1280, height: 720 }, root: this.createNode('ScreenGui'), scripts: emptyScripts() };
+    return { format: 'roblox-ui', version: 3, id: crypto.randomUUID(), name, canvas: { width: 1280, height: 720 }, root: this.createNode('ScreenGui'), scripts: emptyScripts() };
   }
   canParent(parent: UINode, child: UINode, excludingId?: string) {
     if (!Object.hasOwn(this.nodes, parent.className) || !Object.hasOwn(this.nodes, child.className) || child.className === 'ScreenGui' || this.nodes[parent.className].category === 'component') return false;
@@ -92,7 +92,7 @@ export class RobloxProjectStrategy implements ProjectStrategy {
   }
   validate(source: unknown): UIDocument {
     if (!isRecord(source)) throw new Error('界面格式或版本不支持。');
-    if (!exact(source, ['format', 'version', 'id', 'name', 'canvas', 'root', 'scripts']) || source.format !== 'roblox-ui' || source.version !== 2) throw new Error('界面格式或版本不支持。');
+    if (!exact(source, ['format', 'version', 'id', 'name', 'canvas', 'root', 'scripts']) || source.format !== 'roblox-ui' || ![2, 3].includes(source.version as number)) throw new Error('界面格式或版本不支持。');
     if (typeof source.id !== 'string' || !source.id.trim() || typeof source.name !== 'string' || !source.name.trim() || !exact(source.canvas, ['width', 'height']) || source.canvas.width !== 1280 || source.canvas.height !== 720) throw new Error('界面名称、ID 或画布尺寸无效。');
     const ids = new Set<string>();
     let count = 0;
@@ -120,8 +120,8 @@ export class RobloxProjectStrategy implements ProjectStrategy {
     };
     const root = check(source.root, 0);
     if (root.className !== 'ScreenGui') throw new Error('根节点必须是 ScreenGui。');
-    const scripts = validateScripts(source.scripts);
-    return structuredClone({ ...source, version: 2, scripts }) as unknown as UIDocument;
+    const scripts = validateScripts(source.scripts, source.version === 2);
+    return structuredClone({ ...source, version: 3, scripts }) as unknown as UIDocument;
   }
   layout(parent: UINode, width: number, height: number): Map<string, PreviewRect> { return layoutChildren(parent, width, height); }
 }

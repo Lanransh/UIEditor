@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { UIDocument, JSONValue } from '../shared/uiDocument';
-import { validateJSON, type RuntimeAPI, type RuntimeFrame, type RuntimeLog } from '../shared/runtime';
+import type { UIDocument } from '../shared/uiDocument';
+import { type RuntimeAPI, type RuntimeFrame, type RuntimeLog } from '../shared/runtime';
 
 declare global { interface Window { runtime: RuntimeAPI } }
 export function useRuntime(document: UIDocument) {
@@ -39,7 +39,7 @@ export function useRuntime(document: UIDocument) {
       if (token === generation.current) { setActive(false); setFrame(null); append([{ kind: 'error', message: String(error) }]); }
     }
   }
-  async function command(input: { type: 'state'; state: JSONValue } | { type: 'event'; node: string }) {
+  async function command(input: { type: 'event'; node: string }) {
     const id = session.current, token = generation.current;
     if (!id) return;
     try {
@@ -55,10 +55,6 @@ export function useRuntime(document: UIDocument) {
       }
     }
   }
-  async function applyState(source: string) {
-    const state = validateJSON(JSON.parse(source));
-    await command({ type: 'state', state });
-  }
   useEffect(() => () => {
     ++generation.current;
     if (session.current) void window.runtime.stop(session.current);
@@ -70,5 +66,5 @@ export function useRuntime(document: UIDocument) {
     setActive(false); setFrame(null);
     append([...(event.logs ?? []), { kind: 'error', message: event.error }]);
   }), []);
-  return { active, ready: !!frame, frame, logs, start: () => start(), stop, reset: () => start(snapshot.current ?? document), applyState, activate: (node: string) => command({ type: 'event', node }) };
+  return { active, ready: !!frame, frame, logs, start: () => start(), stop, reset: () => start(snapshot.current ?? document), activate: (node: string) => command({ type: 'event', node }) };
 }

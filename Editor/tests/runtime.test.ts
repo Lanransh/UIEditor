@@ -5,191 +5,236 @@ import { LuauSession, RuntimeError } from '../electron/runtime';
 import { robloxStrategy } from '../src/editor/roblox';
 import { rewardExample } from '../src/editor/scriptExample';
 import { findNode } from '../src/shared/uiDocument';
-import { validateReferences } from '../src/shared/runtime';
 import { CommandHistory } from '../src/history/CommandHistory';
 import { documentCommand } from '../src/editor/commands';
 
 const directory = resolve('native-bin');
-async function start(source: string, config = 'return {}') {
+const sourceClass = (body: string) => `local FX = _G.FX
+local UI = FX.Class("RewardInteraction", "FCUICompClass")
+${body}
+return UI`;
+const previewClass = (body: string) => `local FX = _G.FX
+local Preview = FX.Class("RewardPreview", "RewardInteraction")
+${body}
+return Preview`;
+async function start(body: string) {
   const document = rewardExample();
-  document.scripts.source = source; document.scripts.config = config;
+  document.scripts.source = sourceClass(body);
   return LuauSession.start(directory, document);
 }
-test('scripts round-trip; old formats are rejected and stale references remain editable but cannot run', () => {
+const buttonId = (document: ReturnType<typeof rewardExample>) => document.root.children[2].id;
+
+test('two class scripts round-trip and malformed documents are rejected', () => {
   const example = rewardExample();
   assert.deepEqual(robloxStrategy.validate(JSON.parse(JSON.stringify(example))), example);
-  const { scripts, ...legacy } = example;
-  assert.throws(() => robloxStrategy.validate({ ...legacy, version: 1 }), /版本/);
-  example.root.children[2].name = 'Changed';
-  validateReferences(example);
-  example.root.children.pop();
-  assert.doesNotThrow(() => robloxStrategy.validate(example));
-  assert.throws(() => validateReferences(example), /ClaimButton/);
+  assert.deepEqual(Object.keys(example.scripts).sort(), ['integration', 'source']);
+  assert.throws(() => robloxStrategy.validate({ ...example, version: 1 }), /版本/);
+  for (const integration of [123, 'x'.repeat(262145)]) {
+    assert.throws(() => robloxStrategy.validate({ ...example, scripts: { ...example.scripts, integration } }), /脚本/);
+  }
 });
-test('real Luau runs reward display, readonly data, click actions and live state refresh', async () => {
+
+test('preview owns configuration and mutable state; inherited interaction dispatches a claim', async () => {
   const document = rewardExample(), original = JSON.stringify(document);
   const { session, frame } = await LuauSession.start(directory, document);
-  const button = document.scripts.references.ClaimButton;
+  const button = buttonId(document);
   try {
-    assert.equal(findNode(frame.document.root, button)?.properties.Text, '120 seconds remaining');
-    assert.deepEqual(frame.disabled, [button]);
-    assert.equal((await session.command({ type: 'event', node: button })).logs.length, 0);
-    const ready = await session.command({ type: 'state', state: { Status: 'Claimable', RemainingSeconds: 0, Pending: false } });
-    assert.equal(findNode(ready.document.root, button)?.properties.BackgroundColor3, '#42b883');
-    const action = await session.command({ type: 'event', node: button });
-    assert.match(action.logs[0].message, /ClaimReward.*online_5min/);
-    const claimed = await session.command({ type: 'state', state: { Status: 'Claimed', RemainingSeconds: 0, Pending: false } });
+    assert.equal(findNode(frame.document.root, button)?.properties.Text, 'Ready');
+    assert.equal(frame.document.root.children[0].properties.Text, '5-minute reward · 500');
+    const claimed = await session.command({ type: 'event', node: button });
     assert.equal(findNode(claimed.document.root, button)?.properties.Text, 'Claimed');
+    assert.deepEqual(claimed.logs.map(log => log.kind), ['action', 'output']);
+    assert.match(claimed.logs[0].message, /ClaimReward.*online_5min/);
+    assert.deepEqual(claimed.disabled, [button]);
+    assert.equal((await session.command({ type: 'event', node: button })).logs.length, 0);
     assert.equal(JSON.stringify(document), original);
   } finally { await session.stop(); }
   await assert.rejects(session.command({ type: 'event', node: button }), /结束/);
 });
-test('compile and runtime errors retain original interface line numbers', async () => {
-  await assert.rejects(start('function UI:Render(\n'), /interface:2|interface:1/);
-  await assert.rejects(start('function UI:Render(state)\n error("broken")\nend'), /interface:2.*broken/);
-  await assert.rejects(start('function UI:Render(state)\n self.UI:Set("Missing", "Text", "value")\nend'), /interface:2/);
-  await assert.rejects(start('function UI:RefreshUI() end'), /reserved/);
-  await assert.rejects(start('function UI:Render(state) state.Status = "Changed" end'), /readonly/);
-  await assert.rejects(start('function UI:Render() self:GetUIConfig().value = 3 end', 'return {value = 1}'), /readonly/);
-  await assert.rejects(start('print("before-error")\nwarn("before-warning")\nerror("after-print")'), error => {
+
+test('locked and claimed states come from the integration constructor', async () => {
+  for (const status of ['Locked', 'Claimed']) {
+    const document = rewardExample();
+    document.scripts.integration = document.scripts.integration.replace('Status = "Claimable", RemainingSeconds = 0', `Status = "${status}", RemainingSeconds = 120`);
+    const { session, frame } = await LuauSession.start(directory, document);
+    try {
+      assert.equal(findNode(frame.document.root, buttonId(document))?.properties.Text, status === 'Locked' ? '120 seconds remaining' : 'Claimed');
+      assert.deepEqual(frame.disabled, [buttonId(document)]);
+    } finally { await session.stop(); }
+  }
+});
+
+test('FX inheritance supports constructors, super calls, custom methods and destruction', async () => {
+  const document = rewardExample();
+  document.scripts.source = sourceClass(`function UI:Ctor(owner)
+ UI.Super.Ctor(self, owner)
+ self.count = 1
+end
+function UI:Add(value) self.count += value end
+function UI:OnReady()
+ assert(self:IsA("FCUICompClass") and self:IsA("RewardInteraction"))
+ assert(self:GetClassName() == "RewardPreview")
+ assert(FX.Loader:PlayerGui(self:GetRootNode().Name) == self:GetRootNode())
+ self:Add(2)
+ print("ready", self.count)
+end
+function UI:Dtor()
+ print("disposed")
+ UI.Super.Dtor(self)
+end`);
+  document.scripts.integration = previewClass(`function Preview:Ctor(owner)
+ Preview.Super.Ctor(self, owner)
+ self:Add(4)
+end
+function Preview:OnReady()
+ Preview.Super.OnReady(self)
+ self:Add(8)
+ print("preview", self.count)
+end`);
+  const { session, frame } = await LuauSession.start(directory, document);
+  assert.deepEqual(frame.logs.map(log => log.message), ['ready\t7', 'preview\t15']);
+  const stopped = await session.command({ type: 'stop' });
+  assert.equal(stopped.logs[0].message, 'disposed');
+  session.abort();
+});
+
+test('node paths, missing nodes and duplicate sibling names give explicit feedback', async () => {
+  const document = rewardExample();
+  document.root.children[2].name = 'Changed';
+  await assert.rejects(LuauSession.start(directory, document), /Missing UI node: ClaimButton/);
+  document.root.children[2].name = 'ClaimButton';
+  const duplicate = robloxStrategy.createNode('TextButton');
+  duplicate.name = 'ClaimButton';
+  document.root.children.push(duplicate);
+  await assert.rejects(LuauSession.start(directory, document), /Ambiguous child name/);
+});
+
+test('scripts must return classes with the correct inheritance', async () => {
+  const document = rewardExample();
+  document.scripts.source = 'return {}';
+  await assert.rejects(LuauSession.start(directory, document), /Interaction script must return/);
+  document.scripts.source = sourceClass('');
+  document.scripts.integration = 'return _G.FX.Class("Wrong", "FCUICompClass")';
+  await assert.rejects(LuauSession.start(directory, document), /Integration script must return/);
+});
+
+test('compile and runtime errors retain original interface and integration line numbers and logs', async () => {
+  const document = rewardExample();
+  document.scripts.source = 'function broken(';
+  await assert.rejects(LuauSession.start(directory, document), /interface:1|interface:2/);
+  document.scripts.source = 'print("before-error")\nwarn("before-warning")\nerror("after-print")';
+  await assert.rejects(LuauSession.start(directory, document), error => {
     assert.ok(error instanceof RuntimeError);
     assert.match(error.message, /interface:3.*after-print/);
     assert.deepEqual(error.logs, [{ kind: 'output', message: 'before-error' }, { kind: 'warning', message: 'before-warning' }]);
     return true;
   });
+  document.scripts.source = sourceClass('');
+  document.scripts.integration = 'local FX = _G.FX\nerror("integration-error")';
+  await assert.rejects(LuauSession.start(directory, document), /integration:2.*integration-error/);
 });
-test('callback updates are atomic and failed sessions are terminated', async () => {
-  const { session, frame } = await start(`function UI:OnMount()
- self.UI:On("ClaimButton", "Activated", function()
-  self.UI:Set("ClaimButton", "Text", "partial")
-  self.UI:Set("ClaimButton", "TextSize", -3)
+
+test('callback updates are atomic and failed sessions terminate', async () => {
+  const { session, frame } = await start(`function UI:OnReady()
+ local button = self:GetRootNode().ClaimButton
+ button.Activated:Connect(function()
+  button.Text = "partial"
+  button.TextSize = -3
  end)
 end`);
-  const button = frame.document.scripts.references.ClaimButton;
-  const before = JSON.stringify(frame.document);
+  const before = JSON.stringify(frame.document), button = buttonId(frame.document);
   await assert.rejects(session.command({ type: 'event', node: button }), /属性/);
   assert.equal(JSON.stringify(frame.document), before);
   await assert.rejects(session.command({ type: 'event', node: button }), /结束/);
 });
-test('connections disconnect, print is framed, and sessions never share local state', async () => {
+
+test('connections disconnect and reset sessions never share local state', async () => {
   for (let index = 0; index < 2; index++) {
-    const { session, frame } = await start(`function UI:OnMount()
+    const { session, frame } = await start(`function UI:OnReady()
  self.count = 0
- local connection = self.UI:On("ClaimButton", "Activated", function() error("disconnected") end)
+ local button = self:GetRootNode():WaitForChild("ClaimButton")
+ local connection = self:TrackConnection(button.Activated:Connect(function() error("disconnected") end))
  connection:Disconnect()
- self.UI:On("ClaimButton", "Activated", function()
+ self:TrackConnection(button.Activated:Connect(function()
   self.count += 1
   print("count", self.count)
- end)
+ end))
 end`);
     try {
-      const result = await session.command({ type: 'event', node: frame.document.scripts.references.ClaimButton });
+      const result = await session.command({ type: 'event', node: buttonId(frame.document) });
       assert.equal(result.logs[0].message, 'count\t1');
     } finally { await session.stop(); }
   }
 });
+
 test('infinite loops and allocations terminate without hanging the parent', async () => {
   await assert.rejects(start('while true do end'), /250 ms|超时|退出/);
   await assert.rejects(start('local bytes = buffer.create(100 * 1024 * 1024)'), /memory|内存|退出/);
 });
-test('host system access is absent and serializable empty arrays survive data round-trip', async () => {
-  const document = rewardExample();
-  document.scripts.state = { items: [], empty: {}, nullable: null };
-  document.scripts.source = `function UI:Render(state)
- assert(_G == nil and game == nil and require == nil and io == nil and loadstring == nil)
- self:EmitUIAction("data", state)
-end`;
-  const { session, frame } = await LuauSession.start(directory, document);
-  try { assert.match(frame.logs[0].message, /"items":\[\]/); } finally { await session.stop(); }
+
+test('host system access is absent and framework globals remain readonly', async () => {
+  const { session } = await start(`assert(_G.FX and game == nil and require == nil and io == nil and loadstring == nil)
+function UI:Render() self:EmitUIAction("data", { nested = { value = true }, nullable = JSONNull }) end`);
+  await session.stop();
+  await assert.rejects(start('_G.FX.Loader = {}'), /readonly/);
 });
-test('static documents run without hooks', async () => {
+
+test('static documents run with default class templates', async () => {
   const document = robloxStrategy.createDocument();
   const { session, frame } = await LuauSession.start(directory, document);
   try { assert.deepEqual(frame.document, document); } finally { await session.stop(); }
 });
 
-test('authored integration inherits UI, overrides business hooks, and simulates a claim', async () => {
+test('Roblox value types work in integration data and direct node properties', async () => {
   const document = rewardExample();
-  document.scripts.state = { Status: 'Claimable', RemainingSeconds: 0, Pending: false };
-  const { session, frame } = await LuauSession.start(directory, document);
-  try {
-    const button = document.scripts.references.ClaimButton;
-    assert.equal(findNode(frame.document.root, button)?.properties.Text, 'Ready');
-    const claimed = await session.command({ type: 'event', node: button });
-    assert.equal(findNode(claimed.document.root, button)?.properties.Text, 'Claimed');
-    assert.deepEqual(claimed.logs.map(log => log.kind), ['action', 'output']);
-    assert.deepEqual(claimed.disabled, [button]);
-    assert.equal((await session.command({ type: 'event', node: button })).logs.length, 0);
-    assert.equal(document.scripts.state.Status, 'Claimable');
-  } finally { await session.stop(); }
-  document.scripts.integration = 'function Preview:GetUIState()\n error("integration-error")\nend';
-  await assert.rejects(LuauSession.start(directory, document), /integration:2.*integration-error/);
-  document.scripts.integration = 'function Preview:Render() end';
-  await assert.rejects(LuauSession.start(directory, document), /reserved preview method/);
-});
-
-test('UI Roblox values work across config, interface and integration without leaking into saved data', async () => {
-  const document = rewardExample();
-  document.scripts.config = 'return { Size = UDim2.fromOffset(300, 80), Color = Color3.fromRGB(66, 184, 131), Font = Enum.Font.Gotham }';
-  document.scripts.source = `function UI:Render(state)
- local config = self:GetUIConfig()
+  document.scripts.integration = previewClass(`function Preview:Ctor(owner)
+ Preview.Super.Ctor(self, owner)
+ self.Config = { Size = UDim2.fromOffset(300, 80), Color = Color3.fromRGB(66, 184, 131), Font = Enum.Font.Gotham }
+end`);
+  document.scripts.source = sourceClass(`function UI:Render()
+ local config, button = self:GetUIConfig(), self:GetRootNode().ClaimButton
  assert(typeof(config.Size) == "UDim2" and config.Size.X.Offset == 300)
- self.UI:Set("ClaimButton", "Size", config.Size)
- self.UI:Set("ClaimButton", "AnchorPoint", Vector2.new(0.5, 0.5))
- self.UI:Set("ClaimButton", "BackgroundColor3", config.Color)
- self.UI:Set("ClaimButton", "Font", config.Font)
- assert(typeof(self.UI:Get("ClaimButton", "Size")) == "UDim2")
- assert(self.UI:Get("ClaimButton", "Font") == Enum.Font.Gotham)
- assert(self.UI:Get("ClaimButton", "BackgroundColor3").G == 184 / 255)
+ button.Size = config.Size
+ button.AnchorPoint = Vector2.new(0.5, 0.5)
+ button.BackgroundColor3 = config.Color
+ button.Font = config.Font
+ assert(typeof(button) == "Instance" and typeof(button.Size) == "UDim2")
+ assert(button.Font == Enum.Font.Gotham)
+ assert(button.BackgroundColor3.G == 184 / 255)
  assert(UDim2.new(UDim.new(0.5, 10), UDim.new(1, 20)).Width.Scale == 0.5)
- print("types", typeof(UDim.new()), typeof(Vector2.new()), typeof(Color3.new()), typeof(Enum.Font.Gotham))
- warn("preview-warning")
-end`;
-  document.scripts.integration = `function Preview:GetUIState()
- assert(typeof(UDim2.fromScale(1, 1)) == "UDim2")
- return self.State
-end`;
-  const original = JSON.stringify(document);
+end`);
   const { session, frame } = await LuauSession.start(directory, document);
   try {
-    const button = findNode(frame.document.root, document.scripts.references.ClaimButton)!;
+    const button = findNode(frame.document.root, buttonId(document))!;
     assert.deepEqual(button.properties.Size, { x: { scale: 0, offset: 300 }, y: { scale: 0, offset: 80 } });
-    assert.deepEqual(button.properties.AnchorPoint, { x: 0.5, y: 0.5 });
     assert.equal(button.properties.BackgroundColor3, '#42b883');
     assert.equal(button.properties.Font, 'Gotham');
-    assert.deepEqual(frame.logs.map(log => log.kind), ['output', 'warning']);
-    assert.equal(JSON.stringify(document), original);
   } finally { await session.stop(); }
-  await assert.rejects(start('function UI:Render() self.UI:Set("ClaimButton", "Text", Vector2.new()) end'), /Wrong Roblox value type/);
-  await assert.rejects(start('function UI:Render() self.UI:Set("ClaimButton", "Font", Enum.TextXAlignment.Center) end'), /Wrong enum type/);
-  await assert.rejects(start('function UI:Render() local size = UDim2.new() size.X.Offset = 2 end'), /readonly/);
+  await assert.rejects(start('function UI:Render() self:GetRootNode().ClaimButton.Text = Vector2.new() end'), /Wrong Roblox value type/);
+  await assert.rejects(start('function UI:Render() self:GetRootNode().ClaimButton.Font = Enum.TextXAlignment.Center end'), /Wrong enum type/);
+  await assert.rejects(start('local size = UDim2.new() size.X.Offset = 2'), /readonly/);
 });
 
-test('existing version 2 documents gain integration and malformed integration is rejected', () => {
+test('version 2 config, state and references migrate into two class scripts and still run', async () => {
   const document = rewardExample();
-  const { integration, ...scripts } = document.scripts;
-  const loaded = robloxStrategy.validate({ ...document, scripts });
-  assert.match(loaded.scripts.integration, /Preview:GetUIState/);
-  assert.throws(() => robloxStrategy.validate({ ...document, scripts: { ...scripts, integration: 123 } }), /脚本/);
-  assert.throws(() => robloxStrategy.validate({ ...document, scripts: { ...scripts, integration: 'x'.repeat(262145) } }), /脚本/);
+  const loaded = robloxStrategy.validate({ ...document, version: 2, scripts: {
+    config: 'return { title = "legacy" }',
+    state: { text: 'state\u0001', literal: '\\u0001' },
+    references: { Button: buttonId(document) },
+    source: 'function UI:OnMount() self.UI:Set("Button", "Text", self:GetUIConfig().title .. self:GetUIState().text .. self:GetUIState().literal) end',
+    integration: 'function Preview:OnUIAction() end',
+  } });
+  assert.equal(loaded.version, 3);
+  assert.deepEqual(Object.keys(loaded.scripts).sort(), ['integration', 'source']);
+  const { session, frame } = await LuauSession.start(directory, loaded);
+  try { assert.equal(findNode(frame.document.root, buttonId(document))?.properties.Text, 'legacystate\u0001\\u0001'); } finally { await session.stop(); }
 });
-test('script and state edits participate in undo/redo and preserve saved baseline', () => {
+
+test('interaction and integration edits participate in undo/redo', () => {
   const document = rewardExample();
   const history = new CommandHistory<typeof document>();
-  const edited = history.execute(documentCommand('脚本与状态', current => ({ ...current, scripts: { ...current.scripts, source: 'function UI:Render(state) print(state.Status) end', state: { Status: 'Claimed' } } }), robloxStrategy), document);
-  assert.equal(edited.scripts.state && (edited.scripts.state as { Status: string }).Status, 'Claimed');
+  const edited = history.execute(documentCommand('接入脚本', current => ({ ...current, scripts: { ...current.scripts, integration: previewClass('') } }), robloxStrategy), document);
+  assert.notEqual(edited.scripts.integration, document.scripts.integration);
   assert.deepEqual(history.undo(edited), document);
   assert.deepEqual(history.redo(document), edited);
-});
-test('nested data crosses the native stack safely and remains readonly', async () => {
-  const document = rewardExample();
-  let state: Record<string, any> = { value: 'deep' };
-  for (let index = 0; index < 50; index++) state = { next: state };
-  document.scripts.state = state;
-  document.scripts.source = `function UI:Render(state)
- for index = 1, 50 do state = state.next end
- self.UI:Set("StatusText", "Text", state.value)
-end`;
-  const { session, frame } = await LuauSession.start(directory, document);
-  try { assert.equal(findNode(frame.document.root, document.scripts.references.StatusText)?.properties.Text, 'deep'); } finally { await session.stop(); }
 });

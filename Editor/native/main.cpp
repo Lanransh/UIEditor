@@ -123,10 +123,9 @@ static void hostCall(lua_State* L, int host, const char* name, int arguments) {
     lua_getref(L, host); lua_getfield(L, -1, name); lua_remove(L, -2); lua_insert(L, base + 1);
     call(L, arguments, 1);
 }
-static int environment(lua_State* L, int host, int ui = 0, const char* className = "UI") {
+static int environment(lua_State* L, int host) {
     lua_newtable(L);
     int env = lua_gettop(L);
-    if (ui) { lua_getref(L, ui); lua_setfield(L, env, className); }
     lua_pushlightuserdata(L, &nullValue); lua_setfield(L, env, "JSONNull");
     lua_getref(L, host); lua_getfield(L, -1, "print"); lua_remove(L, -2); lua_setfield(L, env, "print");
     lua_getref(L, host); lua_getfield(L, -1, "warn"); lua_remove(L, -2); lua_setfield(L, env, "warn");
@@ -161,23 +160,18 @@ int main() {
             if (input["type"] == "start") {
                 load(L, input["bootstrap"], "=host"); call(L, 0, 1); host = lua_ref(L, -1); lua_pop(L, 1);
                 push(L, input, ctx); hostCall(L, host, "initialize", 1); lua_settop(L, 0);
+                push(L, input, ctx); hostCall(L, host, "prepare", 1); lua_settop(L, 0);
                 int env = environment(L, host);
-                load(L, input["config"], "=config", env); call(L, 0, 1);
-                if (!lua_istable(L, -1)) throw std::runtime_error("Config must return a table");
-                hostCall(L, host, "configure", 1);
-                read(L, -1, ctx); lua_settop(L, 0);
-                push(L, input, ctx); hostCall(L, host, "prepare", 1);
-                int ui = lua_ref(L, -1); lua_settop(L, 0);
-                env = environment(L, host, ui);
-                load(L, input["source"], "=interface", env); call(L, 0, 0); lua_settop(L, 0);
-                hostCall(L, host, "preview", 0); int preview = lua_ref(L, -1); lua_settop(L, 0);
-                env = environment(L, host, preview, "Preview");
-                load(L, input["integration"], "=integration", env); call(L, 0, 0); lua_settop(L, 0);
+                load(L, input["source"], "=interface", env); call(L, 0, 1);
+                hostCall(L, host, "interaction", 1); lua_settop(L, 0);
+                env = environment(L, host);
+                load(L, input["integration"], "=integration", env); call(L, 0, 1);
+                hostCall(L, host, "integration", 1); lua_settop(L, 0);
                 hostCall(L, host, "start", 0); lua_settop(L, 0);
             } else if (input["type"] == "stop") {
                 hostCall(L, host, "dispose", 0); lua_settop(L, 0);
             } else {
-                push(L, input, ctx, input["type"] == "state"); hostCall(L, host, "command", 1); lua_settop(L, 0);
+                push(L, input, ctx); hostCall(L, host, "command", 1); lua_settop(L, 0);
             }
             hostCall(L, host, "output", 0); Json output = read(L, -1, ctx); lua_settop(L, 0);
             for (const char* key : { "operations", "disabled", "logs" }) if (output[key].is_object() && output[key].empty()) output[key] = Json::array();

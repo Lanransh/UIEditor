@@ -12,7 +12,7 @@ export interface UINode {
 }
 export interface UIDocument {
   format: 'roblox-ui';
-  version: 2;
+  version: 3;
   id: string;
   name: string;
   canvas: { width: 1280; height: 720 };
@@ -20,15 +20,37 @@ export interface UIDocument {
   scripts: UIScripts;
 }
 export type JSONValue = null | boolean | number | string | JSONValue[] | { [key: string]: JSONValue };
-export const defaultIntegration = `-- 模拟接入类继承界面脚本；可重写下面四个业务入口。
+export const defaultSource = `local FX = _G.FX
+local UI = FX.Class("UIInteraction", "FCUICompClass")
+
+function UI:OnReady()
+    -- 使用 FX.Loader:Here(self:GetRootNode(), "节点路径") 获取节点。
+end
+
+function UI:Render(state)
+    -- 根据接入类提供的数据更新界面。
+end
+
+return UI`;
+export const defaultIntegration = `local FX = _G.FX
+local Preview = FX.Class("UIPreview", "UIInteraction")
+
+function Preview:Ctor(owner)
+    Preview.Super.Ctor(self, owner)
+    self.Config = {}
+    self.State = {}
+end
+
 function Preview:GetUIConfig() return self.Config end
 function Preview:GetUIState() return self.State end
 function Preview:BindUIData() self:RefreshUI() end
 function Preview:OnUIAction(action, payload)
     print("模拟动作", action)
-end`;
-export interface UIScripts { config: string; source: string; integration: string; references: Record<string, string>; state: JSONValue }
-export const emptyScripts = (): UIScripts => ({ config: 'return {}', source: '', integration: defaultIntegration, references: {}, state: {} });
+end
+
+return Preview`;
+export interface UIScripts { source: string; integration: string }
+export const emptyScripts = (): UIScripts => ({ source: defaultSource, integration: defaultIntegration });
 export const dim = (scale = 0, offset = 0): UDim => ({ scale, offset });
 export const dim2 = (width = 200, height = 100): UDim2 => ({ x: dim(0, width), y: dim(0, height) });
 export function findNode(root: UINode, id: string): UINode | undefined {

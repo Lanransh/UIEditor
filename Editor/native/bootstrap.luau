@@ -56,14 +56,44 @@ clone = function(value)
     return result
 end
 local Base = {}
-local Class = setmetatable({}, table.freeze({ __index = Base }))
-local Preview = setmetatable({}, table.freeze({ __index = Class }))
-local nodes, refs, config, state, instance
+local Class, Preview
+local nodes, instance, root
+local classes = { FCUICompClass = Base }
+local proxies, proxyIds = {}, setmetatable({}, { __mode = "k" })
+local FX = {}
+function FX.Class(name, base)
+    assert(type(name) == "string" and not classes[name], "Class already registered: " .. tostring(name))
+    if type(base) == "string" then base = assert(classes[base], "Base class not found: " .. base) end
+    assert(type(base) == "table", "Expected base class")
+    local cls = { __name = name, __base = base, Super = base }
+    cls.__index = cls
+    setmetatable(cls, { __index = base })
+    function cls:Ctor(...) if base.Ctor then base.Ctor(self, ...) end end
+    function cls:Dtor() if base.Dtor then base.Dtor(self) end end
+    function cls.New(...)
+        local obj = setmetatable({}, cls)
+        obj:Ctor(...)
+        return obj
+    end
+    function cls:GetClassName() return cls.__name end
+    function cls:IsA(target)
+        if type(target) == "string" then target = classes[target] end
+        local current = getmetatable(self)
+        while current do
+            if current == target then return true end
+            current = current.__base
+        end
+        return false
+    end
+    classes[name] = cls
+    return cls
+end
+function FX.GetClass(name) return classes[name] end
 local handlers, disabled = {}, {}
 local operations, logs = {}, {}
 local rendering = false
 local function nodeFor(ref)
-    local id = refs[ref]
+    local id = proxyIds[ref] or (nodes[ref] and ref) or (instance and instance._References and instance._References[ref])
     assert(id and nodes[id], "Unknown node reference: " .. tostring(ref))
     return nodes[id], id
 end
@@ -101,6 +131,76 @@ function API:SetEnabled(ref, enabled)
     assert(type(enabled) == "boolean", "Expected boolean")
     disabled[id] = not enabled
 end
+local function child(parent, name)
+    local node = nodeFor(parent)
+    local found
+    for _, id in ipairs(node.children) do
+        if nodes[id].name == name then
+            assert(not found, "Ambiguous child name: " .. name)
+            found = proxies[id]
+        end
+    end
+    return found
+end
+local function makeProxy(id)
+    local proxy = setmetatable({}, {
+        __index = function(_, key)
+            local node = nodes[id]
+            if key == "Name" then return node.name end
+            if key == "ClassName" then return node.className end
+            if key == "Parent" then return proxies[node.parent] end
+            if key == "FindFirstChild" then return function(_, name) return child(id, name) end end
+            if key == "WaitForChild" then return function(_, name) return assert(child(id, name), "Missing child: " .. name) end end
+            if key == "IsA" then return function(_, name) return node.className == name end end
+            if key == "Activated" then
+                return table.freeze({ Connect = function(_, callback) return API:On(id, "Activated", callback) end })
+            end
+            if node.properties[key] ~= nil then return API:Get(id, key) end
+            return child(id, key)
+        end,
+        __newindex = function(_, key, input) API:Set(id, key, input) end,
+        __metatable = "UI node",
+    })
+    proxyIds[proxy] = id
+    return proxy
+end
+local Loader = {}
+function Loader:Here(parent, path)
+    assert(type(path) == "string", "Expected node path")
+    for name in string.gmatch(path, "[^/]+") do parent = assert(child(parent, name), "Missing UI node: " .. path) end
+    return parent
+end
+function Loader:PlayerGui(name)
+    assert(nodes[root].name == name, "Missing ScreenGui: " .. tostring(name))
+    return proxies[root]
+end
+FX.Loader = table.freeze(Loader)
+function Base:Ctor(owner)
+    self._owner = owner
+    self._rootNode = proxies[root]
+    self.UI = API
+    self._connections = {}
+end
+function Base:GetOwner() return self._owner end
+function Base:GetRootNode() return self._rootNode end
+function Base:TrackConnection(connection)
+    table.insert(self._connections, connection)
+    return connection
+end
+function Base:Dtor()
+    for _, connection in ipairs(self._connections) do connection:Disconnect() end
+end
+function Base:SetButtonEnabled(button, enabled) API:SetEnabled(button, enabled) end
+function Base:Show()
+    local node = self:GetRootNode()
+    if node:IsA("ScreenGui") then node.Enabled = true else node.Visible = true end
+    if self.OnShow then self:OnShow() end
+end
+function Base:Hide()
+    local node = self:GetRootNode()
+    if node:IsA("ScreenGui") then node.Enabled = false else node.Visible = false end
+    if self.OnHide then self:OnHide() end
+end
 function Base:GetUIConfig() return self.Config end
 function Base:GetUIState() return self.State end
 function Base:BindUIData() self:RefreshUI() end
@@ -117,6 +217,8 @@ function Base:RefreshUI()
     rendering = false
 end
 table.freeze(API)
+Base.__index = Base
+Base.__name = "FCUICompClass"
 table.freeze(Base)
 local host = {}
 function host.initialize(input)
@@ -127,58 +229,44 @@ function host.initialize(input)
     end
     table.freeze(Enum)
 end
-local function freeze(input)
-    if type(input) ~= "table" or table.isfrozen(input) then return end
-    for _, item in pairs(input) do freeze(item) end
-    table.freeze(input)
-end
-function host.configure(settings)
-    config = settings
-    freeze(config)
-    local function serialize(input)
-        if valueTypes[input] then return encode(input) end
-        if type(input) ~= "table" then return input end
-        local result = {}
-        for key, item in pairs(input) do result[key] = serialize(item) end
-        return result
-    end
-    return serialize(settings)
-end
 function host.prepare(input)
-    nodes, refs, state = input.nodes, input.references, input.state
-    freeze(state)
-    return Class
+    nodes, root = input.nodes, input.root
+    for id, node in pairs(nodes) do
+        proxies[id] = makeProxy(id)
+        for _, childId in ipairs(node.children) do nodes[childId].parent = id end
+    end
+end
+function host.interaction(cls)
+    assert(type(cls) == "table" and classes[cls.__name] == cls and cls.__base == Base, "Interaction script must return a class inheriting FCUICompClass")
+    Class = cls
+    table.freeze(Class)
+end
+function host.integration(cls)
+    assert(type(cls) == "table" and classes[cls.__name] == cls and cls.__base == Class, "Integration script must return a class inheriting the interaction class")
+    Preview = cls
+    table.freeze(Preview)
 end
 function host.start()
-    for name, method in pairs(Class) do
-        assert(({ OnMount = true, Render = true, OnShow = true, OnHide = true, OnDispose = true })[name] and type(method) == "function", "Unsupported or reserved class method: " .. tostring(name))
-    end
-    table.freeze(Class)
-    for name, method in pairs(Preview) do
-        assert(({ GetUIConfig = true, GetUIState = true, BindUIData = true, OnUIAction = true })[name] and type(method) == "function", "Unsupported or reserved preview method: " .. tostring(name))
-    end
-    table.freeze(Preview)
-    instance = setmetatable({ UI = API, Config = config, State = state }, { __index = Preview })
-    if instance.OnMount then instance:OnMount() end
+    instance = Preview.New({})
+    if instance.OnReady then instance:OnReady() end
     instance:BindUIData()
-    if instance.OnShow then instance:OnShow() end
+    instance:Show()
 end
 function host.command(input)
-    if input.type == "state" then
-        state = input.state
-        instance.State = state
-        instance:RefreshUI()
-    elseif input.type == "event" and not disabled[input.node] then
+    if input.type == "event" and not disabled[input.node] then
         for _, handler in ipairs(handlers[input.node] or {}) do
             if handler.connection.Connected then handler.callback() end
         end
     end
 end
-function host.preview() return Preview end
 function host.dispose()
     if instance then
-        if instance.OnHide then instance:OnHide() end
+        instance:Hide()
         if instance.OnDispose then instance:OnDispose() end
+        instance:Dtor()
+    end
+    for _, list in pairs(handlers) do
+        for _, handler in ipairs(list) do handler.connection:Disconnect() end
     end
     handlers = {}
 end
@@ -200,8 +288,9 @@ function host.warn(...)
     logs[#logs].kind = "warning"
 end
 host.globals = table.freeze({
+    _G = table.freeze({ FX = table.freeze(FX) }),
     UDim = table.freeze(UDim), UDim2 = table.freeze(UDim2), Vector2 = table.freeze(Vector2),
     Color3 = table.freeze(Color3), Enum = Enum,
-    typeof = function(input) return valueTypes[input] or type(input) end,
+    typeof = function(input) return valueTypes[input] or (proxyIds[input] and "Instance") or type(input) end,
 })
 return host

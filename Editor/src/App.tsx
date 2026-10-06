@@ -203,7 +203,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
       <aside className="panel" aria-label="节点树"><h2><Layers3 size={16} />节点树</h2><NodeTree editor={editor} /></aside>
       {separator('tree', '调整节点树宽度')}
       <section className="workspace-editor" aria-label="界面工作区">
-        <nav className="workspace-tabs" aria-label="工作区页签">{(['design', 'source', 'integration'] as const).map((tab, index) => <button key={tab} aria-pressed={workspaceTab === tab} onClick={() => setWorkspaceTab(tab)}>{['编辑界面', '界面脚本', '模拟接入脚本'][index]}</button>)}</nav>
+        <nav className="workspace-tabs" aria-label="工作区页签">{(['design', 'source', 'integration'] as const).map((tab, index) => <button key={tab} aria-pressed={workspaceTab === tab} onClick={() => setWorkspaceTab(tab)}>{['界面', '交互脚本', '接入脚本'][index]}</button>)}</nav>
         <div className="workspace-editor-content">
           <div hidden={workspaceTab !== 'design'} className="workspace-canvas"><DocumentCanvas editor={editor} visible={workspaceTab === 'design'} /></div>
           {(['source', 'integration'] as const).map(mode => <div key={mode} hidden={workspaceTab !== mode} className="workspace-script"><ScriptPanel editor={editor} mode={mode} /></div>)}

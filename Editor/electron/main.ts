@@ -65,7 +65,7 @@ if (!app.requestSingleInstanceLock()) {
       } catch (error) { return { ok: false, error: describeError(error), logs: error instanceof RuntimeError ? error.logs : [] }; }
     });
     ipcMain.handle('runtime:command', async (event, argument) => {
-      if (!trusted(event) || !runtimeSession || argument?.session !== runtimeSession.id || !['state', 'event'].includes(argument?.command?.type)) return { ok: false, error: '运行会话已结束。' };
+      if (!trusted(event) || !runtimeSession || argument?.session !== runtimeSession.id || argument?.command?.type !== 'event') return { ok: false, error: '运行会话已结束。' };
       const session = runtimeSession;
       try { return { ok: true, value: await session.command(argument.command) }; }
       catch (error) { if (runtimeSession === session) stopRuntime(); return { ok: false, error: describeError(error), logs: error instanceof RuntimeError ? error.logs : [] }; }
