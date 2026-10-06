@@ -204,13 +204,6 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
           <button disabled={editor.busy || !history.canRedo} title={history.redoLabel ?? undefined} onClick={history.redo}>重做 <span>Ctrl+Y / Ctrl+Shift+Z</span></button>
         </div>
       </details>
-      <div className="runtime-toolbar">
-        <button disabled={editor.busy} onClick={() => { setWorkspaceTab('design'); void editor.runtime.start(); }}>运行</button>
-        <button disabled={!editor.runtime.active} onClick={() => void editor.runtime.stop()}>停止</button>
-        <button disabled={!editor.runtime.ready} onClick={() => void editor.runtime.reset()}>重置</button>
-        <button disabled={!editor.runtime.ready} onClick={() => void editor.runtime.show()}>打开</button>
-        <button disabled={!editor.runtime.ready} onClick={() => void editor.runtime.hide()}>关闭</button>
-      </div>
     </header>
     {creatingInterface && <NewInterfaceDialog onCancel={() => setCreatingInterface(false)} onCreate={name => { setCreatingInterface(false); void editor.newDocument(name); }} />}
     {editor.error && <div className="editor-error" role="alert">{editor.error}</div>}
@@ -219,6 +212,17 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
       <aside className="panel" aria-label="节点树"><h2><Layers3 size={16} />节点树</h2><NodeTree editor={editor} /></aside>
       {separator('tree', '调整节点树宽度')}
       <section className="workspace-editor" aria-label="界面工作区">
+        <div className="runtime-toolbar">
+          <button disabled={!editor.runtime.active && editor.busy} onClick={() => {
+            if (editor.runtime.active) void editor.runtime.stop();
+            else { setWorkspaceTab('design'); void editor.runtime.start(); }
+          }}>{editor.runtime.active ? '停止' : '运行'}</button>
+          {editor.runtime.active && <>
+            <button disabled={!editor.runtime.ready} onClick={() => void editor.runtime.reset()}>重置</button>
+            <button disabled={!editor.runtime.ready} onClick={() => void editor.runtime.show()}>打开</button>
+            <button disabled={!editor.runtime.ready} onClick={() => void editor.runtime.hide()}>隐藏</button>
+          </>}
+        </div>
         <nav className="workspace-tabs" aria-label="工作区页签">{(['design', 'source', 'integration'] as const).map((tab, index) => <button key={tab} aria-pressed={workspaceTab === tab} onClick={() => setWorkspaceTab(tab)}>{['界面', '交互脚本', '接入脚本'][index]}</button>)}</nav>
         <div className="workspace-editor-content">
           <div hidden={workspaceTab !== 'design'} className="workspace-canvas"><DocumentCanvas editor={editor} visible={workspaceTab === 'design'} /></div>

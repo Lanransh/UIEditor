@@ -95,9 +95,12 @@ try {
     await button.waitFor();
     await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="ClaimButton"]')?.getAttribute('aria-disabled') === 'false');
     assert.equal(await button.getAttribute('aria-disabled'), 'false');
-    const controls = await page.locator('.runtime-toolbar').boundingBox();
-    assert.ok(controls && controls.x < 200, '运行控制应位于左上方');
-    await page.getByRole('button', { name: '关闭', exact: true }).click();
+    const controls = await page.locator('.workspace-editor .runtime-toolbar').boundingBox();
+    const tabs = await page.locator('.workspace-tabs').boundingBox();
+    assert.ok(controls && tabs && controls.y + controls.height <= tabs.y && controls.x === tabs.x, '运行控制应位于工作区页签上方');
+    assert.equal(await page.locator('.runtime-toolbar button').count(), 4);
+    assert.equal(await page.getByRole('button', { name: '运行', exact: true }).count(), 0);
+    await page.getByRole('button', { name: '隐藏', exact: true }).click();
     await button.waitFor({ state: 'hidden' });
     assert.equal(await page.getByRole('button', { name: '停止', exact: true }).isEnabled(), true);
     await page.getByRole('button', { name: '打开', exact: true }).click();
@@ -124,7 +127,7 @@ try {
     await page.getByRole('button', { name: '输出', exact: true }).click();
     assert.equal(await page.getByRole('log').locator('.action').count(), 1);
     await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="ClaimButton"]')?.textContent === 'Claimed');
-    await page.getByRole('button', { name: '关闭', exact: true }).click();
+    await page.getByRole('button', { name: '隐藏', exact: true }).click();
     await button.waitFor({ state: 'hidden' });
     await page.getByRole('button', { name: '打开', exact: true }).click();
     await button.waitFor({ state: 'visible' });
@@ -136,6 +139,7 @@ try {
     await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="ClaimButton"]')?.getAttribute('aria-disabled') === 'false');
     await page.getByRole('button', { name: '停止', exact: true }).click();
     await page.getByRole('button', { name: '运行', exact: true }).waitFor({ state: 'visible' });
+    assert.equal(await page.locator('.runtime-toolbar button').count(), 1);
     assert.equal(await page.getByRole('button', { name: 'ClaimButton', exact: true }).count(), 0);
     assert.equal(await readFile(file, 'utf8'), original);
   }
