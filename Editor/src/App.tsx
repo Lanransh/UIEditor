@@ -14,6 +14,7 @@ declare global { interface Window { projects: ProjectAPI } }
 
 export function App() {
   const [project, setProject] = useState<Project | null>(null);
+  useEffect(() => window.projects.onActivated(setProject), []);
   useEffect(() => { document.title = project ? `${project.name} · Roblox — UI 编辑器` : 'UI 编辑器'; }, [project]);
   return project ? <Workspace key={project.path} project={project} onBack={() => setProject(null)} /> : <ProjectHub onOpen={setProject} />;
 }
@@ -28,6 +29,9 @@ function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
     setBusy(true);
     setError('');
     try {
+      const startup = await window.projects.openStartup();
+      if (!startup.ok) { setError(startup.error); }
+      else if (startup.value) { onOpen(startup.value); return; }
       const result = await window.projects.listRecent();
       if (result.ok) setRecent(result.value); else setError(result.error);
     } catch { setError('无法读取工程历史，请重试。'); }

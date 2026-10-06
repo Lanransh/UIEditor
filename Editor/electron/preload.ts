@@ -5,6 +5,12 @@ import type { RuntimeAPI } from '../src/shared/runtime';
 import type { ImageAssetAPI } from '../src/shared/imageAssets';
 
 const api: ProjectAPI = {
+  openStartup: () => ipcRenderer.invoke('project:open-startup'),
+  onActivated: callback => {
+    const listener = (_event: Electron.IpcRendererEvent, project: import('../src/shared/project').Project) => callback(project);
+    ipcRenderer.on('project:activated', listener);
+    return () => ipcRenderer.removeListener('project:activated', listener);
+  },
   create: () => ipcRenderer.invoke('project:create'),
   open: () => ipcRenderer.invoke('project:open'),
   openRecent: (path) => ipcRenderer.invoke('project:open-recent', path),

@@ -26,6 +26,8 @@ export interface RecentProjectView extends RecentProject {
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
 export interface ProjectAPI {
+  openStartup(): Promise<Result<Project | null>>;
+  onActivated(callback: (project: Project) => void): () => void;
   create(): Promise<Result<Project | null>>;
   open(): Promise<Result<Project | null>>;
   openRecent(path: string): Promise<Result<Project>>;

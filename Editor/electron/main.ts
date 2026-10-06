@@ -14,6 +14,7 @@ import { executeCode, getCodeAdapter } from './code-executor';
 import { openInterface, saveInterface, listInterfaces } from './automation-files';
 import { createCodexMcpSettingsStore } from './codex-mcp-settings.cjs';
 import { ImageAssetStore } from './image-assets';
+import { ensureWorkspaceLauncher } from './workspace-launcher';
 import { resolveImageAssets, type ImageAssetUpdate, type ImageLibrary } from '../src/shared/imageAssets';
 
 const runtime = process.env.UI_EDITOR_USER_DATA
@@ -25,7 +26,9 @@ for (const name of ['userData', 'sessionData', 'logs', 'crashDumps'] as const) {
   app.setPath(name, directory);
 }
 
-if (!app.requestSingleInstanceLock()) {
+const startupWorkspace = process.env.UI_EDITOR_OPEN_WORKSPACE;
+delete process.env.UI_EDITOR_OPEN_WORKSPACE;
+if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null })) {
   app.quit();
 } else {
   void app.whenReady().then(async () => {
@@ -36,7 +39,17 @@ if (!app.requestSingleInstanceLock()) {
       icon: join(__dirname, '../dist/app-icon.png'),
       webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },
     });
-    app.on('second-instance', () => { if (window.isMinimized()) window.restore(); window.focus(); });
+    app.on('second-instance', (_event, _argv, _cwd, data) => {
+      if (window.isMinimized()) window.restore(); window.focus();
+      const path = (data as { workspacePath?: unknown } | null)?.workspacePath;
+      if (typeof path !== 'string') return;
+      void (async () => {
+        if (dirty || busy) throw new Error('请先保存当前界面并完成当前操作，再运行工作区 Run.bat。');
+        busy = true;
+        try { window.webContents.send('project:activated', await remember(await openProject(path))); }
+        finally { busy = false; }
+      })().catch(error => dialog.showMessageBox(window, { type: 'error', title: '无法打开工作区', message: describeError(error) }));
+    });
     window.once('ready-to-show', () => window.show());
     const source = !app.isPackaged && process.env.UI_EDITOR_DEV_URL
       ? process.env.UI_EDITOR_DEV_URL : pathToFileURL(join(__dirname, '../dist/index.html')).href;
@@ -171,6 +184,7 @@ if (!app.requestSingleInstanceLock()) {
       });
     }
     async function remember(project: Project): Promise<Project> {
+      await ensureWorkspaceLauncher(project.path, process.execPath, app.isPackaged ? undefined : app.getAppPath());
       stopRuntime();
       activeProject = project; documentPath = null; dirty = false;
       try { await recent.record(project.path); }
@@ -198,6 +212,12 @@ if (!app.requestSingleInstanceLock()) {
       return directory ? remember(await openProject(directory)) : null;
     });
     handle('project:open-recent', async path => remember(await openProject(await recent.resolveRecent(path))));
+    let startupConsumed = false;
+    handle('project:open-startup', async () => {
+      if (startupConsumed) return null;
+      startupConsumed = true;
+      return startupWorkspace ? remember(await openProject(startupWorkspace)) : null;
+    });
     handle('project:list-recent', recentViews);
     handle('project:remove-recent', async path => { await recent.remove(await recent.resolveRecent(path)); return recentViews(); });
     const requireProject = () => { if (!activeProject) throw new Error('请先打开工程。'); return activeProject; };

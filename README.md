@@ -20,6 +20,8 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 4. 同一父目录已有有效工程时，会询问是否打开；已有无效目录时不覆盖内容。
 5. 历史卡片的垃圾桶仅移出记录，不删除工程。工程移动后使用“打开工程”重新登记。
 
+创建或打开工程会生成工作区 `Run.bat`，双击可直接打开该工程；移动工程或更换编辑器位置后，重新打开工程以更新启动路径。工作区 `.gitignore` 仅追加 `/Run.bat`，工程 `project.json`、UI 文件和项目图片资产均可提交。已有忽略规则保留，用户自建 Run.bat 不会被覆盖。
+
 使用“文件 → 保存”或 Ctrl+S 保存，默认文件为 `interfaces/自定义名称.rbxui.json`；通过“打开界面”重新编辑。节点支持复制、删除、调整层级、画布拖动和尺寸调整，Ctrl+Z 撤销。空白处拖动、空格或中键平移，Ctrl+滚轮缩放，“适应窗口”重新居中。布局组件控制的子节点不能直接拖动。图片属性可保存 Roblox 资源 ID，并选择本地预览图嵌入文件。
 
 使用“文件 → 新建界面”创建 UI，底部“项目资产”显示当前未保存界面和工程 `interfaces` 目录内的 UI 文件卡片。右键卡片选择“打开”即可编辑对应界面，左侧显示其节点树；切换前会提示保存未保存修改。工程外文件仍通过“文件 → 打开界面”选择。
@@ -54,6 +56,7 @@ npm run dev
 | `npm run test:smoke` | 构建并启动真实 Electron，验证 Hub、节点编辑、画布拖动、保存重开和关闭提示 |
 | `npm run test:display` | 使用源码启动隔离显示样例，检查节点渲染与字号约束并保存截图；Studio 对比另行执行，见[显示测试记录](Editor/tests/roblox-display-report.md) |
 | `npm run test:packaged` | 启动已打包 exe，检查 Hub、IPC、运行目录和沙箱配置 |
+| `node tests/workspace-launcher-smoke.mjs` | build 后验证工作区启动文件生成、直接打开工程及已有实例接收启动请求 |
 | `npm run test:runtime` | 构建并验证脚本、按钮动作、数据刷新、重置及错误恢复 |
 | `npm run build:mcp` | 构建独立 stdio MCP 服务，普通 build 已包含 |
 | `npm run test:mcp` | 构建并通过真实 stdio MCP 验证制作、查询、历史、运行与保存 |
