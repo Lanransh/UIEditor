@@ -2,8 +2,46 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { robloxStrategy as strategy } from '../src/editor/roblox';
 import { allNodes, dim, dim2, findNode, findParent } from '../src/shared/uiDocument';
-import { deleteNode, documentCommand, duplicateNode, insertNode, reparentNode, reorderNode } from '../src/editor/commands';
+import { deleteNode, documentCommand, duplicateNode, insertNode, moveNode, nodeDropParent, reparentNode, reorderNode } from '../src/editor/commands';
 import { CommandHistory } from '../src/history/CommandHistory';
+
+test('树拖拽支持前后排序、移入和跨父级移动，整个子树一次撤销重做', () => {
+  const initial = strategy.createDocument(), a = strategy.createNode('Frame'), b = strategy.createNode('Frame'), c = strategy.createNode('TextLabel');
+  a.children.push(c);
+  const original = insertNode(insertNode(initial, initial.root.id, a, strategy), initial.root.id, b, strategy);
+  const before = moveNode(original, b.id, a.id, 'before', strategy);
+  assert.deepEqual(before.root.children.map(node => node.id), [b.id, a.id]);
+  assert.deepEqual(moveNode(before, b.id, a.id, 'after', strategy), original);
+  const history = new CommandHistory<typeof original>();
+  const nested = history.execute(documentCommand('拖拽', d => moveNode(d, a.id, b.id, 'inside', strategy), strategy), original);
+  assert.equal(findParent(nested.root, a.id)?.id, b.id);
+  assert.equal(findParent(nested.root, c.id)?.id, a.id);
+  assert.deepEqual(history.undo(nested), original);
+  assert.deepEqual(history.redo(original), nested);
+  assert.deepEqual(moveNode(nested, a.id, b.id, 'before', strategy), original);
+  assert.equal(original.root.children[0], a);
+  const same = history.execute(documentCommand('不变', d => moveNode(d, a.id, b.id, 'inside', strategy), strategy), nested);
+  assert.equal(same, nested);
+});
+
+test('树拖拽拒绝根、自身、后代、无父级落点和非法组件关系', () => {
+  const initial = strategy.createDocument(), a = strategy.createNode('Frame'), b = strategy.createNode('Frame');
+  const corner = strategy.createNode('UICorner'), duplicate = strategy.createNode('UICorner'), textLimit = strategy.createNode('UITextSizeConstraint');
+  a.children.push(b, corner); b.children.push(duplicate);
+  const document = insertNode(initial, initial.root.id, a, strategy);
+  for (const [id, target, position] of [
+    [document.root.id, a.id, 'inside'], [a.id, a.id, 'before'], [a.id, b.id, 'after'],
+    [b.id, document.root.id, 'before'], [b.id, corner.id, 'inside'],
+    [corner.id, document.root.id, 'inside'], [corner.id, b.id, 'inside'],
+  ] as const) {
+    assert.equal(nodeDropParent(document, id, target, position, strategy), undefined);
+    assert.equal(moveNode(document, id, target, position, strategy), document);
+  }
+  const label = strategy.createNode('TextLabel'); label.children.push(textLimit);
+  const withText = insertNode(document, a.id, label, strategy);
+  assert.equal(moveNode(withText, textLimit.id, b.id, 'inside', strategy), withText);
+  assert.ok(nodeDropParent(document, corner.id, b.id, 'before', strategy));
+});
 
 test('所有支持节点可序列化，Scale/Offset 和节点身份往返保持一致', () => {
   let document = strategy.createDocument('在线奖励');

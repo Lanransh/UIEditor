@@ -1,12 +1,21 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { allNodes, findParent, type PropertyValue, type UDim, type UDim2, type UINode, type Vector2 } from '../shared/uiDocument';
 import type { PropertyDefinition } from './strategy';
 import type { DocumentEditor } from './useDocumentEditor';
 import { layoutComponent } from './roblox';
+import { moveNode, nodeDropParent, type NodeDropPosition } from './commands';
+
+const nodeIcons = import.meta.glob<string>('../assets/roblox-node-icons/*.png', { eager: true, query: '?url', import: 'default' });
 
 export function NodeTree({ editor }: { editor: DocumentEditor }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [type, setType] = useState('Frame');
+  const draggedId = useRef<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; position: NodeDropPosition } | null>(null);
+  function dropPosition(event: DragEvent<HTMLDivElement>): NodeDropPosition {
+    const bounds = event.currentTarget.getBoundingClientRect(), offset = event.clientY - bounds.top;
+    return offset < bounds.height / 3 ? 'before' : offset > bounds.height * 2 / 3 ? 'after' : 'inside';
+  }
   useEffect(() => {
     setCollapsed(previous => {
       const next = new Set(previous);
@@ -17,10 +26,29 @@ export function NodeTree({ editor }: { editor: DocumentEditor }) {
   }, [editor.selected.id, editor.document.root]);
   function branch(node: UINode, depth: number): ReactNode {
     const closed = collapsed.has(node.id);
+    const position = dropTarget?.id === node.id ? dropTarget.position : null;
     return <div key={node.id} role="treeitem" aria-selected={editor.selected.id === node.id} aria-expanded={node.children.length ? !closed : undefined}>
-      <div className={`node-row${editor.selected.id === node.id ? ' selected' : ''}`} style={{ paddingLeft: 6 + depth * 12 }}>
-        <button className="node-expand" disabled={!node.children.length} aria-label={`${closed ? '展开' : '折叠'} ${node.name}`} onClick={() => setCollapsed(previous => { const next = new Set(previous); if (closed) next.delete(node.id); else next.add(node.id); return next; })}>{node.children.length ? closed ? '▸' : '▾' : '·'}</button>
-        <button className="node-select" aria-label={`选择节点 ${node.name}`} onClick={() => editor.select(node.id)}><strong>{node.name}</strong><small>{node.className}</small></button>
+      <div className={`node-row${editor.selected.id === node.id ? ' selected' : ''}${position ? ` drop-${position}` : ''}`} style={{ paddingLeft: 6 + depth * 18 }} title={`${node.name} · ${node.className}`}
+        draggable={!editor.busy && node.id !== editor.document.root.id}
+        onDragStart={event => { draggedId.current = node.id; editor.select(node.id); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', node.id); }}
+        onDragEnd={() => { draggedId.current = null; setDropTarget(null); }}
+        onDragOver={event => {
+          event.stopPropagation();
+          const next = dropPosition(event);
+          const valid = !editor.busy && draggedId.current && nodeDropParent(editor.document, draggedId.current, node.id, next, editor.strategy);
+          event.dataTransfer.dropEffect = valid ? 'move' : 'none';
+          if (valid) event.preventDefault();
+          setDropTarget(valid ? { id: node.id, position: next } : null);
+        }}
+        onDragLeave={event => { if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setDropTarget(null); }}
+        onDrop={event => {
+          event.preventDefault(); event.stopPropagation();
+          const id = draggedId.current, next = dropPosition(event);
+          draggedId.current = null; setDropTarget(null);
+          if (!editor.busy && id) editor.execute('拖拽节点', value => moveNode(value, id, node.id, next, editor.strategy));
+        }}>
+        <button className="node-expand" disabled={!node.children.length} aria-label={`${closed ? '展开' : '折叠'} ${node.name}`} onClick={() => setCollapsed(previous => { const next = new Set(previous); if (closed) next.delete(node.id); else next.add(node.id); return next; })}>{node.children.length ? closed ? '▸' : '▾' : ''}</button>
+        <button className="node-select" aria-label={`选择节点 ${node.name}`} onClick={() => editor.select(node.id)}><img className="node-icon" src={nodeIcons[`../assets/roblox-node-icons/${node.className}.png`]} width={16} height={16} alt="" draggable={false} /><span>{node.name}</span></button>
       </div>
       {!closed && node.children.length > 0 && <div role="group">{node.children.map(child => branch(child, depth + 1))}</div>}
     </div>;

@@ -51,3 +51,23 @@ export function reorderNode(document: UIDocument, id: string, direction: -1 | 1)
     return { ...value, children };
   }) };
 }
+
+export type NodeDropPosition = 'before' | 'inside' | 'after';
+export function nodeDropParent(document: UIDocument, id: string, targetId: string, position: NodeDropPosition, strategy: ProjectStrategy): UINode | undefined {
+  const node = findNode(document.root, id), target = findNode(document.root, targetId);
+  if (!node || !target || id === document.root.id || allNodes(node).some(child => child.id === targetId)) return;
+  const parent = position === 'inside' ? target : findParent(document.root, targetId);
+  return parent && strategy.canParent(parent, node, id) ? parent : undefined;
+}
+export function moveNode(document: UIDocument, id: string, targetId: string, position: NodeDropPosition, strategy: ProjectStrategy): UIDocument {
+  const parent = nodeDropParent(document, id, targetId, position, strategy);
+  if (!parent) return document;
+  const node = findNode(document.root, id)!;
+  const removed = deleteNode(document, id);
+  return { ...document, root: updateNode(removed.root, parent.id, value => {
+    const children = [...value.children];
+    const index = position === 'inside' ? children.length : children.findIndex(child => child.id === targetId) + (position === 'after' ? 1 : 0);
+    children.splice(index, 0, node);
+    return { ...value, children };
+  }) };
+}

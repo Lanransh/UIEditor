@@ -110,12 +110,17 @@ svg { flex-shrink: 0; }
 .node-add { display: flex; gap: 5px; margin-bottom: 8px; }
 .node-add button { white-space: nowrap; flex-shrink: 0; }
 .node-actions { display: flex; gap: 4px; margin-bottom: 10px; }
-.node-row { display: flex; align-items: center; border-radius: 4px; min-width: 0; }
+.node-row { position: relative; display: flex; align-items: center; border-radius: 4px; min-width: 0; height: 24px; user-select: none; }
+.node-row:hover { background: #edf3f2; }
 .node-row.selected { background: #dff2ef; }
-.node-row .node-expand { width: 20px; padding: 4px 0; background: transparent; border: 0; }
-.node-row .node-select { flex: 1; min-width: 0; display: grid; gap: 3px; padding: 7px 3px; text-align: left; border: 0; background: transparent; }
-.node-select strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.node-select small { color: var(--muted); font-size: 10px; }
+.node-row .node-expand { width: 16px; flex-shrink: 0; padding: 0; background: transparent; border: 0; }
+.node-row .node-select { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 0 3px; height: 100%; text-align: left; border: 0; background: transparent; }
+.node-select span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.node-icon { flex-shrink: 0; object-fit: contain; }
+.node-row.drop-inside { background: #dff2ef; box-shadow: inset 0 0 0 1px #168b85; }
+.node-row.drop-before::before, .node-row.drop-after::after { content: ''; position: absolute; left: 6px; right: 0; height: 2px; background: #168b85; pointer-events: none; }
+.node-row.drop-before::before { top: 0; }
+.node-row.drop-after::after { bottom: 0; }
 .property-list { display: grid; align-content: start; gap: 10px; }
 .property-field { display: grid; gap: 5px; }
 .property-field > span { color: #57746f; font-size: 11px; overflow-wrap: anywhere; }

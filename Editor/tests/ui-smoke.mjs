@@ -31,6 +31,16 @@ async function openAsset(name) {
 async function dirty(value) { await page.getByText(value ? '界面有未保存修改' : '界面已保存', { exact: true }).waitFor(); }
 async function undo() { await page.locator('.canvas-heading').click(); await page.keyboard.press('Control+z'); }
 async function savedDocument() { await menu('保存'); await dirty(false); return JSON.parse(await readFile(file, 'utf8')); }
+async function dragNode(source, target, ratio) {
+  const sourceRow = page.getByRole('button', { name: `选择节点 ${source}`, exact: true }).locator('..');
+  const targetRow = page.getByRole('button', { name: `选择节点 ${target}`, exact: true }).locator('..');
+  const from = await sourceRow.boundingBox(), to = await targetRow.boundingBox();
+  await page.mouse.move(from.x + 50, from.y + from.height / 2); await page.mouse.down();
+  await page.mouse.move(from.x + 60, from.y + from.height / 2, { steps: 3 });
+  await page.mouse.move(to.x + 70, to.y + to.height * ratio, { steps: 8 });
+  await page.mouse.move(to.x + 72, to.y + to.height * ratio);
+  await page.mouse.up();
+}
 
 try {
   await dialogs(parent);
@@ -56,6 +66,30 @@ try {
   assert.equal(saved.root.children[0].children.length, 4);
   assert.equal(saved.root.children[0].children[2].previewImage.name, '图标.png');
   assert.equal('state' in saved, false); assert.equal('config' in saved, false);
+  // Compact icon/name rows and native tree drag, including collapsed destinations.
+  assert.equal(await page.locator('.node-select img').count(), 6);
+  assert.ok(await page.locator('.node-select img').evaluateAll(icons => icons.every(icon => icon.complete && icon.naturalWidth === 16 && icon.naturalHeight === 16)));
+  assert.equal(await page.locator('.node-select small').count(), 0);
+  const panelRow = page.getByRole('button', { name: '选择节点 主面板', exact: true }).locator('..');
+  const titleRow = page.getByRole('button', { name: '选择节点 标题', exact: true }).locator('..');
+  assert.equal(await titleRow.evaluate(row => parseFloat(row.style.paddingLeft)) - await panelRow.evaluate(row => parseFloat(row.style.paddingLeft)), 18);
+  await dragNode('领取', '标题', .1); await dirty(true);
+  assert.equal((await savedDocument()).root.children[0].children[1].name, '领取');
+  await undo(); assert.deepEqual(await savedDocument(), saved);
+  await dragNode('标题', '奖励图标', .9);
+  assert.equal((await savedDocument()).root.children[0].children[2].name, '标题');
+  await undo(); assert.deepEqual(await savedDocument(), saved);
+  await dragNode('标题', '领取', .5);
+  assert.equal((await savedDocument()).root.children[0].children[2].children[0].name, '标题');
+  await undo(); assert.deepEqual(await savedDocument(), saved);
+  await dragNode('主面板', '标题', .5); await dirty(false);
+  await page.getByRole('button', { name: '折叠 主面板', exact: true }).click();
+  await select('ScreenGui'); await add('Frame'); await input('节点名称', '待移入');
+  await dragNode('待移入', '主面板', .5);
+  await page.getByRole('button', { name: '选择节点 标题', exact: true }).waitFor();
+  assert.equal((await savedDocument()).root.children[0].children[4].name, '待移入');
+  await undo(); await undo(); await undo(); assert.deepEqual(await savedDocument(), saved);
+  await select('领取');
   await dialogs(null, file.replace('.rbxui.json', ''), 1); await menu('另存为');
   await page.waitForFunction(() => !document.querySelector('fieldset')?.disabled);
   assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), saved);
