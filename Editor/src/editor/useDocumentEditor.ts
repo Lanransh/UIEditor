@@ -6,6 +6,7 @@ import { useEditorHistory } from '../history/useEditorHistory';
 import { useHistoryShortcuts } from '../history/useHistoryShortcuts';
 import { projectStrategy } from './roblox';
 import { deleteNode, documentCommand, duplicateNode, insertNode, pasteNode, reparentNode } from './commands';
+import { useRuntime } from './useRuntime';
 
 declare global { interface Window { documents: DocumentAPI } }
 
@@ -20,15 +21,16 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   const [busy, setBusy] = useState(false);
   const operating = useRef(false);
   const clipboard = useRef<UINode | null>(null);
-  useHistoryShortcuts({ ...history, canUndo: !busy && history.canUndo, canRedo: !busy && history.canRedo });
   const document = history.state;
+  const runtime = useRuntime(document);
+  useHistoryShortcuts({ ...history, canUndo: !busy && !runtime.active && history.canUndo, canRedo: !busy && !runtime.active && history.canRedo });
   const dirty = JSON.stringify(document) !== saved;
   const selected = findNode(document.root, selectedId) ?? document.root;
   useEffect(() => { window.documents.setDirty(dirty); }, [dirty]);
   useEffect(() => () => window.documents.setDirty(false), []);
 
   function execute(label: string, edit: (value: UIDocument) => UIDocument) {
-    if (operating.current) return;
+    if (operating.current || runtime.active) return;
     try { history.execute(documentCommand(label, edit, strategy)); setError(''); }
     catch (cause) { setError(cause instanceof Error ? cause.message : '编辑失败'); }
   }
@@ -51,7 +53,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   async function run(action: () => Promise<void>) {
     if (operating.current) return;
     operating.current = true; setBusy(true);
-    try { await action(); } catch (cause) { setError(cause instanceof Error ? cause.message : '文件操作失败'); }
+    try { await runtime.stop(); await action(); } catch (cause) { setError(cause instanceof Error ? cause.message : '文件操作失败'); }
     finally { operating.current = false; setBusy(false); }
   }
   function reset(value: UIDocument, file: string | null) {
@@ -117,6 +119,6 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
     }
   });
   return { strategy, document, history, selected, select, editNode, execute, add, reparent, pickImage,
-    newDocument, openDocument, save: (saveAs = false) => run(async () => { await save(saveAs); }), back, dirty, path, error, busy };
+    newDocument, openDocument, save: (saveAs = false) => run(async () => { await save(saveAs); }), back, dirty, path, error, busy: busy || runtime.active, runtime };
 }
 export type DocumentEditor = ReturnType<typeof useDocumentEditor>;

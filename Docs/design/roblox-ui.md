@@ -72,9 +72,9 @@ UIGradient 首版使用 ColorStart/ColorEnd 和 TransparencyStart/TransparencyEn
 选择器打开，但不列入项目资产。新建界面显示未保存卡片，保存到工程目录后成为文件资产。
 工程的 project.json 仍只描述工程元数据。
 
-文档保存 format=`roblox-ui`、version=1、稳定文档 ID、名称、固定 canvas 和 root。
+文档保存 format=`roblox-ui`、version=2、稳定文档 ID、名称、固定 canvas、root 和 scripts。首版没有在用项目，不提供 version=1 迁移。
 节点保存稳定 ID、className、name、完整 properties 与有序 children。
-不保存选中状态、视图变换、撤销历史或任何业务数据和脚本字段。
+scripts 保存配置源码、界面基类源码、稳定节点引用和初始模拟状态，格式见 [界面脚本与运行时](ui-runtime.md)。不保存选中状态、视图变换、撤销历史或运行会话。
 
 读取和写入均校验文档与节点字段、属性类型/取值、ID 唯一性、辅助节点关系以及尺寸
 约束的上下界。最多 5000 个节点、64 层，文件最多 32 MiB；不支持版本拒绝加载。
@@ -94,7 +94,7 @@ Image 保存 Roblox 资源标识；节点的 previewImage 分别保存本地文�
 预览图嵌入文档，移动工程不依赖原图片路径；支持 PNG/JPEG/WebP/GIF，单张最多 10 MiB。
 图片只能通过主进程选择并读取，不自动上传或访问远程资源。缺失预览图显示占位提示。
 
-按钮和输入框在画布上只用于选择，不执行交互。字体使用本机替代字体，TextScaled
+编辑模式的按钮和输入框只用于选择；运行模式的 TextButton、ImageButton 支持 Activated，输入框仍不提供运行交互。字体使用本机替代字体，TextScaled
 使用静态估算，GroupColor3 使用浏览器混合近似展示。ImageColor3 只乘入实际图片
 像素，保留透明度和 Fit 留白；Tile 按 Roblox 默认 TileSize（1×1 Scale）展示，
 当前不提供自定义 TileSize。UIStroke 在文本节点上描画文字，在其他节点上画外边框。
@@ -110,15 +110,15 @@ ScrollingFrame 通过 CanvasSize 与 CanvasPosition 展示静态滚动区域，�
 
 ## 配置数据
 
-后续处理，本轮不定义格式或实现。
+使用 Luau 配置脚本返回只读数据表，见 [运行规范](ui-runtime.md)。
 
 ## 运行时状态
 
-后续处理，本轮不定义格式或实现。
+初始模拟状态保存为 JSON，运行中可显式应用新状态触发刷新；运行结果不写回设计。状态外观编辑器尚未实现。
 
 ## Luau 展示与交互
 
-后续处理，本轮不定义接口或实现。
+界面基类负责展示与交互，App 模拟子类提供配置、状态及动作入口，见 [运行规范](ui-runtime.md)。不提供 Controller、任意 Roblox 服务、动态节点或热更新。
 
 ## Roblox 导出与 Rojo
 

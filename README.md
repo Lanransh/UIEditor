@@ -1,13 +1,13 @@
 # UI 编辑器
 
-面向 Roblox UI 制作的独立 Windows 桌面应用。当前提供浅色 Hub、本地工程创建与打开、最近工程记录、Roblox 静态 UI 编辑和 JSON 保存加载。
+面向 Roblox UI 制作的独立 Windows 桌面应用。当前提供浅色 Hub、本地工程管理、Roblox UI 编辑、JSON 保存加载及 Luau 脚本运行模式。
 Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路径卡片与 Roblox 标识。
 
 ## 启动
 
 - 首次运行：双击根目录 `BuildAndRun.bat`，安装锁定依赖、构建并启动。
 - 后续运行：双击 `Run.bat`，直接启动现有构建。源码修改后需重新构建。
-- 构建需要 Node.js 24 LTS（至少 24.13）或更新的受支持版本及 npm；首次安装需要联网。
+- 构建需要 Node.js 24 LTS（至少 24.13）、npm，以及构建 Luau 辅助程序所需的 CMake 3.20+、Git 和 C++17 编译器（MSVC 或 MinGW）；首次获取依赖需要联网。打包应用运行时不需要这些工具或网络。
 - 批处理和打包默认使用与参考工程相同的 npm Electron 镜像；可通过 `ELECTRON_MIRROR` 环境变量覆盖。
 - 可将 Windows 便携 Node.js 放到 `ToolRuntime/Runtime/nodejs/`，批处理优先使用其中的 `node.exe` 和 `npm.cmd`。
 - 打包入口：`ToolRuntime/UIEditor-win32-x64/UIEditor.exe`。运行打包应用无需额外安装 Node.js；分发时需保留整个应用目录，不能只复制 exe。
@@ -24,7 +24,11 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 
 使用“文件 → 新建界面”创建 UI，底部“项目资产”显示当前未保存界面和工程 `interfaces` 目录内的 UI 文件卡片。右键卡片选择“打开”即可编辑对应界面，左侧显示其节点树；切换前会提示保存未保存修改。工程外文件仍通过“文件 → 打开界面”选择。
 
-当前 Roblox 是固定工程模式。本轮只有静态展示，不包含配置/状态数据、Luau 交互、AI/MCP、动态预览或 Roblox 导入导出。支持类型和预览差异见 [静态 UI 设计](Docs/design/roblox-ui.md)。
+当前 Roblox 是固定工程模式，尚未提供 AI/MCP、状态外观编辑器或 Roblox 导入导出。支持类型和预览差异见 [静态 UI 设计](Docs/design/roblox-ui.md)。界面文件采用 version=2，首版不提供旧格式迁移。
+
+点击顶部“脚本”，编辑配置脚本与界面基类脚本，在“节点引用”中将英文标识符绑定到选中节点；也可直接“载入奖励示例”（替换当前界面，可撤销）。点击“运行”后，按钮执行 Luau 事件，设计内容只读。在“模拟状态”填写 JSON 并“应用到运行会话”可主动刷新展示；将示例 Status 改为 Claimable、RemainingSeconds 改为 0、Pending 设为 false 后点击领取，在“运行日志”查看 ClaimReward 动作。将 Status 改为 Claimed 查看完成外观。
+
+“停止”恢复原设计，“重置”恢复运行开始时的快照。运行修改不保存为节点属性，也不影响撤销历史。接口、生命周期和限制见 [界面脚本与运行时](Docs/design/ui-runtime.md)。
 
 ## 开发与验证
 
@@ -32,6 +36,7 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 cd Editor
 npm ci
 node node_modules/electron/install.js
+npm run build:runtime
 npm run dev
 ```
 
@@ -40,12 +45,15 @@ npm run dev
 | 命令 | 用途 |
 | --- | --- |
 | `npm run typecheck` | TypeScript 静态检查 |
-| `npm test` | 工程与界面存储、校验、布局、节点命令撤销重做及失败保存保护测试 |
+| `npm run build:runtime` | 使用固定版本官方 Luau 源码构建独立宿主，输出到 native-bin |
+| `npm test` | 存储、布局、撤销重做及真实 Luau 运行测试；先构建运行宿主 |
 | `npm run build` | 检查并生成界面和 Electron 代码 |
 | `npm start` | 启动已构建代码 |
 | `npm run test:smoke` | 构建并启动真实 Electron，验证 Hub、节点编辑、画布拖动、保存重开和关闭提示 |
 | `npm run test:display` | 使用源码启动隔离显示样例，检查节点渲染与字号约束并保存截图；Studio 对比另行执行，见[显示测试记录](Editor/tests/roblox-display-report.md) |
 | `npm run test:packaged` | 启动已打包 exe，检查 Hub、IPC、运行目录和沙箱配置 |
+| `npm run test:runtime` | 构建并验证脚本、按钮动作、数据刷新、重置及错误恢复 |
+| `node tests/runtime-smoke.mjs --packaged` | 验证已打包 exe 的离线 Luau 运行 |
 | `npm run package` | 构建 Windows x64 应用到 ToolRuntime |
 
 冒烟测试通过 Electron 主进程替代原生目录对话框的返回值，实际执行 UI、IPC 和文件读写；不验证操作系统目录选择器的鼠标交互。

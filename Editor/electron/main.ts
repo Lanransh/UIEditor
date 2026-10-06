@@ -7,8 +7,9 @@ import { createProject, describeError, openProject, RecentProjects } from './pro
 import type { Project, Result, RecentProjectView } from '../src/shared/project';
 import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset } from './documents';
 import { robloxStrategy } from '../src/editor/roblox';
+import { LuauSession } from './runtime';
 
-const runtime = !app.isPackaged && process.env.UI_EDITOR_USER_DATA
+const runtime = process.env.UI_EDITOR_USER_DATA
   ? process.env.UI_EDITOR_USER_DATA
   : join(app.isPackaged ? dirname(dirname(process.execPath)) : join(__dirname, '..', '..', 'ToolRuntime'), 'Runtime');
 for (const name of ['userData', 'sessionData', 'logs', 'crashDumps'] as const) {
@@ -39,6 +40,44 @@ if (!app.requestSingleInstanceLock()) {
     let dirty = false;
     let allowClose = false;
     const trusted = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === source;
+    let runtimeSession: LuauSession | null = null;
+    let runtimeRevision = 0;
+    const stopRuntime = () => { ++runtimeRevision; runtimeSession?.abort(); runtimeSession = null; };
+    window.on('closed', stopRuntime);
+    window.webContents.on('render-process-gone', stopRuntime);
+    ipcMain.handle('runtime:start', async (event, document) => {
+      if (!trusted(event) || !activeProject) return { ok: false, error: '无效的运行来源。' };
+      stopRuntime();
+      const revision = runtimeRevision;
+      try {
+        const started = await LuauSession.start(join(__dirname, app.isPackaged ? '../../native-bin' : '../native-bin'), document);
+        if (revision !== runtimeRevision || window.isDestroyed()) { started.session.abort(); return { ok: false, error: '运行启动已取消。' }; }
+        runtimeSession = started.session;
+        const session = runtimeSession;
+        session.onEnded = error => {
+          if (runtimeSession === session) {
+            runtimeSession = null;
+            if (!window.isDestroyed()) window.webContents.send('runtime:ended', { session: session.id, error });
+          }
+        };
+        return { ok: true, value: { session: runtimeSession.id, frame: started.frame } };
+      } catch (error) { return { ok: false, error: describeError(error) }; }
+    });
+    ipcMain.handle('runtime:command', async (event, argument) => {
+      if (!trusted(event) || !runtimeSession || argument?.session !== runtimeSession.id || !['state', 'event'].includes(argument?.command?.type)) return { ok: false, error: '运行会话已结束。' };
+      const session = runtimeSession;
+      try { return { ok: true, value: await session.command(argument.command) }; }
+      catch (error) { if (runtimeSession === session) stopRuntime(); return { ok: false, error: describeError(error) }; }
+    });
+    ipcMain.handle('runtime:stop', async (event, id) => {
+      if (!trusted(event)) return { ok: false, error: '无效的运行来源。' };
+      if (runtimeSession && runtimeSession.id === id) {
+        const session = runtimeSession;
+        runtimeSession = null;
+        try { await session.stop(); } catch (error) { return { ok: false, error: describeError(error) }; }
+      }
+      return { ok: true, value: null };
+    });
     ipcMain.on('document:dirty', (event, value) => { if (trusted(event) && typeof value === 'boolean') dirty = value; });
     ipcMain.on('document:close', event => { if (trusted(event)) { allowClose = true; window.close(); } });
     window.on('close', event => {
@@ -63,6 +102,7 @@ if (!app.requestSingleInstanceLock()) {
       });
     }
     async function remember(project: Project): Promise<Project> {
+      stopRuntime();
       activeProject = project; documentPath = null; dirty = false;
       try { await recent.record(project.path); }
       catch (error) {
@@ -92,9 +132,10 @@ if (!app.requestSingleInstanceLock()) {
     handle('project:list-recent', recentViews);
     handle('project:remove-recent', async path => { await recent.remove(await recent.resolveRecent(path)); return recentViews(); });
     const requireProject = () => { if (!activeProject) throw new Error('请先打开工程。'); return activeProject; };
-    handle('document:new', async () => { requireProject(); documentPath = null; return null; });
+    handle('document:new', async () => { requireProject(); stopRuntime(); documentPath = null; return null; });
     handle('document:list-assets', async () => listDocumentAssets(requireProject().path));
     handle('document:open', async assetPath => {
+      stopRuntime();
       const project = requireProject();
       if (assetPath !== undefined) {
         const file = await openDocumentAsset(project.path, assetPath);

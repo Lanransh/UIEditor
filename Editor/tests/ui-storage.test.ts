@@ -41,7 +41,7 @@ test('无效输入或写入失败不破坏已有文件；坏文件拒绝读取',
   const document = robloxStrategy.createDocument();
   await writeDocument(path, document);
   const content = await readFile(path, 'utf8');
-  await assert.rejects(writeDocument(path, { ...document, version: 2 }));
+  await assert.rejects(writeDocument(path, { ...document, version: 3 }));
   assert.equal(await readFile(path, 'utf8'), content);
   const blocked = join(directory, 'blocked.rbxui.json'); await mkdir(blocked);
   await assert.rejects(writeDocument(blocked, document));

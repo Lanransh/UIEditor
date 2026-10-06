@@ -4,5 +4,6 @@ Editor/dist-electron/
 ToolRuntime/*
 !ToolRuntime/README.md
 Editor/.cache/
+Editor/native-bin/
 Editor/test-results/
 *.log

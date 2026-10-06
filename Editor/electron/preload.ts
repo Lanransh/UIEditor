@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { ProjectAPI } from '../src/shared/project';
 import type { DocumentAPI } from '../src/shared/documents';
+import type { RuntimeAPI } from '../src/shared/runtime';
 
 const api: ProjectAPI = {
   create: () => ipcRenderer.invoke('project:create'),
@@ -22,3 +23,14 @@ const documents: DocumentAPI = {
   close: () => ipcRenderer.send('document:close'),
 };
 contextBridge.exposeInMainWorld('documents', documents);
+const runtime: RuntimeAPI = {
+  start: document => ipcRenderer.invoke('runtime:start', document),
+  command: (session, command) => ipcRenderer.invoke('runtime:command', { session, command }),
+  stop: session => ipcRenderer.invoke('runtime:stop', session),
+  onEnded: callback => {
+    const listener = (_event: Electron.IpcRendererEvent, event: { session: string; error: string }) => callback(event);
+    ipcRenderer.on('runtime:ended', listener);
+    return () => ipcRenderer.removeListener('runtime:ended', listener);
+  },
+};
+contextBridge.exposeInMainWorld('runtime', runtime);

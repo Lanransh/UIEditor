@@ -5,6 +5,7 @@ import { useDocumentEditor } from './editor/useDocumentEditor';
 import { NodeTree, NodeProperties } from './editor/NodePanels';
 import { DocumentCanvas } from './editor/Canvas';
 import { DocumentAssets } from './editor/DocumentAssets';
+import { ScriptPanel } from './editor/ScriptPanel';
 
 declare global { interface Window { projects: ProjectAPI } }
 
@@ -101,6 +102,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
   const editor = useDocumentEditor(project, onBack);
   const history = editor.history;
   const [assetLibrary, setAssetLibrary] = useState('项目资产');
+  const [scriptsOpen, setScriptsOpen] = useState(false);
   const content = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState({ width: window.innerWidth, height: window.innerHeight - 63 });
   const [sizes, setSizes] = useState({ tree: window.innerWidth <= 1000 ? 180 : 210, properties: window.innerWidth <= 1000 ? 190 : 230, assets: Math.min(240, Math.max(150, window.innerHeight * .25)) });
@@ -188,6 +190,12 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
           <button disabled={editor.busy || !history.canRedo} title={history.redoLabel ?? undefined} onClick={history.redo}>重做 <span>Ctrl+Y / Ctrl+Shift+Z</span></button>
         </div>
       </details>
+      <div className="runtime-toolbar">
+        <button aria-pressed={scriptsOpen} onClick={() => { if (!scriptsOpen) resize('properties', Math.max(properties, 460)); setScriptsOpen(!scriptsOpen); }}>脚本</button>
+        <button disabled={editor.busy} onClick={() => { resize('properties', Math.max(properties, 460)); setScriptsOpen(true); void editor.runtime.start(); }}>运行</button>
+        <button disabled={!editor.runtime.active} onClick={() => void editor.runtime.stop()}>停止</button>
+        <button disabled={!editor.runtime.ready} onClick={() => void editor.runtime.reset()}>重置</button>
+      </div>
     </header>
     {editor.error && <div className="editor-error" role="alert">{editor.error}</div>}
     <div className="workspace-content" ref={content}>
@@ -196,7 +204,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
       {separator('tree', '调整节点树宽度')}
       <DocumentCanvas editor={editor} />
       {separator('properties', '调整属性面板宽度')}
-      <aside className="panel properties" aria-label="属性面板"><h2>属性面板</h2><NodeProperties editor={editor} /></aside>
+      <aside className={`panel properties${scriptsOpen ? ' script-properties' : ''}`} aria-label={scriptsOpen ? '脚本面板' : '属性面板'}><h2>{scriptsOpen ? '界面脚本' : '属性面板'}</h2>{scriptsOpen ? <ScriptPanel editor={editor} /> : <NodeProperties editor={editor} />}</aside>
     </div>
     {separator('assets', '调整资产目录高度')}
     <section className="panel assets" aria-label="资产目录">

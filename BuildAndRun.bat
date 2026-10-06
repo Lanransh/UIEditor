@@ -23,6 +23,11 @@ echo Preparing Electron runtime...
 call node node_modules\electron\install.js
 if errorlevel 1 goto :error
 echo Building UI Editor...
+if not exist native-bin\ui-luau.exe (
+  echo Building Luau host - requires CMake and a C++ compiler...
+  call npm run build:runtime
+  if errorlevel 1 goto :error
+)
 call npm run package
 if errorlevel 1 goto :error
 call "%~dp0Run.bat"

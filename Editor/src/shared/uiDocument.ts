@@ -12,12 +12,16 @@ export interface UINode {
 }
 export interface UIDocument {
   format: 'roblox-ui';
-  version: 1;
+  version: 2;
   id: string;
   name: string;
   canvas: { width: 1280; height: 720 };
   root: UINode;
+  scripts: UIScripts;
 }
+export type JSONValue = null | boolean | number | string | JSONValue[] | { [key: string]: JSONValue };
+export interface UIScripts { config: string; source: string; references: Record<string, string>; state: JSONValue }
+export const emptyScripts = (): UIScripts => ({ config: 'return {}', source: '', references: {}, state: {} });
 export const dim = (scale = 0, offset = 0): UDim => ({ scale, offset });
 export const dim2 = (width = 200, height = 100): UDim2 => ({ x: dim(0, width), y: dim(0, height) });
 export function findNode(root: UINode, id: string): UINode | undefined {

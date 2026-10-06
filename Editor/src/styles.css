@@ -149,3 +149,22 @@ svg { flex-shrink: 0; }
 .preview-scrollbar.horizontal { bottom: 0; }
 .canvas-hint { position: absolute; bottom: 8px; left: 8px; padding: 4px 8px; border-radius: 4px; background: #ffffffd9; color: var(--muted); font-size: 10px; pointer-events: none; }
 .editor-error { padding: 7px 16px; color: #a44338; background: #fff4f2; border-bottom: 1px solid #edc2bd; font-size: 12px; }
+/* Luau editing uses the existing property panel without changing workspace layout. */
+.runtime-toolbar { display: flex; gap: 5px; margin-left: auto; }
+.runtime-toolbar button, .script-panel button { border: 1px solid #cedbda; border-radius: 4px; padding: 4px 8px; color: inherit; background: white; font-size: 12px; }
+.runtime-toolbar button[aria-pressed="true"] { background: #e4f4f2; }
+.panel.script-properties { display: flex; flex-direction: column; min-width: 180px; overflow: hidden; }
+.script-properties h2 { flex-shrink: 0; }
+.script-panel { display: flex; flex-direction: column; min-height: 0; flex: 1; gap: 8px; padding: 8px; }
+.script-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.script-tabs button[aria-pressed="true"] { background: #d7eeea; }
+.script-code { display: flex; flex: 1; min-height: 120px; overflow: hidden; background: #fff; border: 1px solid #d4dedf; }
+.script-code pre, .script-code textarea { margin: 0; font: 12px/20px Consolas, monospace; tab-size: 4; }
+.script-code pre { color: #879493; padding: 8px 6px; text-align: right; background: #f4f6f6; pointer-events: none; }
+.script-code textarea { flex: 1; width: 0; padding: 8px; border: 0; resize: none; white-space: pre; overflow: auto; }
+.script-references, .script-logs { overflow: auto; flex: 1; font-size: 12px; }
+.script-references > div { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+.script-logs pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.script-logs .error { color: #b33434; }
+.script-logs .action { color: #167764; }
+.script-help { font-size: 11px; display: flex; flex-direction: column; gap: 8px; color: #62716e; }

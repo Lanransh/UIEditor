@@ -21,7 +21,7 @@ export function DocumentCanvas({ editor }: { editor: DocumentEditor }) {
   const draftRef = useRef<UIDocument | null>(null);
   const gesture = useRef<Gesture | null>(null);
   const [space, setSpace] = useState(false);
-  const shown = draft ?? editor.document;
+  const shown = editor.runtime.frame?.document ?? draft ?? editor.document;
   useEffect(() => {
     const down = (event: KeyboardEvent) => { if (event.code === 'Space' && event.target instanceof HTMLElement && !event.target.closest('input,textarea,select,button')) { event.preventDefault(); setSpace(true); } };
     const up = (event: KeyboardEvent) => { if (event.code === 'Space') setSpace(false); };
@@ -35,8 +35,9 @@ export function DocumentCanvas({ editor }: { editor: DocumentEditor }) {
     setZoom(scale); setPan({ x: (area.clientWidth - 1280 * scale) / 2, y: (area.clientHeight - 720 * scale) / 2 });
   }
   useEffect(() => { fit(); }, [editor.document.id]);
+  useEffect(() => { if (editor.runtime.ready) fit(); }, [editor.runtime.ready]);
   function start(event: PointerEvent, kind: Gesture['kind'], node?: UINode) {
-    if (editor.busy || gesture.current || ![0, 1].includes(event.button)) return;
+    if ((editor.busy && !editor.runtime.active) || (editor.runtime.active && kind !== 'pan') || gesture.current || ![0, 1].includes(event.button)) return;
     event.preventDefault(); event.stopPropagation();
     if (node) editor.select(node.id);
     const layout = node && layoutComponent(findParent(shown.root, node.id)!);
@@ -101,7 +102,7 @@ export function DocumentCanvas({ editor }: { editor: DocumentEditor }) {
     const stroke = auxiliary(node, 'UIStroke')?.properties;
     const gradient = auxiliary(node, 'UIGradient')?.properties;
     const textNode = node.className.startsWith('Text');
-    const selected = editor.selected.id === node.id || (editor.strategy.nodes[editor.selected.className].category === 'component' && findParent(shown.root, editor.selected.id)?.id === node.id);
+    const selected = !editor.runtime.active && (editor.selected.id === node.id || (editor.strategy.nodes[editor.selected.className].category === 'component' && findParent(shown.root, editor.selected.id)?.id === node.id));
     const resizeLocked = layoutComponent(findParent(shown.root, node.id)!)?.className === 'UIGridLayout';
     const radius = corner ? Math.max(0, pixels(corner, Math.min(rect.width, rect.height))) : 0;
     const style: CSSProperties = {
@@ -128,7 +129,13 @@ export function DocumentCanvas({ editor }: { editor: DocumentEditor }) {
     const tint = node.className.startsWith('Image') ? channels(p.ImageColor3 as string) : [1, 1, 1];
     const thickness = scroll ? p.ScrollBarThickness as number : 0;
     const scrollTexture = (length: number, horizontal = false) => <div style={{ position: 'absolute', width: thickness, height: length, top: horizontal ? thickness : 0, transform: horizontal ? 'rotate(-90deg)' : undefined, transformOrigin: '0 0', backgroundImage: `url("${scrollTop}"), url("${scrollBottom}"), url("${scrollMiddle}")`, backgroundSize: `100% ${thickness}px, 100% ${thickness}px, 100% ${Math.max(0, length - 2 * thickness)}px`, backgroundPosition: 'top, bottom, center', backgroundRepeat: 'no-repeat' }} />;
-    return <div key={node.id} data-node-id={node.id} data-class-name={node.className} className="preview-node" style={style} onPointerDown={event => start(event, space || event.button === 1 ? 'pan' : 'move', space || event.button === 1 ? undefined : node)}>
+    const button = ['TextButton', 'ImageButton'].includes(node.className);
+    const disabled = editor.runtime.frame?.disabled.includes(node.id);
+    return <div key={node.id} data-node-id={node.id} data-class-name={node.className} className="preview-node" style={{ ...style, cursor: editor.runtime.active && button ? disabled ? 'not-allowed' : 'pointer' : undefined }}
+      role={editor.runtime.active && button ? 'button' : undefined} aria-label={editor.runtime.active && button ? node.name : undefined} aria-disabled={editor.runtime.active && button ? disabled : undefined} tabIndex={editor.runtime.active && button && !disabled ? 0 : undefined}
+      onClick={event => { if (editor.runtime.active && button) { event.stopPropagation(); if (!disabled) void editor.runtime.activate(node.id); } }}
+      onKeyDown={event => { if (editor.runtime.active && button && ['Enter', ' '].includes(event.key)) { event.preventDefault(); event.stopPropagation(); if (!disabled && !event.repeat) void editor.runtime.activate(node.id); } }}
+      onPointerDown={event => { if (editor.runtime.active) { event.stopPropagation(); return; } start(event, space || event.button === 1 ? 'pan' : 'move', space || event.button === 1 ? undefined : node); }}>
       <div style={contentStyle}>
         {gradient?.Enabled && <div className="preview-background" style={{ position: 'absolute', inset: 0, borderRadius: radius, pointerEvents: 'none', ...gradientStyle(gradient, p.BackgroundColor3 as string, p.BackgroundTransparency as number, rect.width, rect.height) }} />}
         {textNode && stroke?.Enabled && <div className="preview-text preview-text-stroke" style={{ ...textStyle, color: 'transparent', WebkitTextStroke: `${2 * (stroke.Thickness as number)}px ${rgba(stroke.Color as string, stroke.Transparency as number)}` }}>{text}</div>}
@@ -152,7 +159,7 @@ export function DocumentCanvas({ editor }: { editor: DocumentEditor }) {
   }
   const rectangles = editor.strategy.layout(shown.root, 1280, 720);
   return <section className="canvas" aria-label="Roblox 画布">
-    <div className="canvas-heading"><span>1280 × 720 · {editor.document.name}</span><div className="canvas-tools"><button disabled={editor.busy} onClick={fit}>适应窗口</button><select aria-label="画布缩放" value={zoom} onChange={event => setZoom(Number(event.target.value))}><option value={zoom}>{Math.round(zoom * 100)}%</option>{[.25, .5, .75, 1, 1.5, 2].filter(value => value !== zoom).map(value => <option key={value} value={value}>{value * 100}%</option>)}</select></div></div>
+    <div className="canvas-heading"><span>1280 × 720 · {editor.document.name}</span><div className="canvas-tools"><button disabled={editor.busy && !editor.runtime.active} onClick={fit}>适应窗口</button><select aria-label="画布缩放" disabled={editor.busy && !editor.runtime.active} value={zoom} onChange={event => setZoom(Number(event.target.value))}><option value={zoom}>{Math.round(zoom * 100)}%</option>{[.25, .5, .75, 1, 1.5, 2].filter(value => value !== zoom).map(value => <option key={value} value={value}>{value * 100}%</option>)}</select></div></div>
     <div ref={viewport} className={`canvas-viewport${space ? ' panning' : ''}`} onPointerDown={event => { if (event.button === 0 && !space) editor.select(shown.root.id); start(event, 'pan'); }} onPointerMove={move} onPointerUp={event => finish(event)} onPointerCancel={event => finish(event, true)} onLostPointerCapture={event => finish(event, true)} onWheel={event => {
       if (gesture.current) return;
       if (event.ctrlKey || event.metaKey) {
@@ -164,7 +171,7 @@ export function DocumentCanvas({ editor }: { editor: DocumentEditor }) {
       <div className="ui-artboard" data-testid="ui-artboard" style={{ width: 1280, height: 720, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
         {shown.root.properties.Enabled && shown.root.children.filter(isObject).map(node => renderNode(node, rectangles.get(node.id)!))}
       </div>
-      <div className="canvas-hint">空白处拖动 / 空格或中键平移 · Ctrl+滚轮缩放 · 静态设计</div>
+      <div className="canvas-hint">{editor.runtime.active ? '运行模式 · 点击按钮执行脚本' : '空白处拖动 / 空格或中键平移 · Ctrl+滚轮缩放 · 静态设计'}</div>
     </div>
   </section>;
 }

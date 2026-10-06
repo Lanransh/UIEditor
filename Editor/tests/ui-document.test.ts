@@ -60,7 +60,7 @@ test('拒绝无效版本、属性、重复 ID、非法根和重复组件', () =>
   const frame = strategy.createNode('Frame');
   const document = insertNode(initial, initial.root.id, frame, strategy);
   const changes = [
-    (d: any) => { d.version = 2; },
+    (d: any) => { d.version = 3; },
     (d: any) => { d.root.children[0].id = d.root.id; },
     (d: any) => { d.root.className = 'Frame'; },
     (d: any) => { d.root.children[0].properties.Position.x.scale = '0.5'; },
