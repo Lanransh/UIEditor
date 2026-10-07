@@ -29,7 +29,17 @@ Stud 使用 ImageLabel 的 ScaleType=Enum.ScaleType.Tile、TileSize=UDim2.fromOf
 
 `find` 与 MCP 查询共同采用名称 exact/contains、className、parentId、recursive、offset、limit。默认递归，默认 50 条，最多 200 条。过滤条件取交集。parentId 指定时不包含父节点自身；recursive=false 只查直属子节点。
 
-MCP `uie.nodes.get` 使用 `{id, depth?, view?}`，默认深度 0，最大 64；`uie.nodes.find` 使用相同查询条件。默认查询设计文档，view=runtime 查询运行副本，结果带 runtimeSessionId 和 frameSequence。
+MCP `uie.nodes.get` 使用 `{id?,depth?,view?,target?,format?,maxNodes?}`，省略 id 查询根。JSON 默认深度 0；format="tree" 返回紧凑文本树，默认深度 3；最大深度 64。maxNodes 默认 200、最多 2000，达到限制明确返回截断提示。`uie.nodes.find` 支持相同 target 及原有过滤、分页条件。省略 target 查询当前画布，view=runtime 查询当前运行副本，结果带 runtimeSessionId 和 frameSequence。
+
+## 保存模板与其他工程的读取
+
+先用 `uie.document.list({library:"templates",offset:0,limit:50})` 获取模板的 documentId，再构造 `target={library:"templates",documentId:"实际UUID"}`；省略 projectId 就是当前工程。列表返回 interfaces、total、nextOffset，需读取后续页时传 nextOffset。
+
+`uie.nodes.get/find`、`uie.scripts.get`、`uie.debug.screenshot` 共用 target。先截图和读取浅层树，再按节点 ID 取属性；不要把模板节点 ID 当成当前画布节点 ID。target 读取磁盘保存版本，不切换画布、不改变历史，空白画布也可使用；不接受 view=runtime。截图返回静态 1280×720 PNG，不执行交互脚本。
+
+library 支持 project（默认）、templates、permanent。永久UI全局读取，不传 projectId。跨工程先用 `uie.project.list` 获取已登记工程 UUID，再在 target 加 projectId；App 内打开过的工程才可通过 UUID 查找。UUID 冲突和损坏文件明确返回问题，不按文件名称猜 ID。
+
+`uie.assets.search/get` 可传 projectId 读取来源工程图片；省略使用当前工程，library="permanent" 读取全局图片。`uie.editor.get_state` 返回当前 projectId、projectName、documentId。所有修改与运行仍针对当前编辑会话，不接受 target。
 
 ## 历史、文件与运行边界
 

@@ -8,11 +8,23 @@
 
 ## 工具与查询
 
-固定工具包含 editor.get_state/get_capabilities、nodes.get/find、code.execute、scripts.get/set、document.list/new/open/save、runtime.control/click、debug.get_diagnostics/screenshot 和 assets.search/get/configure，均带 uie 前缀。不提供选中节点、MCP undo/redo 或制作代码内部的历史 API。尚未新建或打开界面时，get_state 返回 nodeCount=0，full 详情的 document 为 null；文档编辑、保存、运行及截图要求先新建或打开界面。图片查询、配置和 ui.assets.apply 见 [图片资产](image-assets.md)。
+固定工具包含 editor.get_state/get_capabilities、nodes.get/find、code.execute、scripts.get/set、document.list/new/open/save、runtime.control/click、debug.get_diagnostics/screenshot、assets.search/get/configure 和 project.list，均带 uie 前缀。不提供选中节点、MCP undo/redo 或制作代码内部的历史 API。尚未新建或打开界面时，get_state 返回 nodeCount=0，full 详情的 document 为 null；状态同时返回 projectId、projectName 和当前 documentId（无文档时为 null）；文档编辑、保存、运行及当前画布截图要求先新建或打开界面。图片查询、配置和 ui.assets.apply 见 [图片资产](image-assets.md)。
 
 scripts.get 读取交互代码 source、接入代码 integration，可用 kind 指定其中一份，省略时读取两份。scripts.set 要求 sessionId/revision，可传 source、integration 或同时传两者，未传字段保持原值。源码长度及结构校验沿用文档边界；语法错误允许保存并在运行时反馈。运行中禁止修改源码。code.execute 内的 ui.scripts.get/set 仍可将源码与节点修改组合提交。
 
-节点 ID 是操作身份；名称路径只辅助显示。get 提供属性、父 ID、子节点摘要及可选深度；find 使用名称 exact/contains、类型和父范围的交集，默认递归，按节点树顺序分页，默认 50 条、最多 200 条。默认读取设计文档；运行副本需显式 view=runtime，并返回运行会话和帧序号。
+节点 ID 是所属文档内的操作身份；名称路径只辅助显示。get 可省略 id 从根读取，JSON 格式提供属性、父 ID、子节点摘要及可选深度（默认 0，最多 64）；format=tree 返回名称、类型、ID 的 Unicode 文本树，默认展开 3 层，深度从根的 0 层计算。两种格式使用 maxNodes 限制返回节点数，默认 200、最多 2000；JSON 在截断父节点返回 truncated/omittedChildren，文本树返回 truncated/truncationReasons 并在树中标明未展开内容。find 使用名称 exact/contains、类型和父范围的交集，默认递归，按节点树顺序分页，默认 50 条、最多 200 条。默认读取设计文档；运行副本需显式 view=runtime，并返回运行会话和帧序号。
+
+## 工程与保存文件的只读目标
+
+project.list 从当前工程和最近工程记录重新读取 project.json，返回工程 UUID、名称、是否当前工程，以及不可用记录和重复 UUID 问题，不扫描磁盘、不切换工程。显式 projectId 只解析已登记且 UUID 唯一的工程；未登记工程需先在 App 打开。省略 projectId 使用当前打开工程，不自动选择最近工程。工程移动后重新打开即可更新位置；同一 UUID 对应多个位置时显式查询报冲突。
+
+document.list 接收 projectId?、library?、offset?、limit?，默认读取当前工程 project 库；templates 是当前/指定工程模板库，permanent 是全局永久UI库且不接受 projectId。返回 interfaces 的 documentId、名称、库内相对路径、问题，以及 total/nextOffset，默认 50 条、最多 200 条；不返回文档内容、图片或脚本。界面 ID 沿用保存定义中的 UUID，不增加路径身份或修改已有文件。损坏文件或旧格式中的非 UUID 界面 ID 单独标明问题，不自动修改文件；同一库内多个文件 UUID 相同时标明问题并拒绝按 ID 读取。跨库、跨工程的相同界面 ID 由目标范围区分。
+
+nodes.get/find、scripts.get 和 debug.screenshot 共用可选 target：`{projectId?,library?,documentId}`。省略 target 读取当前画布（包括未保存修改）；传 target 读取磁盘保存版本，library 默认 project，省略 projectId 使用当前工程。永久库全局读取，不要求打开工程，也不接受 projectId。文件目标不接受 view=runtime；读取不激活工程、不打开文档、不改变会话、dirty 或历史。空白画布或 Hub 中仍可读取有明确来源的保存文件。返回规范化 target，保存文件结果不提供可用于编辑的 sessionId/revision。
+
+目标文件在主进程按 UUID 查找、校验，不接受任意文件路径；库根禁止符号链接，遍历跳过链接。图片引用使用来源工程与永久图片库解析；永久UI只使用永久图片及文件内快照。assets.search/get 增加 projectId?，省略使用当前工程，library=permanent 是全局；不通过查询改变资产配置。
+
+保存文件截图使用独立隐藏、不可聚焦窗口，复用 DocumentPreview 渲染器，等待图片、字体和绘制完成。输出固定 1280×720 PNG（规范化 Windows DPI）、来源 target 和 view=saved-design；不执行文档脚本、不影响前台画布。未传 target 的截图保持现有视口与缩放行为。写入工具及 runtime.control/click、debug.get_diagnostics、get_capabilities 继续绑定当前会话，不接受跨工程目标。
 
 ## 代码事务与历史
 
@@ -26,7 +38,7 @@ scripts.get 读取交互代码 source、接入代码 integration，可用 kind �
 
 只有编辑和运行状态；运行中禁止设计修改和历史操作。run/stop/reset 与用户工具栏共用运行控制，click 与用户按钮共用事件入口，不可见或禁用时返回未分发原因。运行副本与日志不保存、不进入历史。运行错误结束会话，保留日志并恢复编辑。诊断分别提供运行日志及 App 控制台游标，各最多保留 500 条并报告截断。截图切回界面页、等待绘制，捕获实际画布视口，隐藏选择装饰与提示，返回 PNG 尺寸和缩放；它不是 Roblox 设备渲染结果。
 
-文件工具仅允许当前工程 interfaces 内的相对路径，检查越界与符号链接。list 递归列出界面，跳过链接。新目标独占创建，拒绝覆盖；无路径保存当前文件使用既有原子写入。切换未保存界面需先保存或显式 discardChanges。MCP 不弹系统文件对话框，不自动放弃修改。
+文件写入和打开工具仅允许当前工程 interfaces 内的相对路径，检查越界与符号链接。只读 list 支持三个 UI 库并跳过链接。新目标独占创建，拒绝覆盖；无路径保存当前文件使用既有原子写入。切换未保存界面需先保存或显式 discardChanges。MCP 不弹系统文件对话框，不自动放弃修改。
 
 ## Hub、工作区与打包
 
@@ -36,7 +48,7 @@ Hub 右上角“设置”提供 Codex MCP 配置，不提供 AI 工作区打开�
 
 ## 验证
 
-`npm run build:runtime` 构建原生宿主与编辑入口；`npm run build` 包含 MCP bundle。`tests/automation.test.ts` 检查真实 Luau、事务、查询、文件、配置及桥接；`npm run test:mcp` 使用真实 stdio 与隔离 Electron 工程检查制作、历史、运行、点击、日志、截图及保存重开。先 package 后执行 `npm run test:mcp:packaged` 验证打包路径。所有 App 测试不能替代 Studio 或设备验收。
+`npm run build:runtime` 构建原生宿主与编辑入口；`npm run build` 包含 MCP bundle。`tests/automation-reader.test.ts` 检查 UUID 来源、默认工程、全局库、文件重命名、重复身份、图片来源、树截断与校验；`tests/automation.test.ts` 检查真实 Luau、事务、查询、文件、配置及桥接；`npm run test:mcp` 使用真实 stdio 与隔离 Electron 工程检查制作、历史、运行、点击、日志、截图及保存重开，并验证空白/脏画布下读取模板和跨工程查询不改变会话、独立截图的像素/尺寸及窗口清理。先 package 后执行 `npm run test:mcp:packaged` 验证打包路径。所有 App 测试不能替代 Studio 或设备验收。
 
 需要保留正在运行的打包应用时，可用 UI_EDITOR_PACKAGE_OUTPUT 指定隔离打包目录，再以 UI_EDITOR_PACKAGED_EXECUTABLE 指定该 exe 执行打包 MCP 测试，不需要终止现有用户会话。
 

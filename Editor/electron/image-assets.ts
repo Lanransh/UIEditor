@@ -20,8 +20,12 @@ function validateAsset(value: unknown): ImageAsset {
     previewImage: { name: a.previewImage.name, dataUrl: a.previewImage.dataUrl }, robloxId: normalizeRobloxId(a.robloxId) };
 }
 export class ImageAssetStore {
-  constructor(private runtime: string, private project: string) {}
-  private directory(library: ImageLibrary) { return join(library === 'permanent' ? this.runtime : this.project, 'image-assets'); }
+  constructor(private runtime: string, private project?: string) {}
+  private directory(library: ImageLibrary) {
+    const root = library === 'permanent' ? this.runtime : this.project;
+    if (!root) throw new Error('请先打开工程。');
+    return join(root, 'image-assets');
+  }
   async assetDirectory(id: string): Promise<string> {
     const asset = (await this.list()).find(a => a.id === id);
     if (!asset) throw new Error('图片资产不存在。');
@@ -30,6 +34,7 @@ export class ImageAssetStore {
     return directory;
   }
   private async read(library: ImageLibrary): Promise<Catalog> {
+    if (library === 'project' && !this.project) return empty();
     const directory = this.directory(library), path = join(directory, 'catalog.json');
     if (!await regular(directory, true)) return empty();
     const info = await regular(path);
