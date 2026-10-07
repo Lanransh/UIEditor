@@ -4,9 +4,11 @@
 
 ## 参考与适用范围
 
-默认模板来自 Roblox_Y1 的 TemplatePage：SmallWindowUI、MediumWindowUI、LargeWindowUI、TitleBox、CloseBtn、OperationButtonExamplesUI、ProgressBarImg。需要这些模板时先读取 Figma 原节点，保留其结构和视觉，不凭空声明已复用。UIEditor 尚无 Figma 组件导入器，须将支持的结构移植为可编辑 Roblox 节点，必要图片单独下载。
+制作时执行 [AGENTS.md 的参考优先规则](AGENTS.md#角色与参考优先)：默认主动查看当前工程模板参考，自行选择用途匹配的模板，再延续其布局与样式，不要求用户指定。下面的蓝色窗口参数是确认工程没有模板或用户明确允许自由设计时的默认参考值，不覆盖已选模板，不要求每个界面套用同一蓝色窗口。
 
-本次 StudDailyLoginUI 按用户指定的 WelfareUI（120:14）制作，采用绿色标题、黑色描边、灰色内容底板和粉红关闭按钮；这是该参考主题，不强行改成下述默认蓝色窗口。后续未指定主题时参考蓝色模板；明确参考的布局、配色优先于默认模板参考值。
+默认规范的来源是 Roblox_Y1 的 TemplatePage：SmallWindowUI、MediumWindowUI、LargeWindowUI、TitleBox、CloseBtn、OperationButtonExamplesUI、ProgressBarImg。需要这些 Figma 模板时先读取原节点，保留其结构和视觉，不凭空声明已复用。UIEditor 尚无 Figma 组件导入器，须将支持的结构移植为可编辑 Roblox 节点，必要图片单独下载。
+
+`examples/` 中的 StudDailyLoginUI 曾按 WelfareUI（120:14）制作，采用绿色标题、黑色描边、灰色内容底板和粉红关闭按钮；这只是该示例的参考主题，不是其他界面的默认模板。不得把签到结构、七天奖励或示例配色自动带入新需求。
 
 ## 基础约束与节点命名
 
@@ -80,9 +82,9 @@ ProgressBarImg 参考 520×54，底色 #2B6EDB，描边 #12438F / 3，圆角 27�
 
 ## Stud 样式与资源
 
-资源及来源见 [assets/stud/README.md](assets/stud/README.md)。StudTile.png 为原始 96×96 透明方形凸纹，用一个 ImageLabel 平铺，TileSize=27×27 Offset。底板负责颜色，纹理透明背景，文字和图标在上层。标题/主按钮 ImageTransparency=0，普通卡片 .72，第七天卡片 .88。
+资源及来源见 [assets/stud/README.md](assets/stud/README.md)。Stud 使用一个 ImageLabel 平铺，底板负责颜色，纹理透明背景，文字和图标在上层。贴图、平铺尺寸和透明度优先沿用实际模板。签到示例使用原始 96×96 的 StudTile.png，TileSize=27×27 Offset，标题/主按钮 ImageTransparency=0，普通卡片 .72，第七天卡片 .88；这些数值不是所有模板的强制参数。
 
-此次参考配色：标题 #85D84A，领取 #67ED14，选中导航 #278CE9，未选 #546A84，锁定 #809389，普通卡片 #E9F0F4，可领卡片 #EFF9D9，周奖励 #FFF5D9，周奖励标题 #FFD36A，关闭 #F54B6C。表面黑色描边 2~3，圆角 2~6，内部高光和底部压边形成厚度。
+签到示例参考配色：标题 #85D84A，领取 #67ED14，选中导航 #278CE9，未选 #546A84，锁定 #809389，普通卡片 #E9F0F4，可领卡片 #EFF9D9，周奖励 #FFF5D9，周奖励标题 #FFD36A，关闭 #F54B6C。表面黑色描边 2~3，圆角 2~6，内部高光和底部压边形成厚度。其他界面的颜色、纹理密度与透明度按实际选用的模板，不强套示例数值。
 
 不逐个创建凸点，不整窗图片化，不虚构上传 ID。本地预览嵌入界面；Stud 使用现有 Toolkit 源码里的真实 ID，权限和图标资源仍需 Studio 验证。图片不自动上传；Roblox UI 导入通过文件菜单交给 Toolkit，使用已配置的真实资源 ID。脚本映射与原始运行脚本见 [Toolkit 移植](references/toolkit-stud-port.md)。
 
