@@ -97,10 +97,11 @@ try {
   await dialogs(imageFile); await page.getByRole('button', { name: '选择预览图片', exact: true }).click();
   await page.getByText('图标.png', { exact: true }).waitFor();
   await select('主面板'); await add('TextButton'); await input('节点名称', '领取'); await input('Text', '领取奖励'); await input('Position.y.offset', 260);
-  // Tree context save writes the whole interface to the project without a save dialog.
+  // Tree context save selects the project library without a native file dialog.
   await dialogs(null, null);
   await page.getByRole('button', { name: '选择节点 领取', exact: true }).click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '保存为项目UI', exact: true }).click();
+  await page.getByRole('menuitem', { name: '保存…', exact: true }).click();
+  await page.getByRole('dialog', { name: '保存UI', exact: true }).getByRole('button', { name: '保存', exact: true }).click();
   await dirty(false);
   const saved = JSON.parse(await readFile(file, 'utf8'));
   await page.getByRole('button', { name: 'UI 资产 在线奖励', exact: true }).waitFor();

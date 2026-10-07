@@ -55,6 +55,17 @@ export function safeFileName(name: string): string {
   const clean = name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/g, '').slice(0, 100) || '未命名界面';
   return /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(clean) ? `_${clean}` : clean;
 }
+export function templateFolderPath(root: string, name: unknown): string {
+  if (typeof name !== 'string' || !name.trim() || name !== safeFileName(name) || name === '.' || name === '..') throw new Error('文件夹名称无效，请勿使用路径或特殊字符。');
+  return join(documentAssetDirectory(root, 'templates'), name);
+}
+export async function listTemplateFolders(root: string): Promise<string[]> {
+  const entries = await readdir(documentAssetDirectory(root, 'templates'), { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  });
+  return entries.filter(entry => entry.isDirectory()).map(entry => entry.name).sort((a, b) => a.localeCompare(b, 'zh-CN'));
+}
 export async function readDocument(path: string): Promise<UIDocument> {
   if ((await stat(path)).size > 32 * 1024 * 1024) throw new Error('界面文件超过 32 MiB。');
   let source: unknown;

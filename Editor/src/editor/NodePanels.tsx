@@ -4,11 +4,13 @@ import type { PropertyDefinition } from './strategy';
 import type { DocumentEditor } from './useDocumentEditor';
 import { layoutComponent } from './roblox';
 import { moveNode, nodeDropParent, type NodeDropPosition } from './commands';
+import { SaveDocumentDialog } from './SaveDocumentDialog';
 
 const nodeIcons = import.meta.glob<string>('../assets/roblox-node-icons/*.png', { eager: true, query: '?url', import: 'default' });
 
 export function NodeTree({ editor }: { editor: DocumentEditor }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
   const [menu, setMenu] = useState<{ parent: UINode; x: number; y: number; context?: boolean } | null>(null);
   const menuElement = useRef<HTMLDivElement>(null);
   const draggedId = useRef<string | null>(null);
@@ -87,12 +89,12 @@ export function NodeTree({ editor }: { editor: DocumentEditor }) {
     {menu && <div ref={menuElement} className="node-add-menu" role="menu" aria-label={menu.context ? '节点操作' : '添加子节点'} style={{ left: menu.x, top: menu.y }}
       onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setMenu(null); } }}
       onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setMenu(null); }}>
-      {menu.context && <button role="menuitem" autoFocus onClick={() => { setMenu(null); void editor.saveProjectUI(); }}>保存为项目UI</button>}
-      {menu.context && <button role="menuitem" onClick={() => { setMenu(null); void editor.saveTemplate(); }}>保存为模板参考</button>}
+      {menu.context && <button role="menuitem" autoFocus onClick={() => { setMenu(null); setSaving(true); }}>保存…</button>}
       {Object.keys(editor.strategy.nodes).filter(name => editor.strategy.canParent(menu.parent, editor.strategy.createNode(name))).map((name, index) => <button key={name} role="menuitem" autoFocus={!menu.context && index === 0} onClick={() => {
         editor.add(name, menu.parent.id); setMenu(null);
       }}><img className="node-icon" src={nodeIcons[`../assets/roblox-node-icons/${name}.png`]} width={16} height={16} alt="" />{name}</button>)}
     </div>}
+    {saving && <SaveDocumentDialog editor={editor} onClose={() => setSaving(false)} />}
   </fieldset>;
 }
 

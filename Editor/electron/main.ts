@@ -6,7 +6,7 @@ import { mkdir, stat } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { createProject, describeError, openProject, RecentProjects } from './projects';
 import type { Project, Result, RecentProjectView } from '../src/shared/project';
-import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset, moveDocumentAsset } from './documents';
+import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset, moveDocumentAsset, listTemplateFolders, templateFolderPath } from './documents';
 import { robloxStrategy } from '../src/editor/roblox';
 import { LuauSession, RuntimeError } from './runtime';
 import { ToolkitClient } from './toolkit';
@@ -271,10 +271,24 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       if (documentPath === argument.path) documentPath = asset.path;
       return asset;
     });
-    handle('document:save-template', async source => {
+    ipcMain.handle('document:template-folders', async event => {
+      if (!trusted(event)) return { ok: false, error: '无效的操作来源。' };
+      try { requireProject(); return { ok: true, value: await listTemplateFolders(runtime) }; }
+      catch (error) { return { ok: false, error: describeError(error) }; }
+    });
+    handle('document:create-template-folder', async name => {
       requireProject();
+      await mkdir(join(runtime, 'template-references'), { recursive: true });
+      await mkdir(templateFolderPath(runtime, name));
+      return null;
+    });
+    handle('document:save-template', async argument => {
+      requireProject();
+      const { document: source, folder } = argument as { document: unknown; folder?: string };
       const document = robloxStrategy.validate(source);
-      const path = join(runtime, 'template-references', `${safeFileName(document.name)}.rbxui.json`);
+      const directory = folder === undefined || folder === '' ? join(runtime, 'template-references') : templateFolderPath(runtime, folder);
+      if (folder && !(await listTemplateFolders(runtime)).includes(folder)) throw new Error('模板文件夹不存在，请刷新后重试。');
+      const path = join(directory, `${safeFileName(document.name)}.rbxui.json`);
       const exists = await stat(path).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });
       if (exists) {
         const answer = await dialog.showMessageBox(window, { type: 'question', title: '模板参考已存在', message: '是否覆盖同名模板参考？', detail: path, buttons: ['覆盖', '取消'], defaultId: 1, cancelId: 1 });

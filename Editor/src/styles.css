@@ -76,7 +76,8 @@ svg { flex-shrink: 0; }
 .asset-libraries button.selected { background: #e4f4f2; color: var(--accent); }
 .assets-empty { display: grid; place-items: center; color: var(--muted); font-size: 12px; }
 .document-assets { min-width: 0; overflow: auto; padding: 16px 20px; font-size: 12px; }
-.document-asset-toolbar { margin-bottom: 12px; }
+.document-asset-toolbar { margin-bottom: 12px; display: flex; gap: 8px; }
+.document-asset-toolbar button, .document-asset-toolbar select { padding: 6px 10px; border: 1px solid #cedbda; border-radius: 4px; background: white; color: inherit; }
 .asset-grid { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 20px; }
 .ui-asset { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 124px; padding: 0; border: 0; background: transparent; color: inherit; }
 .ui-asset-preview { display: grid; place-items: center; width: 100%; height: 76px; border: 1px solid #cedbda; border-radius: 4px; background: #f3f6f6; color: #718181; }

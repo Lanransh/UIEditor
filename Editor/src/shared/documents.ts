@@ -11,7 +11,9 @@ export interface DocumentAPI {
   previewAsset(path: string, library?: DocumentLibrary): Promise<Result<DocumentFile>>;
   openTemplate(path: string, library?: 'templates' | 'permanent'): Promise<Result<DocumentFile>>;
   moveAsset(path: string, source: DocumentLibrary, target: DocumentLibrary): Promise<Result<DocumentAsset>>;
-  saveTemplate(document: UIDocument): Promise<Result<DocumentFile | null>>;
+  listTemplateFolders(): Promise<Result<string[]>>;
+  createTemplateFolder(name: string): Promise<Result<null>>;
+  saveTemplate(document: UIDocument, folder?: string): Promise<Result<DocumentFile | null>>;
   save(document: UIDocument, saveAs?: boolean, projectUI?: boolean): Promise<Result<DocumentFile | null>>;
   pickImage(): Promise<Result<UINode['previewImage'] | null>>;
   confirmChanges(): Promise<Result<'save' | 'discard' | 'cancel'>>;

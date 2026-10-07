@@ -102,8 +102,8 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
     if (!result.ok) { setError(result.error); return; }
     reset(strategy.validate(result.value.document), null);
   });
-  const saveTemplate = () => run(async () => {
-    const result = await window.documents.saveTemplate(document);
+  const saveTemplate = (folder?: string) => run(async () => {
+    const result = await window.documents.saveTemplate(document, folder);
     if (!result.ok) { setError(result.error); return; }
     if (result.value) setError('');
   });

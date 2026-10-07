@@ -34,10 +34,30 @@ export function DocumentAssets({ editor, library }: { editor: DocumentEditor; li
   const [assets, setAssets] = useState<DocumentAsset[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [folders, setFolders] = useState<string[]>([]);
+  const [folder, setFolder] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [folderName, setFolderName] = useState('');
+  const folderDialog = useRef<HTMLDialogElement>(null);
   const [revision, refresh] = useState(0);
   const [menu, setMenu] = useState<{ path: string | null; x: number; y: number; moving?: boolean } | null>(null);
   const menuElement = useRef<HTMLDivElement>(null);
   const assetLibrary: DocumentLibrary = library === '模板参考' ? 'templates' : library === '永久UI' ? 'permanent' : 'project';
+  useEffect(() => {
+    setFolder(''); setCreating(false);
+  }, [library]);
+  useEffect(() => {
+    if (creating) folderDialog.current?.showModal();
+  }, [creating]);
+  useEffect(() => {
+    if (assetLibrary !== 'templates') return;
+    let cancelled = false;
+    void window.documents.listTemplateFolders().then(result => {
+      if (cancelled) return;
+      if (result.ok) setFolders(result.value); else setError(result.error);
+    }).catch(cause => { if (!cancelled) setError(String(cause)); });
+    return () => { cancelled = true; };
+  }, [assetLibrary, revision, editor.busy]);
 
   useEffect(() => {
     if (editor.busy) return;
@@ -69,9 +89,30 @@ export function DocumentAssets({ editor, library }: { editor: DocumentEditor; li
     };
   }, [menu]);
 
-  const entries = assetLibrary === 'project' && !editor.path ? [{ name: editor.document.name, path: null }, ...assets] : assets;
+  const visibleAssets = assetLibrary === 'templates' ? assets.filter(asset => {
+    const parts = asset.path.replace(/\\/g, '/').split('/');
+    const relative = parts.slice(parts.lastIndexOf('template-references') + 1);
+    return folder ? relative.length > 1 && relative[0] === folder : relative.length === 1;
+  }) : assets;
+  const entries = assetLibrary === 'project' && !editor.path ? [{ name: editor.document.name, path: null }, ...visibleAssets] : visibleAssets;
   return <div className="document-assets" aria-label="UI 界面资产" aria-busy={loading || editor.busy}>
-    {assetLibrary === 'templates' && <div className="document-asset-toolbar"><button disabled={editor.busy} onClick={() => void editor.saveTemplate()}>保存当前UI为模板参考</button></div>}
+    {assetLibrary === 'templates' && <div className="document-asset-toolbar">
+      <select aria-label="浏览模板文件夹" value={folder} onChange={event => setFolder(event.target.value)}><option value="">模板参考根目录</option>{folders.map(name => <option key={name}>{name}</option>)}</select>
+      <button disabled={editor.busy} onClick={() => { setFolderName(''); setCreating(true); }}>＋ 新建文件夹</button>
+    </div>}
+    {creating && <dialog ref={folderDialog} className="new-interface-dialog" aria-label="新建模板文件夹" onCancel={() => setCreating(false)}>
+      <form onSubmit={event => {
+        event.preventDefault();
+        void window.documents.createTemplateFolder(folderName.trim()).then(result => {
+          if (!result.ok) { setError(result.error); return; }
+          setFolder(folderName.trim()); setCreating(false); setError(''); refresh(value => value + 1);
+        }).catch(cause => setError(String(cause)));
+      }}>
+        <h2>新建模板文件夹</h2><label>文件夹名称<input autoFocus aria-label="文件夹名称" value={folderName} onChange={event => setFolderName(event.target.value)} /></label>
+        {error && <p role="alert">{error}</p>}
+        <div className="new-interface-actions"><button type="button" onClick={() => setCreating(false)}>取消</button><button type="submit" disabled={!folderName.trim()}>创建</button></div>
+      </form>
+    </dialog>}
     {error && <div className="asset-error" role="alert">{error}<button disabled={editor.busy} onClick={() => refresh(value => value + 1)}>重试</button></div>}
     <div className="asset-grid">
       {entries.map(asset => <button key={asset.path ?? editor.document.id} className={`ui-asset${asset.path === editor.path ? ' current' : ''}`} disabled={editor.busy}

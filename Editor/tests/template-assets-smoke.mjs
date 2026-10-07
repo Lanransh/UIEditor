@@ -42,6 +42,13 @@ async function add(type, parent) {
   await page.waitForFunction(type => document.querySelector('[aria-label="节点名称"]')?.value === type, type);
 }
 async function idle() { await page.waitForFunction(() => !document.querySelector('fieldset')?.disabled); }
+async function treeSave(target) {
+  await page.getByRole('button', { name: '选择节点 TextLabel', exact: true }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '保存…', exact: true }).click();
+  await page.getByLabel('保存到', { exact: true }).selectOption(target);
+  await page.getByRole('dialog', { name: '保存UI', exact: true }).getByRole('button', { name: '保存', exact: true }).click();
+  await idle();
+}
 async function preview(text) {
   await page.getByRole('img', { name: 'TemplateDemo 缩略图', exact: true }).locator('.preview-text-fill').getByText(text, { exact: true }).waitFor();
 }
@@ -82,14 +89,30 @@ try {
   const referenceBefore = await readFile(templateFile, 'utf8');
   await input('Text', '更新参考');
   await dialogs(first, 1);
-  await page.getByRole('button', { name: '保存当前UI为模板参考', exact: true }).click(); await idle();
+  assert.equal(await page.getByRole('button', { name: '保存当前UI为模板参考', exact: true }).count(), 0);
+  await treeSave('templates');
   assert.equal(await readFile(templateFile, 'utf8'), referenceBefore);
   await page.getByText('界面有未保存修改', { exact: true }).waitFor();
   await dialogs();
-  await page.getByRole('button', { name: '选择节点 TextLabel', exact: true }).click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '保存为模板参考', exact: true }).click(); await idle();
+  await treeSave('templates');
   await preview('更新参考');
   const reference = await readFile(templateFile, 'utf8');
+  await page.getByRole('button', { name: '＋ 新建文件夹', exact: true }).click();
+  await page.getByLabel('文件夹名称', { exact: true }).fill('奖励界面');
+  await page.getByRole('dialog', { name: '新建模板文件夹', exact: true }).getByRole('button', { name: '创建', exact: true }).click();
+  await page.getByLabel('浏览模板文件夹', { exact: true }).getByRole('option', { name: '奖励界面', exact: true }).waitFor({ state: 'attached' });
+  await page.getByRole('button', { name: '选择节点 TextLabel', exact: true }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '保存…', exact: true }).click();
+  await page.getByLabel('保存到', { exact: true }).selectOption('templates');
+  await page.getByLabel('模板文件夹', { exact: true }).selectOption('奖励界面');
+  await page.getByRole('dialog', { name: '保存UI', exact: true }).getByRole('button', { name: '保存', exact: true }).click();
+  await idle(); await preview('更新参考');
+  assert.equal(await readFile(join(runtime, 'template-references', '奖励界面', 'TemplateDemo.rbxui.json'), 'utf8'), reference);
+  const invalidFolder = await page.evaluate(() => window.documents.createTemplateFolder('../escape'));
+  assert.equal(invalidFolder.ok, false);
+  const duplicateFolder = await page.evaluate(() => window.documents.createTemplateFolder('奖励界面'));
+  assert.equal(duplicateFolder.ok, false);
+  await page.getByLabel('浏览模板文件夹', { exact: true }).selectOption('');
 
   await dialogs(second, 1); await menu('返回 Hub');
   await page.getByRole('button', { name: '创建工程', exact: true }).click();
