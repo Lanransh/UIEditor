@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { uiEditorCompSource } from '../src/shared/uiCompClass';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -302,11 +304,16 @@ test('interaction and integration edits participate in undo/redo', () => {
 
 
 test('new shared UI base is registered and generated classes remain FC UI components', async () => {
+  assert.ok((await readFile(resolve(directory, 'bootstrap.luau'), 'utf8')).includes(uiEditorCompSource));
   const document = robloxStrategy.createDocument('SharedContract');
   document.scripts.source = `local FX = _G.FX
 local UI = FX.Class("CSharedContractUIBaseCompClass", "CUIEditorUICompClass")
 function UI:OnReady()
     assert(self:IsA("CUIEditorUICompClass"))
+    assert(FX.GetClass("CUIEditorUICompClass").Ctor ~= FX.GetClass("FCUICompClass").Ctor)
+    assert(FX.GetClass("CUIEditorUICompClass").RefreshUI ~= FX.GetClass("FCUICompClass").RefreshUI)
+    assert(self:GetCompName() == "ScreenGuiComp")
+    assert(self:GetRootNode().Name == "ScreenGui")
     assert(self:IsA("FCUICompClass"))
     assert(FX.GetClass("CUIEditorUICompClass").Super == FX.GetClass("FCUICompClass"))
     self:EmitUIAction("Ready", { Id = "contract" })

@@ -39,7 +39,7 @@ return UI
 
 接入源码使用 `FX.Class("COnlineRewardUIPreviewCompClass", "COnlineRewardUIBaseCompClass")`，返回 Preview 类。在 `Preview:Ctor(owner)` 中先调用 `Preview.Super.Ctor(self, owner)`，再赋值 `self.Config` 和 `self.State`。接入类可覆盖 GetUIConfig/GetUIState/BindUIData/OnUIAction 和生命周期，也可定义自有方法；覆盖生命周期时用 Super 显式调用父类。临时配置和状态可直接修改；修改后调用 RefreshUI 驱动展示。
 
-App 提供 FX.Class、FX.GetClass、Super、New、IsA、GetClassName 的兼容实现，注册预览所需的 FCUICompClass 和 CUIEditorUICompClass 基类；新交互类继承后者，旧直接继承前者的文档保留兼容；没有加载完整游戏框架。基类提供 Ctor、Dtor、GetOwner、GetRootNode、TrackConnection、Show、Hide，以及数据与动作接口。游戏参考类原有的网络、组件管理及动画服务不在 App 模拟范围内；数据与动作接口属于当前编辑器的交互合同，实际游戏接入由导出的公共 CUIEditorUICompClass 提供这些接口，原有 FCUICompClass 保持不变；见 [导入设计](roblox-import.md)。
+App 提供 FX.Class、FX.GetClass、Super、New、IsA、GetClassName 的兼容实现，注册预览所需的 FCUICompClass，并加载 UIEditor 唯一维护的 CUIEditorUICompClass 公共类（与导入包同源）；新交互类继承后者，旧直接继承前者的文档保留兼容；没有加载完整游戏框架。基类提供 Ctor、Dtor、GetOwner、GetRootNode、TrackConnection、Show、Hide，以及数据与动作接口。游戏参考类原有的网络、组件管理及动画服务不在 App 模拟范围内；数据与动作接口属于当前编辑器的交互合同，实际游戏接入由导出的公共 CUIEditorUICompClass 提供这些接口，原有 FCUICompClass 保持不变；见 [导入设计](roblox-import.md)。
 
 初始化顺序为接入类 Ctor → OnReady → BindUIData（默认首次 RefreshUI）→ Show/OnShow。停止执行 Hide/OnHide → 可选旧版 OnDispose → Dtor，并统一断开连接。新会话和重置重新构造接入实例，不共享上一轮状态。EmitUIAction 记录动作后调用实例的 OnUIAction；RefreshUI 读取 GetUIState 返回值并调用 Render，拒绝递归刷新。
 
