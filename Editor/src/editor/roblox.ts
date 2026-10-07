@@ -63,7 +63,7 @@ export function validProperty(value: unknown, definition: PropertyDefinition): b
     case 'color': return typeof value === 'string' && /^#[\da-f]{6}$/i.test(value);
     case 'enum': return typeof value === 'string' && !!definition.choices?.includes(value);
     case 'vector': return exact(value, ['x', 'y']) && finite(value.x, definition.min, definition.max) && finite(value.y, definition.min, definition.max);
-    case 'udim': return exact(value, ['scale', 'offset']) && finite(value.scale) && finite(value.offset);
+    case 'udim': return exact(value, ['scale', 'offset']) && finite(value.scale) && finite(value.offset) && Number.isInteger(value.offset);
     case 'udim2': return exact(value, ['x', 'y']) && validProperty(value.x, dimension()) && validProperty(value.y, dimension());
   }
 }
@@ -107,7 +107,10 @@ export class RobloxProjectStrategy implements ProjectStrategy {
       const definition = this.nodes[value.className];
       if (value.className.startsWith('Image') && isRecord(value.properties) && !Object.hasOwn(value.properties, 'TileSize')) value.properties.TileSize = structuredClone(image.TileSize.value);
       if (!exact(value.properties, Object.keys(definition.properties))) throw new Error(`${value.name} 存在缺失或不支持的属性。`);
-      for (const [key, property] of Object.entries(definition.properties)) if (!validProperty(value.properties[key], property)) throw new Error(`${value.name}.${key} 属性值无效。`);
+      for (const [key, property] of Object.entries(definition.properties)) if (!validProperty(value.properties[key], property)) {
+        const detail = ['udim', 'udim2'].includes(property.kind) ? ' Scale 必须是有限数字，Offset 必须是整数。' : '';
+        throw new Error(`${value.name}.${key} 属性值无效。${detail}`);
+      }
       const p = value.properties;
       if (value.className === 'UISizeConstraint' && ((p.MinSize as Vector2).x > (p.MaxSize as Vector2).x || (p.MinSize as Vector2).y > (p.MaxSize as Vector2).y)) throw new Error('最小尺寸不能大于最大尺寸。');
       if (value.className === 'UITextSizeConstraint' && (p.MinTextSize as number) > (p.MaxTextSize as number)) throw new Error('最小字号不能大于最大字号。');

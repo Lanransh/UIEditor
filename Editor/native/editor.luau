@@ -75,7 +75,15 @@ function nodes.setProperties(id, properties)
             local expected = ({ udim = "UDim", udim2 = "UDim2", vector = "Vector2", color = "Color3" })[definition.kind]
             assert(kind == expected, "Wrong value type: " .. key)
         end
-        node.properties[key] = clone(encode(item))
+        local encoded = encode(item)
+        if definition.kind == "udim" or definition.kind == "udim2" then
+            local dimensions = definition.kind == "udim" and {encoded} or {encoded.x, encoded.y}
+            for _, dimension in ipairs(dimensions) do
+                assert(type(dimension.offset) == "number" and dimension.offset % 1 == 0,
+                    node.name .. "." .. key .. " 的 Offset 必须是整数。")
+            end
+        end
+        node.properties[key] = clone(encoded)
         if key == "Image" then node.imageAssetId = nil end
     end
     changed()

@@ -121,7 +121,7 @@ function PropertyField({ name, definition, value, change, disabled }: { name: st
     input = <div className="property-parts">{fields.map(field => {
       const [axis, component] = field.split('.');
       const number = component ? (value as UDim2)[axis as 'x' | 'y'][component as 'scale' | 'offset'] : (value as unknown as Record<string, number>)[axis];
-      return <label key={field}><span>{field}</span><NumberInput label={`${name}.${field}`} definition={definition} value={number} disabled={disabled} onChange={next => {
+      return <label key={field}><span>{field}</span><NumberInput label={`${name}.${field}`} definition={{ ...definition, integer: field === 'offset' || component === 'offset' }} value={number} disabled={disabled} onChange={next => {
         if (component) { const copy = structuredClone(value as UDim2); copy[axis as 'x' | 'y'][component as 'scale' | 'offset'] = next; change(copy); }
         else change({ ...value as UDim | Vector2, [axis]: next });
       }} /></label>;

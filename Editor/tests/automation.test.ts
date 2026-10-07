@@ -134,3 +134,18 @@ test('MCP directory is static and bridge authenticates forwarding and screenshot
     assert.equal((await fetch(`http://127.0.0.1:${info.port}/call`, { method: 'POST' })).status, 403);
   } finally { bridge.close(); }
 });
+
+
+test('MCP create and setProperties reject fractional offsets during execution and preserve the input', async () => {
+  const before = robloxStrategy.createDocument('Test'), saved = JSON.stringify(before);
+  for (const source of [
+    'ui.nodes.create("ImageButton", {name="ConfirmBtn", properties={TileSize=UDim2.fromOffset(28.125,28)}})',
+    'local n=ui.nodes.create("ImageButton", {name="ConfirmBtn"}); ui.nodes.setProperties(n.id,{TileSize=UDim2.new(.5,28,.25,28.125)})',
+    'local n=ui.nodes.create("UICorner", {parentId=ui.nodes.create("Frame").id}); ui.nodes.setProperties(n.id,{CornerRadius=UDim.new(.5,1.5)})',
+  ]) await assert.rejects(executeCode(robloxCodeAdapter, directory, before, 'luau', source), (error: any) => {
+    assert.equal(error.stage, 'execution'); assert.match(error.message, /Offset 必须是整数/); return true;
+  });
+  assert.equal(JSON.stringify(before), saved);
+  const result = await executeCode(robloxCodeAdapter, directory, before, 'luau', 'ui.nodes.create("ImageButton", {properties={TileSize=UDim2.new(.125,28,.25,-28)}})');
+  assert.deepEqual(result.document.root.children[0].properties.TileSize, {x:{scale:.125,offset:28},y:{scale:.25,offset:-28}});
+});

@@ -84,8 +84,8 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
         const angle = (value.properties.Rotation as number) * Math.PI / 180;
         const position = structuredClone(value.properties.Position as UDim2);
         const halfX = dx * ownScale / 2, halfY = dy * ownScale / 2;
-        position.x.offset += anchor.x * dx * ownScale - (1 - Math.cos(angle)) * halfX - Math.sin(angle) * halfY;
-        position.y.offset += anchor.y * dy * ownScale + Math.sin(angle) * halfX - (1 - Math.cos(angle)) * halfY;
+        position.x.offset = Math.round(position.x.offset + anchor.x * dx * ownScale - (1 - Math.cos(angle)) * halfX - Math.sin(angle) * halfY);
+        position.y.offset = Math.round(position.y.offset + anchor.y * dy * ownScale + Math.sin(angle) * halfX - (1 - Math.cos(angle)) * halfY);
         properties.Position = position;
       }
       return { ...value, properties };

@@ -203,3 +203,28 @@ test('宽高比遵循 Studio 默认 FitWithinMaxSize，不放大原始尺寸', (
     ratio.properties.AspectRatio = 1;
   }
 });
+
+
+test('fractional offsets fail editing and loading without changing document or history; fractional scales remain valid', () => {
+  const initial = strategy.createDocument(), image = strategy.createNode('ImageButton');
+  image.name = 'ConfirmBtn'; initial.root.children.push(image);
+  const saved = JSON.stringify(initial), history = new CommandHistory<typeof initial>();
+  for (const key of ['TileSize', 'Position', 'Size']) {
+    for (const axis of ['x', 'y'] as const) {
+      const invalid = structuredClone(initial);
+      invalid.root.children[0].properties[key] = { x: dim(.5, 28), y: dim(.25, -28) };
+      (invalid.root.children[0].properties[key] as import('../src/shared/uiDocument').UDim2)[axis].offset = 28.125;
+      assert.throws(() => strategy.validate(invalid), /ConfirmBtn.*Offset 必须是整数/);
+      assert.throws(() => history.execute(documentCommand('修改属性', () => invalid, strategy), initial), /Offset 必须是整数/);
+    }
+  }
+  const corner = strategy.createNode('UICorner'); image.children.push(corner);
+  corner.properties.CornerRadius = dim(.5, 1.5);
+  assert.throws(() => strategy.validate(initial), /CornerRadius.*Offset 必须是整数/);
+  corner.properties.CornerRadius = dim(.5, 8);
+  image.properties.TileSize = { x: dim(.125, 28), y: dim(.25, -28) };
+  assert.deepEqual(strategy.validate(initial), initial);
+  image.children = []; image.properties.TileSize = strategy.createNode('ImageButton').properties.TileSize;
+  assert.equal(JSON.stringify(initial), saved);
+  assert.equal(history.canUndo, false);
+});
