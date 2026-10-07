@@ -8,6 +8,7 @@ import { DocumentAssets } from './editor/DocumentAssets';
 import { ImageAssets, ImageAssetProperties } from './editor/ImageAssets';
 import { ScriptPanel, RuntimeOutput } from './editor/ScriptPanel';
 import { NewInterfaceDialog } from './editor/NewInterfaceDialog';
+import { RobloxImportDialog } from './editor/RobloxImportDialog';
 import { McpSettings } from './editor/McpSettings';
 
 declare global { interface Window { projects: ProjectAPI } }
@@ -114,6 +115,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
   const editor = useDocumentEditor(project, onBack);
   const history = editor.history;
   const [creatingInterface, setCreatingInterface] = useState(false);
+  const [importingRoblox, setImportingRoblox] = useState(false);
   const [uiLibrary, setUiLibrary] = useState('项目UI');
   const [imageLibrary, setImageLibrary] = useState('永久图片');
   const [bottomTab, setBottomTab] = useState<'assets' | 'images' | 'output'>('assets');
@@ -214,6 +216,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
           <button disabled={editor.busy} onClick={() => void editor.saveProjectUI()}>保存为项目UI</button>
           <button disabled={editor.busy} onClick={() => void editor.saveTemplate()}>保存为模板参考</button>
           <button aria-label="另存为" disabled={editor.busy} onClick={() => void editor.save(true)}>另存为 <span>Ctrl+Shift+S</span></button>
+          <button disabled={editor.busy} onClick={() => setImportingRoblox(true)}>导入 Roblox</button>
           <button disabled={editor.busy} onClick={() => void editor.back()}><ArrowLeft size={15} />返回 Hub</button>
         </div>
       </details>
@@ -233,6 +236,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
       </details>
     </header>
     {creatingInterface && <NewInterfaceDialog onCancel={() => setCreatingInterface(false)} onCreate={name => { setCreatingInterface(false); void editor.newDocument(name); }} />}
+    {importingRoblox && <RobloxImportDialog document={editor.document} onClose={() => setImportingRoblox(false)} />}
     {editor.error && <div className="editor-error" role="alert">{editor.error}</div>}
     <div className="workspace-content" ref={content}>
     <div className="workspace-body">

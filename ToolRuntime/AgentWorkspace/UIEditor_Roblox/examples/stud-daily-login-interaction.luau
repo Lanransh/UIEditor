@@ -1,6 +1,6 @@
 local FX = _G.FX
 local FXLoader = FX.Loader
-local UI = FX.Class("CStudDailyLoginUIBaseCompClass", "FCUICompClass")
+local UI = FX.Class("CStudDailyLoginUIBaseCompClass", "CUIEditorUICompClass")
 
 -- 绑定已保存的设计节点；连接随组件销毁清理，不创建视觉效果。
 function UI:OnReady()

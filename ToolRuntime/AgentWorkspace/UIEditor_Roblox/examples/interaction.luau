@@ -1,6 +1,6 @@
 local FX = _G.FX
 local FXLoader = FX.Loader
-local UI = FX.Class("COnlineRewardUIBaseCompClass", "FCUICompClass")
+local UI = FX.Class("COnlineRewardUIBaseCompClass", "CUIEditorUICompClass")
 
 -- 绑定设计节点；事件连接随组件销毁清理。
 function UI:OnReady()

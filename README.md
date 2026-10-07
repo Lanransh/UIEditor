@@ -27,9 +27,9 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 
 使用“文件 → 新建界面”创建 UI，底部“项目资产”显示当前未保存界面和工程 `interfaces` 目录内的 UI 文件卡片。右键卡片选择“打开”即可编辑对应界面，左侧显示其节点树；切换前会提示保存未保存修改。工程外文件仍通过“文件 → 打开界面”选择。
 
-当前 Roblox 是固定工程模式，提供外部 AI 使用的 MCP，尚未提供内置 AI、状态外观编辑器或 Roblox 导入导出。MCP 服务需要可用的 Node.js；普通 App 使用不需要。支持类型和预览差异见 [静态 UI 设计](Docs/design/roblox-ui.md)。界面文件采用 version=3，只保存交互和接入两份类脚本；加载 version=2 时将配置、状态和引用转换到脚本中，不支持 version=1。
+当前 Roblox 是固定工程模式，提供外部 AI 使用的 MCP，支持通过 Toolkit 导入 Roblox，尚未提供内置 AI 或状态外观编辑器。MCP 服务需要可用的 Node.js；普通 App 使用不需要。支持类型和预览差异见 [静态 UI 设计](Docs/design/roblox-ui.md)。界面文件采用 version=3，只保存交互和接入两份类脚本；加载 version=2 时将配置、状态和引用转换到脚本中，不支持 version=1。
 
-中央工作区只有“界面 / 交互脚本 / 接入脚本”三个一级页签。交互脚本返回继承 FCUICompClass 的 FX 类，负责通用展示和事件；接入脚本返回继承交互类的测试类，在 Ctor 中定义临时 Config、State，在动作处理中维护状态并 RefreshUI。通过 FX.Loader:Here 获取节点，直接读写属性和连接 Activated 事件，不再使用二级配置、引用或模拟状态面板。“载入奖励示例”会替换当前界面，可撤销；示例运行后点击领取，由接入类模拟修改为 Claimed。需要测试其他状态时，停止后修改接入类中的初始状态，再重新运行。底部“输出”显示 print、warn、动作和源码错误，与“UI 资产 / 图片资产”共用底部面板。脚本支持 UDim、UDim2、Vector2、Color3 和当前 UI 属性使用的 Enum，具体子集见运行规范。
+中央工作区只有“界面 / 交互脚本 / 接入脚本”三个一级页签。交互脚本返回继承 CUIEditorUICompClass 的 FX 类，负责通用展示和事件；接入脚本返回继承交互类的测试类，在 Ctor 中定义临时 Config、State，在动作处理中维护状态并 RefreshUI。通过 FX.Loader:Here 获取节点，直接读写属性和连接 Activated 事件，不再使用二级配置、引用或模拟状态面板。“载入奖励示例”会替换当前界面，可撤销；示例运行后点击领取，由接入类模拟修改为 Claimed。需要测试其他状态时，停止后修改接入类中的初始状态，再重新运行。底部“输出”显示 print、warn、动作和源码错误，与“UI 资产 / 图片资产”共用底部面板。脚本支持 UDim、UDim2、Vector2、Color3 和当前 UI 属性使用的 Enum，具体子集见运行规范。
 
 “停止”恢复原设计，“重置”恢复运行开始时的快照。运行修改不保存为节点属性，也不影响撤销历史。接口、生命周期和限制见 [交互脚本与接入运行时](Docs/design/ui-runtime.md)。
 
@@ -82,3 +82,5 @@ npm run dev
 节点编辑通过 `Editor/src/history/useEditorHistory.ts` 接入命令历史，约定见[撤销与重做接入](Docs/design/app-design.md#撤销与重做接入)。“编辑”菜单提供撤销/重做入口，按历史状态启用；加载界面清空历史。
 
 工程数据存放在用户选择的目录。最近记录及 Electron 数据集中保存在 `ToolRuntime/Runtime/`，构建不会清除该目录；应用所在位置需可写。
+
+通过文件菜单「导入 Roblox」选择 Toolkit 当前打开且配置了 PlaceId 的游戏工程，提交当前 UI 和交互脚本；接入脚本只用于编辑器模拟预览。Toolkit 用 Rojo 构建并投递模型；生成脚本写入 Client/UI/Generated，游戏业务类继承生成交互类。首次使用需更新并重启 Toolkit/Studio 插件，接入与验证命令见 [导入设计](Docs/design/roblox-import.md)。

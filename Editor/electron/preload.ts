@@ -65,3 +65,9 @@ contextBridge.exposeInMainWorld('automation', {
     return () => { ipcRenderer.removeListener('automation:request', listener); ipcRenderer.send('automation:ready', false); };
   },
 });
+
+contextBridge.exposeInMainWorld('toolkit', {
+  discover: () => ipcRenderer.invoke('toolkit:discover'),
+  submit: (targetId: string, document: unknown) => ipcRenderer.invoke('toolkit:submit', { targetId, document }),
+  task: (targetId: string, taskId: string, action: string) => ipcRenderer.invoke('toolkit:task', { targetId, taskId, action }),
+});

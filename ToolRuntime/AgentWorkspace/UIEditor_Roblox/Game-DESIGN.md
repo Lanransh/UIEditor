@@ -84,7 +84,7 @@ ProgressBarImg 参考 520×54，底色 #2B6EDB，描边 #12438F / 3，圆角 27�
 
 此次参考配色：标题 #85D84A，领取 #67ED14，选中导航 #278CE9，未选 #546A84，锁定 #809389，普通卡片 #E9F0F4，可领卡片 #EFF9D9，周奖励 #FFF5D9，周奖励标题 #FFD36A，关闭 #F54B6C。表面黑色描边 2~3，圆角 2~6，内部高光和底部压边形成厚度。
 
-不逐个创建凸点，不整窗图片化，不虚构上传 ID。本地预览嵌入界面；Stud 使用现有 Toolkit 源码里的真实 ID，权限和图标资源仍需 Studio 验证。尚无自动上传或 Roblox 导出。脚本映射与原始运行脚本见 [Toolkit 移植](references/toolkit-stud-port.md)。
+不逐个创建凸点，不整窗图片化，不虚构上传 ID。本地预览嵌入界面；Stud 使用现有 Toolkit 源码里的真实 ID，权限和图标资源仍需 Studio 验证。图片不自动上传；Roblox UI 导入通过文件菜单交给 Toolkit，使用已配置的真实资源 ID。脚本映射与原始运行脚本见 [Toolkit 移植](references/toolkit-stud-port.md)。
 
 ## 制作与验收
 

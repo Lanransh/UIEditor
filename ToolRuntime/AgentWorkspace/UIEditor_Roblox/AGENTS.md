@@ -27,3 +27,5 @@ MCP 不提供 undo/redo。修改结果进入编辑器历史，用户可在 App �
 - `examples/` 提供节点制作、交互类和模拟接入类。示例不会自动加载。
 
 运行只是 App 模拟；动作和状态不能作为真实资格校验或发奖依据。完成时说明制作内容、验证结果及是否保存。
+
+交互类继承公共 `CUIEditorUICompClass`，公共类在游戏中继承 `FCUICompClass`。导入通过文件菜单调用 Toolkit；生成脚本进入游戏 Client/UI/Generated，真实业务子类独立维护。旧直接继承 FCUICompClass 的文档仍可模拟，导入时迁到公共基类。

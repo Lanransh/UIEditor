@@ -10,11 +10,11 @@ import { documentCommand } from '../src/editor/commands';
 
 const directory = resolve('native-bin');
 const sourceClass = (body: string) => `local FX = _G.FX
-local UI = FX.Class("RewardInteraction", "FCUICompClass")
+local UI = FX.Class("COnlineRewardUIBaseCompClass", "FCUICompClass")
 ${body}
 return UI`;
 const previewClass = (body: string) => `local FX = _G.FX
-local Preview = FX.Class("RewardPreview", "RewardInteraction")
+local Preview = FX.Class("COnlineRewardUIPreviewCompClass", "COnlineRewardUIBaseCompClass")
 ${body}
 return Preview`;
 async function start(body: string) {
@@ -101,8 +101,8 @@ test('FX inheritance supports constructors, super calls, custom methods and dest
 end
 function UI:Add(value) self.count += value end
 function UI:OnReady()
- assert(self:IsA("FCUICompClass") and self:IsA("RewardInteraction"))
- assert(self:GetClassName() == "RewardPreview")
+ assert(self:IsA("FCUICompClass") and self:IsA("COnlineRewardUIBaseCompClass"))
+ assert(self:GetClassName() == "COnlineRewardUIPreviewCompClass")
  assert(FX.Loader:PlayerGui(self:GetRootNode().Name) == self:GetRootNode())
  self:Add(2)
  print("ready", self.count)
@@ -298,4 +298,32 @@ test('interaction and integration edits participate in undo/redo', () => {
   assert.notEqual(edited.scripts.integration, document.scripts.integration);
   assert.deepEqual(history.undo(edited), document);
   assert.deepEqual(history.redo(document), edited);
+});
+
+
+test('new shared UI base is registered and generated classes remain FC UI components', async () => {
+  const document = robloxStrategy.createDocument('SharedContract');
+  document.scripts.source = `local FX = _G.FX
+local UI = FX.Class("CSharedContractUIBaseCompClass", "CUIEditorUICompClass")
+function UI:OnReady()
+    assert(self:IsA("CUIEditorUICompClass"))
+    assert(self:IsA("FCUICompClass"))
+    assert(FX.GetClass("CUIEditorUICompClass").Super == FX.GetClass("FCUICompClass"))
+    self:EmitUIAction("Ready", { Id = "contract" })
+end
+function UI:Render(state)
+    assert(state.Ready == true)
+end
+return UI`;
+  document.scripts.integration = `local FX = _G.FX
+local Preview = FX.Class("CSharedContractUIPreviewCompClass", "CSharedContractUIBaseCompClass")
+function Preview:Ctor(owner)
+    Preview.Super.Ctor(self, owner)
+    self.Config = {}
+    self.State = { Ready = true }
+end
+return Preview`;
+  const { session, frame } = await LuauSession.start(directory, document);
+  try { assert.match(frame.logs[0].message, /Ready.*contract/); }
+  finally { await session.stop(); }
 });

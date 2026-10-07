@@ -4,7 +4,7 @@
 
 中央工作区只有“界面 / 交互脚本 / 接入脚本”三个一级页签。界面页编辑节点和布局；另外两页使用本地打包的 Monaco 编辑 Luau 源码，提供关键字、字符串、注释、数字与函数名称高亮，行号、Tab 缩进、自动缩进与括号配对；没有二级代码、配置、节点引用或模拟状态页签。右侧保留属性面板，底部输出显示打印、警告、动作和错误。
 
-交互类负责供游戏复用的展示、事件和通用交互；测试接入类继承交互类，在自身 Ctor 中定义临时配置、初始化并维护状态，在动作处理中模拟业务结果。配置和状态不再作为独立编辑数据保存。App 运行时支持这些类的预览，尚未实现 Roblox 导入导出，也没有真实协议或发奖。
+交互类负责供游戏复用的展示、事件和通用交互；测试接入类继承交互类，在自身 Ctor 中定义临时配置、初始化并维护状态，在动作处理中模拟业务结果。配置和状态不再作为独立编辑数据保存。App 运行时支持这些类的预览，Roblox 导入通过 Toolkit 独立执行，只导入界面和交互基类；接入类只在编辑器中预览，也没有真实协议或发奖。
 
 中央工作区的“界面 / 交互脚本 / 接入脚本”页签上方单独一排提供运行控制。“运行 / 停止”共用一个按钮，随会话状态切换；“重置 / 打开 / 隐藏”仅在运行后显示，运行就绪后可用。运行与重置控制会话；运行自动切回界面，运行中可以切换脚本页阅读源码。“打开 / 隐藏”从编辑器外部调用当前实例的 Show / Hide，并触发 OnShow / OnHide；隐藏保留实例、状态和事件连接，重新打开不重新构造或绑定。脚本编辑进入文档撤销历史。奖励示例包含静态节点、交互类及测试接入类；载入会替换当前界面，可撤销。示例从 Claimable 开始，领取后接入类修改自身状态为 Claimed 并刷新界面；可以修改接入类构造函数中的状态测试 Locked 或 Claimed。
 
@@ -20,7 +20,7 @@ version=3 的 scripts 只包含 source（交互源码）和 integration（接入
 
 ```lua
 local FX = _G.FX
-local UI = FX.Class("COnlineRewardUIBaseCompClass", "FCUICompClass")
+local UI = FX.Class("COnlineRewardUIBaseCompClass", "CUIEditorUICompClass")
 
 function UI:OnReady()
     local root = FX.Loader:PlayerGui("OnlineRewardUI")
@@ -39,7 +39,7 @@ return UI
 
 接入源码使用 `FX.Class("COnlineRewardUIPreviewCompClass", "COnlineRewardUIBaseCompClass")`，返回 Preview 类。在 `Preview:Ctor(owner)` 中先调用 `Preview.Super.Ctor(self, owner)`，再赋值 `self.Config` 和 `self.State`。接入类可覆盖 GetUIConfig/GetUIState/BindUIData/OnUIAction 和生命周期，也可定义自有方法；覆盖生命周期时用 Super 显式调用父类。临时配置和状态可直接修改；修改后调用 RefreshUI 驱动展示。
 
-App 提供 FX.Class、FX.GetClass、Super、New、IsA、GetClassName 的兼容实现，只注册预览所需的 FCUICompClass 基类；没有加载完整游戏框架。基类提供 Ctor、Dtor、GetOwner、GetRootNode、TrackConnection、Show、Hide，以及数据与动作接口。游戏参考类原有的网络、组件管理及动画服务不在 App 模拟范围内；数据与动作接口属于当前编辑器的交互合同，实际游戏接入仍需提供对应实现。
+App 提供 FX.Class、FX.GetClass、Super、New、IsA、GetClassName 的兼容实现，注册预览所需的 FCUICompClass 和 CUIEditorUICompClass 基类；新交互类继承后者，旧直接继承前者的文档保留兼容；没有加载完整游戏框架。基类提供 Ctor、Dtor、GetOwner、GetRootNode、TrackConnection、Show、Hide，以及数据与动作接口。游戏参考类原有的网络、组件管理及动画服务不在 App 模拟范围内；数据与动作接口属于当前编辑器的交互合同，实际游戏接入由导出的公共 CUIEditorUICompClass 提供这些接口，原有 FCUICompClass 保持不变；见 [导入设计](roblox-import.md)。
 
 初始化顺序为接入类 Ctor → OnReady → BindUIData（默认首次 RefreshUI）→ Show/OnShow。停止执行 Hide/OnHide → 可选旧版 OnDispose → Dtor，并统一断开连接。新会话和重置重新构造接入实例，不共享上一轮状态。EmitUIAction 记录动作后调用实例的 OnUIAction；RefreshUI 读取 GetUIState 返回值并调用 Render，拒绝递归刷新。
 

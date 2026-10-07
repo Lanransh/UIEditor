@@ -236,13 +236,26 @@ end
 function Base:RefreshUI()
     assert(not rendering, "Recursive RefreshUI is not allowed")
     rendering = true
-    if self.Render then self:Render(self:GetUIState()) end
+    local ok, err = pcall(function()
+        if self.Render then self:Render(self:GetUIState()) end
+    end)
     rendering = false
+    if not ok then error(err, 0) end
 end
 table.freeze(API)
 Base.__index = Base
 Base.__name = "FCUICompClass"
 table.freeze(Base)
+local Shared = FX.Class("CUIEditorUICompClass", "FCUICompClass")
+-- 公共类提供编辑器合同；Base 的同名方法仅兼容旧文档。
+Shared.GetUIConfig = Base.GetUIConfig
+Shared.GetUIState = Base.GetUIState
+Shared.BindUIData = Base.BindUIData
+Shared.OnUIAction = Base.OnUIAction
+Shared.EmitUIAction = Base.EmitUIAction
+Shared.RefreshUI = Base.RefreshUI
+Shared.SetButtonEnabled = Base.SetButtonEnabled
+table.freeze(Shared)
 local host = {}
 function host.initialize(input)
     for property, choices in pairs(input.enums) do
@@ -260,7 +273,7 @@ function host.prepare(input)
     end
 end
 function host.interaction(cls)
-    assert(type(cls) == "table" and classes[cls.__name] == cls and cls.__base == Base, "Interaction script must return a class inheriting FCUICompClass")
+    assert(type(cls) == "table" and classes[cls.__name] == cls and (cls.__base == Base or cls.__base == Shared), "Interaction script must return a class inheriting CUIEditorUICompClass")
     Class = cls
     table.freeze(Class)
 end
