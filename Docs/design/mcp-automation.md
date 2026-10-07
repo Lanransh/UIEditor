@@ -39,3 +39,7 @@ Hub 右上角“设置”提供 Codex MCP 配置，不提供 AI 工作区打开�
 `npm run build:runtime` 构建原生宿主与编辑入口；`npm run build` 包含 MCP bundle。`tests/automation.test.ts` 检查真实 Luau、事务、查询、文件、配置及桥接；`npm run test:mcp` 使用真实 stdio 与隔离 Electron 工程检查制作、历史、运行、点击、日志、截图及保存重开。先 package 后执行 `npm run test:mcp:packaged` 验证打包路径。所有 App 测试不能替代 Studio 或设备验收。
 
 需要保留正在运行的打包应用时，可用 UI_EDITOR_PACKAGE_OUTPUT 指定隔离打包目录，再以 UI_EDITOR_PACKAGED_EXECUTABLE 指定该 exe 执行打包 MCP 测试，不需要终止现有用户会话。
+
+MCP 冒烟测试默认设置 `UI_EDITOR_BACKGROUND=1`：窗口从启动起保持隐藏，不显示任务栏入口、不获取焦点，也不因第二实例请求恢复窗口；后台渲染不节流，仍执行真实界面操作与画布截图。测试检查窗口始终未显示、未获取焦点。普通启动不设置此变量，保持原有可见窗口行为；后台启动仍需使用隔离的 `UI_EDITOR_USER_DATA`，避免连接到用户的前台实例。
+
+其他 Electron 自动化验证（UI、运行时、图片、模板、工作区启动、显示、导入和打包冒烟）也显式启用此后台模式。打包验证使用隔离运行数据；打包 EXE 必须包含最新后台启动逻辑，不能用旧 EXE 验证后台行为。

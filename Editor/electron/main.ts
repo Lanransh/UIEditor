@@ -28,6 +28,7 @@ for (const name of ['userData', 'sessionData', 'logs', 'crashDumps'] as const) {
 }
 
 const startupWorkspace = process.env.UI_EDITOR_OPEN_WORKSPACE;
+const background = process.env.UI_EDITOR_BACKGROUND === '1';
 delete process.env.UI_EDITOR_OPEN_WORKSPACE;
 if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null })) {
   app.quit();
@@ -37,11 +38,12 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     const window = new BrowserWindow({
       width: 1200, height: 800, minWidth: 900, minHeight: 600,
       title: 'UI 编辑器', backgroundColor: '#f7f8fa', show: false,
+      skipTaskbar: background, focusable: !background,
       icon: join(__dirname, '../dist/app-icon.png'),
-      webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },
+      webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: !background },
     });
     app.on('second-instance', (_event, _argv, _cwd, data) => {
-      if (window.isMinimized()) window.restore(); window.focus();
+      if (!background) { if (window.isMinimized()) window.restore(); window.focus(); }
       const path = (data as { workspacePath?: unknown } | null)?.workspacePath;
       if (typeof path !== 'string') return;
       void (async () => {
@@ -51,7 +53,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
         finally { busy = false; }
       })().catch(error => dialog.showMessageBox(window, { type: 'error', title: '无法打开工作区', message: describeError(error) }));
     });
-    window.once('ready-to-show', () => window.show());
+    if (!background) window.once('ready-to-show', () => window.show());
     const source = !app.isPackaged && process.env.UI_EDITOR_DEV_URL
       ? process.env.UI_EDITOR_DEV_URL : pathToFileURL(join(__dirname, '../dist/index.html')).href;
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -198,10 +200,11 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       const result = await dialog.showOpenDialog(window, { title, properties: ['openDirectory'] });
       return result.canceled ? undefined : result.filePaths[0];
     }
-    handle('project:create', async () => {
+    handle('project:create', async templateSource => {
+      const source = templateSource === undefined ? undefined : await recent.resolveRecent(templateSource);
       const parent = await pick('选择父文件夹 — 将自动创建 UIEditorWorkspace');
       if (!parent) return null;
-      const result = await createProject(parent);
+      const result = await createProject(parent, source);
       if (result.kind === 'existing') {
         const answer = await dialog.showMessageBox(window, { type: 'question', title: '工程已存在', message: '此位置已有有效工程，是否打开？', detail: result.project.path, buttons: ['打开工程', '取消'], defaultId: 0, cancelId: 1 });
         if (answer.response !== 0) return null;
@@ -238,7 +241,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     const documentStorage = (library: unknown) => {
       const project = requireProject();
       if (library === undefined || library === 'project') return { root: project.path, library: 'project' as const };
-      if (library === 'templates') return { root: runtime, library: 'templates' as const };
+      if (library === 'templates') return { root: project.path, library: 'templates' as const };
       if (library === 'permanent') return { root: runtime, library: 'permanent' as const };
       throw new Error('UI 资产库无效。');
     };
@@ -273,21 +276,21 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     });
     ipcMain.handle('document:template-folders', async event => {
       if (!trusted(event)) return { ok: false, error: '无效的操作来源。' };
-      try { requireProject(); return { ok: true, value: await listTemplateFolders(runtime) }; }
+      try { return { ok: true, value: await listTemplateFolders(requireProject().path) }; }
       catch (error) { return { ok: false, error: describeError(error) }; }
     });
     handle('document:create-template-folder', async name => {
-      requireProject();
-      await mkdir(join(runtime, 'template-references'), { recursive: true });
-      await mkdir(templateFolderPath(runtime, name));
+      const project = requireProject();
+      await mkdir(join(project.path, 'template-references'), { recursive: true });
+      await mkdir(templateFolderPath(project.path, name));
       return null;
     });
     handle('document:save-template', async argument => {
-      requireProject();
+      const project = requireProject();
       const { document: source, folder } = argument as { document: unknown; folder?: string };
       const document = robloxStrategy.validate(source);
-      const directory = folder === undefined || folder === '' ? join(runtime, 'template-references') : templateFolderPath(runtime, folder);
-      if (folder && !(await listTemplateFolders(runtime)).includes(folder)) throw new Error('模板文件夹不存在，请刷新后重试。');
+      const directory = folder === undefined || folder === '' ? join(project.path, 'template-references') : templateFolderPath(project.path, folder);
+      if (folder && !(await listTemplateFolders(project.path)).includes(folder)) throw new Error('模板文件夹不存在，请刷新后重试。');
       const path = join(directory, `${safeFileName(document.name)}.rbxui.json`);
       const exists = await stat(path).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });
       if (exists) {

@@ -7,7 +7,7 @@ await mkdir('test-results', { recursive: true });
 const root = await mkdtemp(resolve('test-results/image-assets-ui-'));
 const parent = join(root, 'project'); await mkdir(parent);
 const runtime = join(root, 'runtime');
-const env = { ...process.env, UI_EDITOR_USER_DATA: runtime }; delete env.ELECTRON_RUN_AS_NODE;
+const env = { ...process.env, UI_EDITOR_BACKGROUND: '1', UI_EDITOR_USER_DATA: runtime }; delete env.ELECTRON_RUN_AS_NODE;
 const application = await electron.launch(process.argv.includes('--packaged') ? { executablePath: resolve(process.env.UI_EDITOR_PACKAGED_EXECUTABLE || '../ToolRuntime/UIEditor-win32-x64/UIEditor.exe'), args: [], env } : { args: ['.'], env });
 const page = await application.firstWindow(), errors = [];
 page.on('pageerror', error => errors.push(error.message)); page.setDefaultTimeout(10000);
@@ -147,7 +147,7 @@ try {
   assert.equal(dropped.document.root.children.at(-1).imageAssetId, asset.id);
   const droppedNode = dropped.document.root.children.at(-1);
   const droppedElement = page.locator(`[data-node-id="${droppedNode.id}"]`);
-  await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].focus());
+  assert.equal(await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().every(window => !window.isVisible() && !window.isFocused() && !window.isFocusable())), true);
   await droppedElement.hover({ position: { x: 15, y: 15 } });
   const box = await droppedElement.boundingBox();
   const zoom = Number(await page.locator('.canvas-viewport').getAttribute('data-zoom'));

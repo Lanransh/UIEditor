@@ -12,6 +12,7 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 - 批处理和打包默认使用与参考工程相同的 npm Electron 镜像；可通过 `ELECTRON_MIRROR` 环境变量覆盖。
 - 可将 Windows 便携 Node.js 放到 `ToolRuntime/Runtime/nodejs/`，批处理优先使用其中的 `node.exe` 和 `npm.cmd`。
 - 打包入口：`ToolRuntime/UIEditor-win32-x64/UIEditor.exe`。运行打包应用无需额外安装 Node.js；分发时需保留整个应用目录，不能只复制 exe。
+- 打包只收集 `dist`、`dist-electron` 和 `package.json`，Luau 与 MCP 通过额外资源复制；运行依赖已由 Vite/esbuild 打入构建产物，不再复制或扫描 `node_modules`。打包过程显示阶段与耗时，首次下载、解压 Electron 仍需等待。
 
 ## 使用
 
@@ -63,7 +64,7 @@ npm run dev
 | `npm run test:mcp` | 构建并通过真实 stdio MCP 验证制作、查询、历史、运行与保存 |
 | `npm run test:mcp:packaged` | 验证已打包程序的 MCP 完整链路，需先 package |
 | `npm run test:assets` | 构建并验证图片库、共用属性面板、单一 Roblox ID、保存重开及资产 MCP |
-| `npm run test:templates` | 构建并验证模板参考、缩略图、跨工程副本、重启持久化、UI库互移与保存路径 |
+| `npm run test:templates` | 构建并验证项目模板与文件夹隔离、缩略图、独立副本、重启持久化、UI库互移与保存路径 |
 | `node tests/runtime-smoke.mjs --packaged` | 验证已打包 exe 的离线 Luau 运行 |
 | `npm run package` | 构建 Windows x64 应用到 ToolRuntime |
 

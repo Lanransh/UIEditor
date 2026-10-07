@@ -11,7 +11,7 @@ const api: ProjectAPI = {
     ipcRenderer.on('project:activated', listener);
     return () => ipcRenderer.removeListener('project:activated', listener);
   },
-  create: () => ipcRenderer.invoke('project:create'),
+  create: templateSource => ipcRenderer.invoke('project:create', templateSource),
   open: () => ipcRenderer.invoke('project:open'),
   openRecent: (path) => ipcRenderer.invoke('project:open-recent', path),
   listRecent: () => ipcRenderer.invoke('project:list-recent'),

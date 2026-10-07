@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && vite build && node scripts/build-electron.mjs",
     "start": "electron .",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test tests/*.test.ts tests/*.test.mjs",
     "test:smoke": "npm run build && node tests/smoke.mjs && node tests/ui-smoke.mjs",
     "test:display": "node tests/roblox-display.mjs",
     "test:roblox-import": "npm run build && node tests/roblox-import-smoke.mjs",

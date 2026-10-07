@@ -75,24 +75,24 @@ test('无效输入或写入失败不破坏已有文件；坏文件拒绝读取',
   await writeFile(path, '{bad'); await assert.rejects(readDocument(path), /JSON/);
 });
 
-test('模板参考保存于独立Runtime目录，与项目UI隔离且校验资产路径', async () => {
-  const runtime = await mkdtemp(join(tmpdir(), 'ui-template-library-'));
-  assert.deepEqual(await listDocumentAssets(runtime, 'templates'), []);
+test('模板参考保存于工程目录，与项目UI隔离且校验资产路径', async () => {
+  const project = await mkdtemp(join(tmpdir(), 'ui-template-library-'));
+  assert.deepEqual(await listDocumentAssets(project, 'templates'), []);
   const document = robloxStrategy.createDocument('TemplateDemo');
-  const path = join(runtime, 'template-references', '分类', 'TemplateDemo.rbxui.json');
+  const path = join(project, 'template-references', '分类', 'TemplateDemo.rbxui.json');
   await writeDocument(path, document);
-  const projectFile = join(runtime, 'interfaces', 'ProjectOnly.rbxui.json');
+  const projectFile = join(project, 'interfaces', 'ProjectOnly.rbxui.json');
   await writeDocument(projectFile, document);
-  assert.deepEqual(await listDocumentAssets(runtime, 'templates'), [{ name: 'TemplateDemo', path }]);
-  assert.deepEqual(await openDocumentAsset(runtime, path, 'templates'), { path, document });
-  await assert.rejects(openDocumentAsset(runtime, projectFile, 'templates'), /模板参考库/);
-  await assert.rejects(openDocumentAsset(runtime, path), /当前工程/);
-  await assert.rejects(openDocumentAsset(runtime, join(runtime, 'template-references', '分类'), 'templates'), /模板参考库/);
-  const link = join(runtime, 'template-references', '链接');
-  await symlink(join(runtime, 'interfaces'), link, process.platform === 'win32' ? 'junction' : 'dir');
-  assert.equal((await listDocumentAssets(runtime, 'templates')).length, 1);
+  assert.deepEqual(await listDocumentAssets(project, 'templates'), [{ name: 'TemplateDemo', path }]);
+  assert.deepEqual(await openDocumentAsset(project, path, 'templates'), { path, document });
+  await assert.rejects(openDocumentAsset(project, projectFile, 'templates'), /模板参考库/);
+  await assert.rejects(openDocumentAsset(project, path), /当前工程/);
+  await assert.rejects(openDocumentAsset(project, join(project, 'template-references', '分类'), 'templates'), /模板参考库/);
+  const link = join(project, 'template-references', '链接');
+  await symlink(join(project, 'interfaces'), link, process.platform === 'win32' ? 'junction' : 'dir');
+  assert.equal((await listDocumentAssets(project, 'templates')).length, 1);
   await writeFile(path, '{bad');
-  await assert.rejects(openDocumentAsset(runtime, path, 'templates'), /JSON/);
+  await assert.rejects(openDocumentAsset(project, path, 'templates'), /JSON/);
 });
 
 test('预览图片嵌入后不依赖原路径，拒绝非图片和外部 URL', async () => {
@@ -125,18 +125,19 @@ test('UI在三个库之间移动，保留原始字节，拒绝同名覆盖与工
   assert.deepEqual(await openDocumentAsset(runtime, permanent.path, 'permanent'), { path: permanent.path, document });
   await assert.rejects(moveDocumentAsset(runtime, permanent.path, 'permanent', runtime, 'permanent'), /其他资产文件夹/);
 
-  const template = await moveDocumentAsset(runtime, permanent.path, 'permanent', runtime, 'templates');
+  const template = await moveDocumentAsset(runtime, permanent.path, 'permanent', project, 'templates');
+  assert.equal(template.path, join(project, 'template-references', 'MoveDemo.rbxui.json'));
   assert.equal(await readFile(template.path, 'utf8'), content);
   await assert.rejects(readFile(permanent.path), { code: 'ENOENT' });
   const target = join(project, 'interfaces', 'MoveDemo.rbxui.json');
   const other = robloxStrategy.createDocument('OtherUI');
   await writeDocument(target, other);
-  await assert.rejects(moveDocumentAsset(runtime, template.path, 'templates', project, 'project'), /同名UI/);
+  await assert.rejects(moveDocumentAsset(project, template.path, 'templates', project, 'project'), /同名UI/);
   assert.equal(await readFile(template.path, 'utf8'), content);
   assert.deepEqual(await readDocument(target), other);
 
   const emptyProject = await mkdtemp(join(tmpdir(), 'ui-move-empty-'));
-  const moved = await moveDocumentAsset(runtime, template.path, 'templates', emptyProject, 'project');
+  const moved = await moveDocumentAsset(project, template.path, 'templates', emptyProject, 'project');
   assert.equal(await readFile(moved.path, 'utf8'), content);
   await assert.rejects(readFile(template.path), { code: 'ENOENT' });
   const outside = join(project, 'outside.rbxui.json');

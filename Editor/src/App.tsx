@@ -8,6 +8,7 @@ import { DocumentAssets } from './editor/DocumentAssets';
 import { ImageAssets, ImageAssetProperties } from './editor/ImageAssets';
 import { ScriptPanel, RuntimeOutput } from './editor/ScriptPanel';
 import { NewInterfaceDialog } from './editor/NewInterfaceDialog';
+import { NewProjectDialog } from './editor/NewProjectDialog';
 import { RobloxImportDialog } from './editor/RobloxImportDialog';
 import { McpSettings } from './editor/McpSettings';
 
@@ -22,6 +23,7 @@ export function App() {
 
 function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
   const [mcpSettings, setMcpSettings] = useState(false);
+  const [creatingProject, setCreatingProject] = useState(false);
   const [recent, setRecent] = useState<RecentProjectView[] | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(true);
@@ -93,7 +95,7 @@ function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
       <h1 id="hub-title">选择工程</h1>
       <p>创建或打开一个 Roblox 工程，开始你的 UI 设计。</p>
       <div className="hub-actions">
-        <button className="primary" disabled={busy} onClick={() => void open(() => window.projects.create())}><FolderPlus size={19} />创建工程</button>
+        <button className="primary" disabled={busy} onClick={() => recent?.length ? setCreatingProject(true) : void open(() => window.projects.create())}><FolderPlus size={19} />创建工程</button>
         <button className="secondary" disabled={busy} onClick={() => void open(() => window.projects.open())}><FolderOpen size={19} />打开工程</button>
       </div>
       <p className="creation-hint">选择父文件夹后，将自动创建 UIEditorWorkspace 工程目录。</p>
@@ -108,6 +110,7 @@ function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
     </div>
     <footer className="hub-footer"><span>UI 编辑器 · 基础版</span><span>本地工程 / Roblox</span></footer>
     {mcpSettings && <McpSettings onClose={() => setMcpSettings(false)} />}
+    {creatingProject && <NewProjectDialog recent={recent ?? []} onCancel={() => setCreatingProject(false)} onCreate={source => { setCreatingProject(false); void open(() => window.projects.create(source)); }} />}
   </main>;
 }
 

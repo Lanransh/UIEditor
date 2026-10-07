@@ -7,7 +7,7 @@ const output = resolve('test-results');
 await mkdir(output, { recursive: true });
 const root = await mkdtemp(join(output, 'ui-smoke-'));
 const parent = join(root, '中文 工程'); await mkdir(parent);
-const env = { ...process.env, UI_EDITOR_USER_DATA: join(root, 'runtime') }; delete env.ELECTRON_RUN_AS_NODE;
+const env = { ...process.env, UI_EDITOR_BACKGROUND: '1', UI_EDITOR_USER_DATA: join(root, 'runtime') }; delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({ args: ['.'], env });
 const page = await app.firstWindow(), errors = [];
 page.setDefaultTimeout(10000);

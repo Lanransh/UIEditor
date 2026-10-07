@@ -8,7 +8,7 @@ const output = resolve('test-results');
 await mkdir(output, { recursive: true });
 const root = await mkdtemp(join(output, 'launcher-smoke-'));
 const workspace = join(root, 'UIEditorWorkspace');
-const env = { ...process.env, UI_EDITOR_USER_DATA: join(root, 'runtime') };
+const env = { ...process.env, UI_EDITOR_BACKGROUND: '1', UI_EDITOR_USER_DATA: join(root, 'runtime') };
 delete env.ELECTRON_RUN_AS_NODE;
 delete env.UI_EDITOR_OPEN_WORKSPACE;
 let application;
@@ -40,6 +40,7 @@ try {
   const exited = new Promise((done, reject) => { child.once('error', reject); child.once('exit', code => code === 0 ? done() : reject(new Error(`Second instance exited ${code}`))); });
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
   await exited;
+  assert.equal(await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().every(window => !window.isVisible() && !window.isFocused())), true);
   console.log('PASS: 创建工作区生成文件、启动直达工程、保留忽略规则、已有实例接收工作区。');
 } finally {
   if (application) await application.close();

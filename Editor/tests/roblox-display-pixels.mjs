@@ -18,7 +18,7 @@ const samples = {
   342: [[266, 72]],
 };
 const output = resolve('test-results/roblox-display');
-const env = { ...process.env, UI_EDITOR_USER_DATA: resolve(output, 'pixels-runtime') }; delete env.ELECTRON_RUN_AS_NODE;
+const env = { ...process.env, UI_EDITOR_BACKGROUND: '1', UI_EDITOR_USER_DATA: resolve(output, 'pixels-runtime') }; delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({ args: ['.'], env });
 try {
   const page = await app.firstWindow(), results = [];

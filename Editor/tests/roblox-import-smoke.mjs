@@ -8,7 +8,7 @@ const output = resolve('test-results/roblox-import'); await mkdir(output, { recu
 const server = await createServer({ server: { port: 0 } }); await server.listen();
 const address = server.httpServer.address();
 const url = `http://127.0.0.1:${address.port}/tests/fixtures/roblox-import.html`;
-const env = { ...process.env, UI_EDITOR_USER_DATA: await mkdtemp(resolve(output, 'runtime-')) }; delete env.ELECTRON_RUN_AS_NODE;
+const env = { ...process.env, UI_EDITOR_BACKGROUND: '1', UI_EDITOR_USER_DATA: await mkdtemp(resolve(output, 'runtime-')) }; delete env.ELECTRON_RUN_AS_NODE;
 let app;
 try {
   app = await electron.launch({ args: ['.'], env });

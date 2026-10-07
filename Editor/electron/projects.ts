@@ -1,7 +1,8 @@
-import { mkdir, readFile, writeFile, unlink, rmdir, rename, realpath } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import { mkdir, readFile, writeFile, unlink, rmdir, rename, realpath, lstat } from 'node:fs/promises';
+import { basename, dirname, join, resolve, relative, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { WORKSPACE_DIRECTORY, type Project, type ProjectManifest, type RecentProject } from '../src/shared/project';
+import { listDocumentAssets, readDocument } from './documents';
 
 function code(error: unknown): string | undefined {
   return (error as NodeJS.ErrnoException)?.code;
@@ -38,7 +39,7 @@ export async function openProject(directory: string): Promise<Project> {
 
 export type CreateResult = { kind: 'created' | 'existing'; project: Project };
 
-export async function createProject(parent: string): Promise<CreateResult> {
+export async function createProject(parent: string, templateSource?: string): Promise<CreateResult> {
   const directory = join(await realpath(parent), WORKSPACE_DIRECTORY);
   try {
     await mkdir(directory);
@@ -51,14 +52,43 @@ export async function createProject(parent: string): Promise<CreateResult> {
   const file = join(directory, 'project.json');
   // Only remove a file after this operation has successfully created it.
   let fileCreated = false;
+  const templateFiles: string[] = [];
+  const templateDirectories = new Set<string>();
   try {
+    const templates: { path: string; content: string }[] = [];
+    if (templateSource !== undefined) {
+      const source = await openProject(templateSource);
+      const root = join(source.path, 'template-references');
+      const info = await lstat(root).catch(error => { if (code(error) === 'ENOENT') return null; throw error; });
+      if (info && (!info.isDirectory() || info.isSymbolicLink())) throw new Error('来源工程的模板参考目录无效。');
+      for (const asset of await listDocumentAssets(source.path, 'templates')) {
+        templates.push({ path: relative(root, asset.path), content: JSON.stringify(await readDocument(asset.path), null, 2) + '\n' });
+      }
+    }
     const { open } = await import('node:fs/promises');
     const handle = await open(file, 'wx');
     fileCreated = true;
     try { await handle.writeFile(JSON.stringify(manifest, null, 2) + '\n', 'utf8'); }
     finally { await handle.close(); }
+    for (const template of templates) {
+      const target = join(directory, 'template-references', template.path);
+      let folder = directory;
+      for (const part of relative(directory, dirname(target)).split(sep)) {
+        folder = join(folder, part);
+        if (!templateDirectories.has(folder)) {
+          await mkdir(folder);
+          templateDirectories.add(folder);
+        }
+      }
+      const handle = await open(target, 'wx');
+      templateFiles.push(target);
+      try { await handle.writeFile(template.content, 'utf8'); }
+      finally { await handle.close(); }
+    }
     return { kind: 'created', project: await openProject(directory) };
   } catch (error) {
+    for (const path of templateFiles.reverse()) await unlink(path).catch(() => {});
+    for (const path of [...templateDirectories].reverse()) await rmdir(path).catch(() => {});
     if (fileCreated) await unlink(file).catch(() => {});
     await rmdir(directory).catch(() => {});
     throw error;

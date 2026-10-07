@@ -8,7 +8,7 @@ await mkdir(resolve('test-results'), { recursive: true });
 const root = await mkdtemp(resolve('test-results/runtime-smoke-'));
 const parent = join(root, 'project'); await mkdir(parent);
 const file = join(parent, 'UIEditorWorkspace/interfaces/reward.rbxui.json');
-const env = { ...process.env, UI_EDITOR_USER_DATA: join(root, 'runtime') }; delete env.ELECTRON_RUN_AS_NODE;
+const env = { ...process.env, UI_EDITOR_BACKGROUND: '1', UI_EDITOR_USER_DATA: join(root, 'runtime') }; delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch(packaged
   ? { executablePath: resolve('../ToolRuntime/UIEditor-win32-x64/UIEditor.exe'), env }
   : { args: ['.'], env });

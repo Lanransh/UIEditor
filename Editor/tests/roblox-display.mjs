@@ -8,7 +8,7 @@ const output = resolve('test-results/roblox-display');
 await mkdir(output, { recursive: true });
 const server = await createServer({ server: { port: 5198, strictPort: true } });
 await server.listen();
-const env = { ...process.env, UI_EDITOR_USER_DATA: await mkdtemp(resolve(output, 'runtime-')) };
+const env = { ...process.env, UI_EDITOR_BACKGROUND: '1', UI_EDITOR_USER_DATA: await mkdtemp(resolve(output, 'runtime-')) };
 delete env.ELECTRON_RUN_AS_NODE;
 let app;
 try {

@@ -36,9 +36,15 @@ try {
   assert.equal((await raw('uie.history.undo')).isError, true);
   assert.equal((await raw('uie.editor.get_state')).isError, true);
   const parent = join(root, 'project'); await mkdir(parent);
-  const env: Record<string, string> = { ...Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)), UI_EDITOR_USER_DATA: runtime, CODEX_HOME: join(root, 'codex') }; delete env.ELECTRON_RUN_AS_NODE;
+  const env: Record<string, string> = { ...Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)), UI_EDITOR_USER_DATA: runtime, UI_EDITOR_BACKGROUND: '1', CODEX_HOME: join(root, 'codex') }; delete env.ELECTRON_RUN_AS_NODE;
   app = await electron.launch(packaged ? { executablePath: packagedExecutable, env } : { args: ['.'], env });
   const page = await app.firstWindow(); page.setDefaultTimeout(15000);
+  await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    if (window.isVisible() || window.isFocused() || window.isFocusable()) throw new Error('MCP test window is not running in the background.');
+    window.on('show', () => { throw new Error('MCP test window must remain hidden.'); });
+    window.on('focus', () => { throw new Error('MCP test window must not take focus.'); });
+  });
   async function uiHistory(action: 'undo' | 'redo') {
     await page.locator('.canvas-viewport').click({ position: { x: 5, y: 5 } });
     await page.keyboard.press(action === 'undo' ? 'Control+z' : 'Control+y');
@@ -148,6 +154,7 @@ print("Created reward UI")`;
   assert.equal((await call('uie.document.list')).interfaces.length, 1);
   assert.notEqual(initial.sessionId, (await state()).sessionId);
   assert.deepEqual(pageErrors, []);
+  assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().every(window => !window.isVisible() && !window.isFocused())), true);
   console.log(`MCP ${packaged ? 'packaged' : 'development'} smoke passed: ${root}`);
 } finally {
   if (app) await app.close(); lines.close(); mcp.kill(); for (const item of pending.values()) clearTimeout(item.timer);

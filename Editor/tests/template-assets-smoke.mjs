@@ -8,10 +8,11 @@ const root = await mkdtemp(resolve('test-results/template-assets-'));
 const first = join(root, '工程A'), second = join(root, '工程B');
 await mkdir(first); await mkdir(second);
 const runtime = join(root, 'runtime');
-const env = { ...process.env, UI_EDITOR_USER_DATA: runtime }; delete env.ELECTRON_RUN_AS_NODE;
+const env = { ...process.env, UI_EDITOR_BACKGROUND: '1', UI_EDITOR_USER_DATA: runtime }; delete env.ELECTRON_RUN_AS_NODE;
 let app, page;
 const errors = [];
-const templateFile = join(runtime, 'template-references', 'TemplateDemo.rbxui.json');
+const templatePath = parent => join(parent, 'UIEditorWorkspace', 'template-references', 'TemplateDemo.rbxui.json');
+let templateFile = templatePath(first);
 const projectFile = parent => join(parent, 'UIEditorWorkspace', 'interfaces', 'TemplateDemo.rbxui.json');
 const textOf = document => document.root.children[0].children[0].properties.Text;
 
@@ -86,6 +87,9 @@ try {
 
   await page.getByRole('button', { name: '模板参考', exact: true }).click();
   await preview('参考快照');
+  assert.equal(await page.getByLabel('浏览模板文件夹', { exact: true }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: '＋ 新建文件夹', exact: true }).count(), 0);
+  assert.equal(await page.getByRole('dialog', { name: '新建模板文件夹', exact: true }).count(), 0);
   assert.equal(await page.getByRole('button', { name: /（未保存）/ }).count(), 0);
   await menu('保存'); await page.getByText('界面已保存', { exact: true }).waitFor();
   assert.equal(textOf(JSON.parse(await readFile(projectFile(first), 'utf8'))), '参考快照');
@@ -101,26 +105,49 @@ try {
   await treeSave('templates');
   await preview('更新参考');
   const reference = await readFile(templateFile, 'utf8');
-  await page.getByRole('button', { name: '＋ 新建文件夹', exact: true }).click();
-  await page.getByLabel('文件夹名称', { exact: true }).fill('奖励界面');
-  await page.getByRole('dialog', { name: '新建模板文件夹', exact: true }).getByRole('button', { name: '创建', exact: true }).click();
-  await page.getByLabel('浏览模板文件夹', { exact: true }).getByRole('option', { name: '奖励界面', exact: true }).waitFor({ state: 'attached' });
+  // Existing project folders remain usable without a folder-creation UI.
+  await mkdir(join(first, 'UIEditorWorkspace', 'template-references', '奖励界面'));
+  await preview('更新参考');
   await page.getByRole('button', { name: '选择节点 TextLabel', exact: true }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: '保存…', exact: true }).click();
   await page.getByLabel('保存到', { exact: true }).selectOption('templates');
   await page.getByLabel('模板文件夹', { exact: true }).selectOption('奖励界面');
   await page.getByRole('dialog', { name: '保存UI', exact: true }).getByRole('button', { name: '保存', exact: true }).click();
-  await idle(); await preview('更新参考');
-  assert.equal(await readFile(join(runtime, 'template-references', '奖励界面', 'TemplateDemo.rbxui.json'), 'utf8'), reference);
+  await idle();
+  await page.waitForFunction(() => document.querySelectorAll('[aria-label="UI 资产 TemplateDemo"]').length === 2);
+  const templateCards = page.getByRole('button', { name: 'UI 资产 TemplateDemo', exact: true });
+  const visiblePaths = [];
+  for (const card of await templateCards.all()) {
+    visiblePaths.push(await card.getAttribute('title'));
+    await card.locator('.preview-text-fill').getByText('更新参考', { exact: true }).waitFor();
+  }
+  assert.deepEqual(visiblePaths.sort(), [templateFile, join(first, 'UIEditorWorkspace', 'template-references', '奖励界面', 'TemplateDemo.rbxui.json')].sort());
+  assert.equal(await readFile(join(first, 'UIEditorWorkspace', 'template-references', '奖励界面', 'TemplateDemo.rbxui.json'), 'utf8'), reference);
   const invalidFolder = await page.evaluate(() => window.documents.createTemplateFolder('../escape'));
   assert.equal(invalidFolder.ok, false);
   const duplicateFolder = await page.evaluate(() => window.documents.createTemplateFolder('奖励界面'));
   assert.equal(duplicateFolder.ok, false);
-  await page.getByLabel('浏览模板文件夹', { exact: true }).selectOption('');
+  assert.equal(await page.getByLabel('浏览模板文件夹', { exact: true }).count(), 0);
 
   await dialogs(second, 1); await menu('返回 Hub');
   await page.getByRole('button', { name: '创建工程', exact: true }).click();
+  await page.getByRole('dialog', { name: '创建工程', exact: true }).getByRole('button', { name: '下一步', exact: true }).click();
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
+  await page.getByRole('button', { name: '模板参考', exact: true }).click();
+  const assetsInSecond = await page.evaluate(() => window.documents.listAssets('templates'));
+  assert.deepEqual(assetsInSecond, { ok: true, value: [] });
+  assert.deepEqual(await page.evaluate(() => window.documents.listTemplateFolders()), { ok: true, value: [] });
+  for (const method of ['previewAsset', 'openTemplate']) {
+    const rejectedTemplate = await page.evaluate(({ path, method }) => window.documents[method](path, 'templates'), { path: templateFile, method });
+    assert.equal(rejectedTemplate.ok, false);
+  }
+  const rejectedMove = await page.evaluate(path => window.documents.moveAsset(path, 'templates', 'permanent'), templateFile);
+  assert.equal(rejectedMove.ok, false);
+  const savedInSecond = await page.evaluate(document => window.documents.saveTemplate(document), JSON.parse(reference));
+  assert.equal(savedInSecond.ok, true);
+  templateFile = templatePath(second);
+  assert.equal(savedInSecond.value.path, templateFile);
+  await page.getByRole('button', { name: '项目UI', exact: true }).click();
   await page.getByRole('button', { name: '模板参考', exact: true }).click();
   await preview('更新参考');
   assert.equal(await page.getByLabel('界面名称', { exact: true }).count(), 0);
@@ -143,7 +170,7 @@ try {
   await page.getByRole('button', { name: '创建工程', exact: true }).waitFor();
   await app.evaluate(({ app }) => app.exit());
   await app.close(); app = null;
-  // Runtime assets survive a full app restart, not just workspace switching.
+  // Project templates survive a full app restart, not just workspace switching.
   await launch(); await dialogs(second);
   await page.getByRole('button', { name: '打开 工程B', exact: true }).click();
   await page.getByRole('button', { name: '模板参考', exact: true }).click();
@@ -202,8 +229,10 @@ try {
   await assert.rejects(readFile(permanentFile), { code: 'ENOENT' });
   const outsideMove = await page.evaluate(path => window.documents.moveAsset(path, 'project', 'permanent'), projectFile(first));
   assert.equal(outsideMove.ok, false);
+  assert.equal(await readFile(templatePath(first), 'utf8'), reference);
+  await assert.rejects(readFile(join(runtime, 'template-references', 'TemplateDemo.rbxui.json')), { code: 'ENOENT' });
   assert.deepEqual(errors, []);
-  console.log('PASS: template snapshots, cross-project copies, persistence, thumbnails, moves between all libraries, collision safety, source validation and active-document save-path tracking.');
+  console.log('PASS: project-scoped template snapshots, folders and source validation, independent copies, persistence, thumbnails, moves between all libraries, collision safety and active-document save-path tracking.');
 } finally {
   if (app) {
     if (page && !page.isClosed()) await page.screenshot({ path: resolve('test-results/template-reference-last-state.png') }).catch(() => {});

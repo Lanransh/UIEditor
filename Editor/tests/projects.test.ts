@@ -1,8 +1,10 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, writeFile, rm, rename } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm, rename, readdir, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createProject, openProject, RecentProjects, validateManifest } from '../electron/projects';
+import { listDocumentAssets, readDocument, writeDocument } from '../electron/documents';
+import { robloxStrategy } from '../src/editor/roblox';
 
 async function fixture(t: TestContext) {
   const base = join(process.cwd(), 'test-results');
@@ -11,6 +13,87 @@ async function fixture(t: TestContext) {
   t.after(() => rm(root, { recursive: true, force: true }));
   return root;
 }
+
+test('新工程仅克隆模板参考，保留子文件夹、同名文件和完整快照，副本相互独立', async t => {
+  const root = await fixture(t);
+  const source = (await createProject(root)).project;
+  const document = robloxStrategy.createDocument('Reward');
+  await writeDocument(join(source.path, 'template-references', 'Reward.rbxui.json'), document);
+  await writeDocument(join(source.path, 'template-references', '中文 分类', 'Reward.rbxui.json'), document);
+  await writeDocument(join(source.path, 'interfaces', 'ProjectOnly.rbxui.json'), document);
+  await mkdir(join(source.path, 'image-assets'));
+  await writeFile(join(source.path, 'image-assets', 'keep.txt'), 'project image');
+  await writeFile(join(source.path, 'template-references', 'ignored.txt'), 'not a template');
+  const parent = join(root, '新工程');
+  await mkdir(parent);
+  const target = (await createProject(parent, source.path)).project;
+  assert.notEqual(target.manifest.id, source.manifest.id);
+  assert.deepEqual((await readdir(target.path)).sort(), ['project.json', 'template-references']);
+  assert.equal((await listDocumentAssets(target.path, 'templates')).length, 2);
+  const copy = join(target.path, 'template-references', '中文 分类', 'Reward.rbxui.json');
+  assert.deepEqual(await readDocument(copy), document);
+  await writeDocument(copy, robloxStrategy.createDocument('Changed'));
+  assert.deepEqual(await readDocument(join(source.path, 'template-references', '中文 分类', 'Reward.rbxui.json')), document);
+  assert.deepEqual(await readDocument(join(target.path, 'template-references', 'Reward.rbxui.json')), document);
+});
+
+test('不克隆或来源没有模板时创建空工程', async t => {
+  const root = await fixture(t);
+  const source = (await createProject(root)).project;
+  for (const templateSource of [undefined, source.path]) {
+    const parent = join(root, templateSource ? 'empty-source' : 'no-clone');
+    await mkdir(parent);
+    const target = (await createProject(parent, templateSource)).project;
+    assert.deepEqual(await readdir(target.path), ['project.json']);
+  }
+});
+
+test('来源无效或模板损坏时创建失败，不留下工程或改变来源文件', async t => {
+  const root = await fixture(t);
+  const source = (await createProject(root)).project;
+  await writeDocument(join(source.path, 'template-references', 'Good.rbxui.json'), robloxStrategy.createDocument('Good'));
+  const broken = join(source.path, 'template-references', 'Broken.rbxui.json');
+  await writeFile(broken, '{bad');
+  const parent = join(root, 'target');
+  await mkdir(parent);
+  await assert.rejects(createProject(parent, source.path), /JSON/);
+  assert.deepEqual(await readdir(parent), []);
+  assert.equal(await readFile(broken, 'utf8'), '{bad');
+  await assert.rejects(createProject(parent, join(root, 'missing', 'UIEditorWorkspace')));
+  assert.deepEqual(await readdir(parent), []);
+});
+
+test('目标已存在时不克隆模板、不改动目标，也不读取失效来源', async t => {
+  const root = await fixture(t);
+  const target = (await createProject(root)).project;
+  const file = join(target.path, 'template-references', 'Keep.rbxui.json');
+  const document = robloxStrategy.createDocument('Keep');
+  await writeDocument(file, document);
+  const result = await createProject(root, join(root, 'missing', 'UIEditorWorkspace'));
+  assert.equal(result.kind, 'existing');
+  assert.deepEqual(result.project, target);
+  assert.deepEqual(await readDocument(file), document);
+});
+
+test('克隆不跟随模板子目录链接，拒绝链接形式的模板根目录', async t => {
+  const root = await fixture(t);
+  const source = (await createProject(root)).project;
+  const outside = join(root, 'outside');
+  await writeDocument(join(outside, 'External.rbxui.json'), robloxStrategy.createDocument('External'));
+  const templates = join(source.path, 'template-references');
+  await mkdir(templates);
+  await symlink(outside, join(templates, 'linked'), 'junction');
+  const parent = join(root, 'target');
+  await mkdir(parent);
+  const target = (await createProject(parent, source.path)).project;
+  assert.deepEqual(await listDocumentAssets(target.path, 'templates'), []);
+  await rm(templates, { recursive: true });
+  await symlink(outside, templates, 'junction');
+  const rejected = join(root, 'rejected');
+  await mkdir(rejected);
+  await assert.rejects(createProject(rejected, source.path), /模板参考目录无效/);
+  assert.deepEqual(await readdir(rejected), []);
+});
 
 test('中文与空格路径：创建、重读、重复创建、移动后打开保持身份', async t => {
   const root = await fixture(t);
