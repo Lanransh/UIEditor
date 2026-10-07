@@ -31,7 +31,7 @@ try {
     dialog.showMessageBox = async () => ({ response: 0 });
   }, { parent, file });
   await page.getByRole('button', { name: '创建工程', exact: true }).click();
-  assert.equal(await page.getByRole('button', { name: '资产目录', exact: true }).getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.getByRole('button', { name: 'UI 资产', exact: true }).getAttribute('aria-pressed'), 'true');
   assert.equal(await page.getByRole('log').isVisible(), false);
   await page.getByRole('button', { name: '文件', exact: true }).click();
   await page.getByRole('button', { name: '新建界面', exact: true }).click();
@@ -95,6 +95,19 @@ try {
     await button.waitFor();
     await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="ClaimButton"]')?.getAttribute('aria-disabled') === 'false');
     assert.equal(await button.getAttribute('aria-disabled'), 'false');
+    assert.equal(await button.evaluate(node => getComputedStyle(node).cursor), 'pointer');
+    const passiveNodes = page.getByTestId('ui-artboard').locator('.preview-node:not([role="button"])');
+    assert.ok(await passiveNodes.count() > 0);
+    assert.ok((await passiveNodes.evaluateAll(nodes => nodes.map(node => getComputedStyle(node).cursor))).every(cursor => cursor === 'default'), '运行中的普通节点应显示正常光标');
+    const label = page.getByTestId('ui-artboard').locator('.preview-node[data-class-name="TextLabel"]').first();
+    const beforeDrag = await page.getByTestId('ui-artboard').locator('.preview-node').evaluateAll(nodes => nodes.map(node => ({ id: node.dataset.nodeId, style: node.getAttribute('style') })));
+    const bounds = await label.boundingBox();
+    assert.ok(bounds);
+    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(bounds.x + bounds.width / 2 + 30, bounds.y + bounds.height / 2 + 20, { steps: 5 });
+    await page.mouse.up();
+    assert.deepEqual(await page.getByTestId('ui-artboard').locator('.preview-node').evaluateAll(nodes => nodes.map(node => ({ id: node.dataset.nodeId, style: node.getAttribute('style') }))), beforeDrag, '运行中拖动不得改变节点');
     const controls = await page.locator('.workspace-editor .runtime-toolbar').boundingBox();
     const tabs = await page.locator('.workspace-tabs').boundingBox();
     assert.ok(controls && tabs && controls.y + controls.height <= tabs.y && controls.x === tabs.x, '运行控制应位于工作区页签上方');
@@ -121,12 +134,13 @@ try {
     await page.getByRole('log').getByText(/ClaimReward.*online_5min/).waitFor();
     assert.equal(await page.getByRole('log').locator('.action').count(), 1);
     await page.getByRole('log').getByText(/模拟领取.*online_5min/).waitFor();
-    await page.getByRole('button', { name: '资产目录', exact: true }).click();
+    await page.getByRole('button', { name: 'UI 资产', exact: true }).click();
     assert.equal(await page.getByRole('log').isVisible(), false);
     await page.getByRole('navigation', { name: '资产库', exact: true }).waitFor();
     await page.getByRole('button', { name: '输出', exact: true }).click();
     assert.equal(await page.getByRole('log').locator('.action').count(), 1);
     await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="ClaimButton"]')?.textContent === 'Claimed');
+    assert.equal(await button.evaluate(node => getComputedStyle(node).cursor), 'not-allowed');
     await page.getByRole('button', { name: '隐藏', exact: true }).click();
     await button.waitFor({ state: 'hidden' });
     await page.getByRole('button', { name: '打开', exact: true }).click();
@@ -142,10 +156,12 @@ try {
     assert.equal(await page.locator('.runtime-toolbar button').count(), 1);
     assert.equal(await page.getByRole('button', { name: 'ClaimButton', exact: true }).count(), 0);
     assert.equal(await readFile(file, 'utf8'), original);
+    assert.ok((await page.getByTestId('ui-artboard').locator('.preview-node').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).cursor))).every(cursor => cursor === 'move'), '停止后恢复编辑光标');
+    await page.getByText('界面已保存', { exact: true }).waitFor();
   }
   await page.getByRole('button', { name: '交互脚本', exact: true }).click();
   const source = page.getByRole('textbox', { name: '交互脚本', exact: true });
-  await setScript('local UI = _G.FX.Class("RewardInteraction", "FCUICompClass")\nfunction UI:Render(state)\n print("before-error"); warn("before-warning"); error("smoke-error")\nend\nreturn UI');
+  await setScript('print("before-error")\nwarn("before-warning")\nerror("smoke-error")');
   await page.getByRole('button', { name: '运行', exact: true }).click();
   await page.getByRole('log').getByText(/interface:3.*smoke-error/).waitFor();
   await page.getByRole('log').locator('.output').getByText(/before-error/).waitFor();
