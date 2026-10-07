@@ -1,3 +1,4 @@
+import { uiEditorCompSource } from '../src/shared/uiCompClass';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ToolkitClient } from '../electron/toolkit';
@@ -18,7 +19,8 @@ test('Toolkit discovery keeps tokens private and submits only validated packages
   assert.equal(calls[1].url, 'http://127.0.0.1:34871/ui-editor/submit');
   assert.equal((calls[1].init?.headers as Record<string, string>).Authorization, 'Bearer private-token');
   assert.equal(JSON.parse(String(calls[1].init?.body)).format, 'ui-editor-import');
-  assert.deepEqual(JSON.parse(String(calls[1].init?.body)).scripts, { source: doc.scripts.source });
+  assert.equal(JSON.parse(String(calls[1].init?.body)).scripts.shared, uiEditorCompSource);
+  assert.ok(JSON.parse(String(calls[1].init?.body)).scripts.source.includes(doc.scripts.source));
   assert.equal(calls[1].init?.redirect, 'error');
   await assert.rejects(client.submit('unknown', doc), /连接已失效/);
   assert.equal(calls.length, 2);

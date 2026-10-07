@@ -30,8 +30,7 @@ let executable = join(output, 'Release', 'ui-luau.exe');
 try { await access(executable); } catch { executable = join(output, 'ui-luau.exe'); }
 await mkdir(join(root, 'native-bin'), { recursive: true });
 await copyFile(executable, join(root, 'native-bin', 'ui-luau.exe'));
-await copyFile(join(root, 'native', 'bootstrap.luau'), join(root, 'native-bin', 'bootstrap.luau'));
-await copyFile(join(root, 'native', 'editor.luau'), join(root, 'native-bin', 'editor.luau'));
+await import('./build-runtime-hosts.mjs');
 for (const [name, variable, license] of [['luau', 'UI_EDITOR_LUAU_SOURCE', 'LICENSE.txt'], ['json', 'UI_EDITOR_JSON_SOURCE', 'LICENSE.MIT']]) {
   const source = process.env[variable] ? resolve(process.env[variable]) : join(output, '_deps', `${name}-src`);
   await copyFile(join(source, license), join(root, 'native-bin', `${name}-LICENSE.txt`));

@@ -16,6 +16,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   const strategy = projectStrategy(project.manifest.mode);
   const [initial] = useState(() => strategy.createDocument());
   const history = useEditorHistory(initial);
+  const [hasDocument, setHasDocument] = useState(false);
   const [selectedId, setSelectedId] = useState(initial.root.id);
   const [inspectedAssetId, setInspectedAssetId] = useState<string | null>(null);
   const [assetConfigurationDirty, setAssetConfigurationDirty] = useState(false);
@@ -45,13 +46,13 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   }, []);
   const runtime = useRuntime(document);
   useHistoryShortcuts({ ...history, canUndo: !busy && !runtime.active && history.canUndo, canRedo: !busy && !runtime.active && history.canRedo });
-  const dirty = JSON.stringify(document) !== saved;
+  const dirty = hasDocument && JSON.stringify(document) !== saved;
   const selected = findNode(document.root, selectedId) ?? document.root;
   useEffect(() => { window.documents.setDirty(dirty || assetConfigurationDirty); }, [dirty, assetConfigurationDirty]);
   useEffect(() => () => window.documents.setDirty(false), []);
 
   function execute(label: string, edit: (value: UIDocument) => UIDocument) {
-    if (operating.current || runtime.active) return;
+    if (!hasDocument || operating.current || runtime.active) return;
     try { history.execute(documentCommand(label, value => edit(resolveImageAssets(value, imageAssets)), strategy)); setError(''); }
     catch (cause) { setError(cause instanceof Error ? cause.message : '编辑失败'); }
   }
@@ -59,6 +60,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
     execute(label, value => ({ ...value, root: updateNode(value.root, id, edit) }));
   }
   async function save(saveAs = false, projectUI = false): Promise<boolean> {
+    if (!hasDocument) return false;
     const result = await window.documents.save(document, saveAs, projectUI);
     if (!result.ok) { setError(result.error); return false; }
     if (!result.value) return false;
@@ -81,6 +83,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   }
   function reset(value: UIDocument, file: string | null) {
     fileState.current = { path: file, saved: JSON.stringify(resolveImageAssets(value, imageAssets)) };
+    setHasDocument(true);
     history.reset(value); setSaved(JSON.stringify(resolveImageAssets(value, imageAssets))); setPath(file); setInspectedAssetId(null); setAssetConfigurationDirty(false); setSelectedId(value.root.id); setError('');
   }
   const newDocument = (name: string) => run(async () => {
@@ -103,6 +106,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
     reset(strategy.validate(result.value.document), null);
   });
   const saveTemplate = (folder?: string) => run(async () => {
+    if (!hasDocument) return;
     const result = await window.documents.saveTemplate(document, folder);
     if (!result.ok) { setError(result.error); return; }
     if (result.value) setError('');
@@ -126,7 +130,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   });
   useEffect(() => {
     const listener = (event: KeyboardEvent) => {
-      if (operating.current || event.defaultPrevented || event.isComposing || event.repeat || event.altKey || event.shiftKey) return;
+      if (!hasDocument || operating.current || event.defaultPrevented || event.isComposing || event.repeat || event.altKey || event.shiftKey) return;
       const target = event.target;
       if (target instanceof HTMLElement && (target.closest('input, textarea, select') || target.isContentEditable)) return;
       if (event.key === 'Delete' && !event.ctrlKey && !event.metaKey) {
@@ -181,13 +185,14 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
     return result.value;
   }
   function useImage(asset: ImageAsset, create = false) {
+    if (!hasDocument) return;
     if (create || !selected.className.startsWith('Image')) {
       const node = applyImageAsset(strategy.createNode('ImageLabel'), asset);
       const parent = strategy.canParent(selected, node) ? selected : document.root;
       execute('插入图片资产', value => insertNode(value, parent.id, node, strategy)); select(node.id);
     } else editNode(selected.id, node => applyImageAsset(node, asset), '应用图片资产');
   }
-  const editor = { projectPath: project.path, strategy, document, history, selected, select, editNode, execute, add, reparent, pickImage,
+  const editor = { projectPath: project.path, strategy, document, hasDocument, history, selected, select, editNode, execute, add, reparent, pickImage,
     inspectedAssetId, inspectAsset, clearAssetInspection, setAssetConfigurationDirty,
     imageAssets, assetsLoading, refreshImages, configureImage, importImage, useImage,
     newDocument, openDocument, openTemplate, saveTemplate, moveAsset, save: (saveAs = false) => run(async () => { await save(saveAs); }),

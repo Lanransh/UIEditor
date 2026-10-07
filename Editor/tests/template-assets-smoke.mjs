@@ -67,6 +67,10 @@ async function move(target) {
 try {
   await launch(); await dialogs();
   await page.getByRole('button', { name: '创建工程', exact: true }).click();
+  await page.getByText('请打开一个工程', { exact: true }).waitFor();
+  await menu('新建界面');
+  await page.getByRole('textbox', { name: '新界面名称', exact: true }).fill('TemplateDemo');
+  await page.getByRole('button', { name: '创建', exact: true }).click();
   await page.getByRole('tree', { name: 'Roblox 节点' }).waitFor();
   await input('界面名称', 'TemplateDemo');
   await add('Frame', 'ScreenGui'); await add('TextLabel', 'Frame');
@@ -116,10 +120,10 @@ try {
 
   await dialogs(second, 1); await menu('返回 Hub');
   await page.getByRole('button', { name: '创建工程', exact: true }).click();
-  await page.getByRole('tree', { name: 'Roblox 节点' }).waitFor();
+  await page.getByText('请打开一个工程', { exact: true }).waitFor();
   await page.getByRole('button', { name: '模板参考', exact: true }).click();
   await preview('更新参考');
-  assert.equal(await page.getByLabel('界面名称', { exact: true }).inputValue(), 'Untitled');
+  assert.equal(await page.getByLabel('界面名称', { exact: true }).count(), 0);
   const rejected = await page.evaluate(path => window.documents.previewAsset(path, 'templates'), projectFile(first));
   assert.equal(rejected.ok, false);
   await openCopy();
@@ -165,6 +169,9 @@ try {
   assert.equal(textOf(JSON.parse(await readFile(projectFile(second), 'utf8'))), '工程B副本');
 
   // The active document follows its moved path, retaining pending edits and history.
+  await menu('新建界面');
+  await page.getByRole('textbox', { name: '新界面名称', exact: true }).fill('Untitled');
+  await page.getByRole('button', { name: '创建', exact: true }).click();
   await page.getByRole('button', { name: '项目UI', exact: true }).click();
   await page.getByRole('button', { name: 'UI 资产 Untitled（未保存）', exact: true }).click({ button: 'right' });
   assert.equal(await page.getByRole('menuitem', { name: '移动', exact: true }).isEnabled(), false);

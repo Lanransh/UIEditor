@@ -31,6 +31,11 @@ async function tool(name, args = {}) {
 try {
   await dialogs(parent);
   await page.getByRole('button', { name: '创建工程', exact: true }).click();
+  await page.getByText('请打开一个工程', { exact: true }).waitFor();
+  await page.getByRole('button', { name: '文件', exact: true }).click();
+  await page.getByRole('button', { name: '新建界面', exact: true }).click();
+  await page.getByRole('textbox', { name: '新界面名称', exact: true }).fill('ImageAssets');
+  await page.getByRole('button', { name: '创建', exact: true }).click();
   await page.getByRole('tree', { name: 'Roblox 节点' }).waitFor();
   const libraries = page.getByRole('navigation', { name: '资产库', exact: true });
   assert.equal(await libraries.getByRole('button', { name: '永久图片', exact: true }).count(), 0);

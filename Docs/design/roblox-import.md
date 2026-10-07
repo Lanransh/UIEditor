@@ -18,9 +18,17 @@ Generated/
   COnlineRewardUIBaseCompClass.lua         # 继承公共基类
 ```
 
-类文件按源码中的实际类名命名，不从可改的文档显示名猜测。界面交互类附加 ScreenGuiName 元数据供公共基类查找 PlayerGui；公共基类提供组件名、根节点、配置、状态、刷新、动作转发与原生按钮禁用。连接清理、Show/Hide 仍继承游戏 FCUICompClass。App 注册同名公共类模拟相同合同，不载入完整游戏框架。
+公共基类源码唯一维护在 `Editor/src/shared/uiCompClass.ts`；构建时嵌入编辑器运行宿主，导入时随 `scripts.shared` 提交给 Toolkit。UIEditor 生成完整交互源码（公共类 require、ScreenGuiName 元数据及旧父类兼容转换）；Toolkit 原样同步 `scripts.source/shared`，只负责目标工程、Rojo 路径、构建与投递。UIEditor 不读取目标工程结构。旧 UIEditor 未携带公共类时，Toolkit 提示更新客户端。
+
+类文件按源码中的实际类名命名，不从可改的文档显示名猜测。界面交互类附加 ScreenGuiName 元数据供公共基类查找 PlayerGui；公共基类提供组件名、根节点、配置、状态、刷新、动作转发与原生按钮禁用。连接清理、Show/Hide 仍继承游戏 FCUICompClass。App 加载这份公共类，宿主仅适配固定画布、原生按钮禁用与动作日志，不载入完整游戏框架。
 
 新文档使用公共基类；旧直接继承 FCUICompClass 的交互类保留 App 兼容，导入时仅转换类声明的父类。迁移不修改已保存源码。
+
+## 分辨率适配与自动翻译
+
+公共类在 Ctor 中启动适配，以 1280×720 为设计基准，取当前 ScreenGui 可用宽高比例的较小值，整体等比缩放并居中；大屏可放大，比例不同时留白。仅处理直属 GuiObject，不增加父级容器，保留节点查找路径；直属位置与尺寸中的 Scale/Offset 先按设计画布解析，子孙节点沿用内部布局。已有 UIScale 与设备比例相乘，避免重复缩放；尺寸变化和新增直属节点自动更新，移出节点与组件销毁时恢复设计值并清理监听。编辑器运行在固定 1280×720 画布，设备适配比例为 1。
+
+UIEditor 生成的 ScreenGui 和全部 GuiObject 显式开启 AutoLocalize，布局与约束节点不写此属性；自动翻译由 Roblox 的游戏本地化表提供，App 不模拟翻译服务。
 
 ## 游戏业务继承
 
@@ -57,6 +65,7 @@ Toolkit 校验包结构、节点数量与深度、类继承关系和目标映射
 ## 验证
 
 - `npx tsx --test tests/roblox-import.test.ts tests/toolkit.test.ts tests/script-templates.test.ts tests/runtime.test.ts`：转换、通信、公共类模板和 App 运行。
+- `lua tests/ui-comp-scaling.lua`（在 Editor 目录，需要 Lua 5.4）：使用模拟引擎接口验证缩放、居中与清理，不代替 Studio 渲染。
 - `npm run test:roblox-import`：隔离 Electron 对话框测试，不向实际后台或地图投递。
 - Toolkit `pytest tests/roblox_sync tests/figma_roblox/test_studio_delivery.py -q`：真实 Rojo 构建、归属、回执、失败保留及共享插件回归。
 

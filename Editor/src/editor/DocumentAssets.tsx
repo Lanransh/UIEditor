@@ -94,7 +94,7 @@ export function DocumentAssets({ editor, library }: { editor: DocumentEditor; li
     const relative = parts.slice(parts.lastIndexOf('template-references') + 1);
     return folder ? relative.length > 1 && relative[0] === folder : relative.length === 1;
   }) : assets;
-  const entries = assetLibrary === 'project' && !editor.path ? [{ name: editor.document.name, path: null }, ...visibleAssets] : visibleAssets;
+  const entries = assetLibrary === 'project' && editor.hasDocument && !editor.path ? [{ name: editor.document.name, path: null }, ...visibleAssets] : visibleAssets;
   return <div className="document-assets" aria-label="UI 界面资产" aria-busy={loading || editor.busy}>
     {assetLibrary === 'templates' && <div className="document-asset-toolbar">
       <select aria-label="浏览模板文件夹" value={folder} onChange={event => setFolder(event.target.value)}><option value="">模板参考根目录</option>{folders.map(name => <option key={name}>{name}</option>)}</select>

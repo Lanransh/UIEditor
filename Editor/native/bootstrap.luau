@@ -246,15 +246,19 @@ table.freeze(API)
 Base.__index = Base
 Base.__name = "FCUICompClass"
 table.freeze(Base)
-local Shared = FX.Class("CUIEditorUICompClass", "FCUICompClass")
--- 公共类提供编辑器合同；Base 的同名方法仅兼容旧文档。
-Shared.GetUIConfig = Base.GetUIConfig
-Shared.GetUIState = Base.GetUIState
-Shared.BindUIData = Base.BindUIData
-Shared.OnUIAction = Base.OnUIAction
-Shared.EmitUIAction = Base.EmitUIAction
-Shared.RefreshUI = Base.RefreshUI
+local Shared = (function()
+    local _G = { FX = FX }
+    -- UIEDITOR_SHARED_BASE
+end)()
+-- 编辑器在固定 1280×720 画布上运行，设备适配比例为 1。
+-- 引擎尺寸监听和原生按钮属性由宿主适配，不重复实现公共类合同。
+function Shared:_AdaptToScreen(screen) end
 Shared.SetButtonEnabled = Base.SetButtonEnabled
+local emitUIAction = Shared.EmitUIAction
+function Shared:EmitUIAction(action, payload)
+    table.insert(logs, { kind = "action", message = action, payload = payload })
+    emitUIAction(self, action, payload)
+end
 table.freeze(Shared)
 local host = {}
 function host.initialize(input)
@@ -275,6 +279,7 @@ end
 function host.interaction(cls)
     assert(type(cls) == "table" and classes[cls.__name] == cls and (cls.__base == Base or cls.__base == Shared), "Interaction script must return a class inheriting CUIEditorUICompClass")
     Class = cls
+    Class.ScreenGuiName = nodes[root].name
     table.freeze(Class)
 end
 function host.integration(cls)

@@ -26,7 +26,7 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
       const verify = () => { if (!alive || a.sessionId !== sessionId.current || a.revision !== e.history.inspect().revision || signature !== JSON.stringify(current.current.editor.imageAssets)) throw new Error('编辑会话、资产配置或 revision 已变化，请重新读取状态。'); };
       const writable = () => { verify(); if (e.runtime.inspect().sessionId || e.runtime.active || e.busy) throw new Error('当前正在运行或处理操作，请停止后编辑。'); };
       const resolved = () => resolveImageAssets(e.history.inspect().state, e.imageAssets);
-      const dirty = () => JSON.stringify(resolved()) !== f.saved();
+      const dirty = () => e.hasDocument && JSON.stringify(resolved()) !== f.saved();
       const relativePath = () => { const root = e.projectPath.replaceAll('\\', '/') + '/interfaces/', path = f.path()?.replaceAll('\\', '/'); return path?.toLowerCase().startsWith(root.toLowerCase()) ? path.slice(root.length) : null; };
       const state = () => ({ ...stamp(), projectType: e.strategy.mode, state: e.runtime.inspect().sessionId ? 'runtime' : 'edit', dirty: dirty(), relativePath: relativePath() });
       const readDocument = () => {
@@ -36,8 +36,9 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
         return { document: resolved() };
       };
       try {
+        if (!e.hasDocument && !['uie.editor.get_state', 'uie.editor.get_capabilities', 'uie.document.list', 'uie.document.new', 'uie.document.open', 'uie.assets.search', 'uie.assets.get', 'uie.assets.configure', 'uie.debug.get_diagnostics'].includes(request.name)) throw new Error('请先新建或打开界面。');
         switch (request.name) {
-          case 'uie.editor.get_state': return { ...state(), ...(a.detail === 'full' ? { document: resolved() } : { nodeCount: allNodes(h.state.root).length }) };
+          case 'uie.editor.get_state': return { ...state(), ...(a.detail === 'full' ? { document: e.hasDocument ? resolved() : null } : { nodeCount: e.hasDocument ? allNodes(h.state.root).length : 0 }) };
           case 'uie.assets.search': case 'uie.assets.get': {
             const assets = await e.refreshImages();
             if (request.name === 'uie.assets.get') {

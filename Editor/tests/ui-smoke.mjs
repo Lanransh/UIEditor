@@ -54,6 +54,12 @@ async function dragNode(source, target, ratio) {
 try {
   await dialogs(parent);
   await page.getByRole('button', { name: '创建工程', exact: true }).click();
+  await page.getByText('请打开一个工程', { exact: true }).waitFor();
+  await dialogs(null); await menu('打开界面');
+  await page.getByText('请打开一个工程', { exact: true }).waitFor();
+  await menu('新建界面');
+  await page.getByRole('textbox', { name: '新界面名称', exact: true }).fill('OnlineRewards');
+  await page.getByRole('button', { name: '创建', exact: true }).click();
   await page.getByRole('tree', { name: 'Roblox 节点' }).waitFor();
   assert.deepEqual(await page.getByTestId('ui-artboard').evaluate(element => ({ width: element.offsetWidth, height: element.offsetHeight })), { width: 1280, height: 720 });
   await input('界面名称', '在线奖励');
@@ -257,7 +263,7 @@ try {
   const savedThumbnail = page.getByRole('img', { name: 'NestedTemplate 缩略图', exact: true });
   await savedThumbnail.locator('.preview-text-fill').getByText('领取奖励', { exact: true }).waitFor();
   await page.getByRole('img', { name: 'Broken 缩略图', exact: true }).getByText('预览不可用', { exact: true }).waitFor();
-  assert.equal(await page.getByLabel('界面名称', { exact: true }).inputValue(), 'Untitled');
+  assert.equal(await page.getByLabel('界面名称', { exact: true }).count(), 0);
   assert.equal(await savedThumbnail.locator('[role="button"], .node-selection').count(), 0);
   const filters = await page.locator('filter').evaluateAll(elements => elements.map(element => element.id));
   assert.equal(new Set(filters).size, filters.length);
