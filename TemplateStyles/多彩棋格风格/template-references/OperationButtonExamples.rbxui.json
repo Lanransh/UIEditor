@@ -83,7 +83,7 @@
                   "scale": 0
                 }
               },
-              "Text": "操作按钮模板",
+              "Text": "Action Buttons",
               "TextColor3": "#ffffff",
               "TextScaled": false,
               "TextSize": 24,
@@ -248,7 +248,7 @@
                       "scale": 1
                     }
                   },
-                  "Text": "确定",
+                  "Text": "Confirm",
                   "TextColor3": "#ffffff",
                   "TextScaled": false,
                   "TextSize": 24,
@@ -469,7 +469,7 @@
                       "scale": 1
                     }
                   },
-                  "Text": "取消",
+                  "Text": "Cancel",
                   "TextColor3": "#ffffff",
                   "TextScaled": false,
                   "TextSize": 24,
@@ -690,7 +690,7 @@
                       "scale": 1
                     }
                   },
-                  "Text": "购买",
+                  "Text": "Buy",
                   "TextColor3": "#ffffff",
                   "TextScaled": false,
                   "TextSize": 24,
@@ -911,7 +911,7 @@
                       "scale": 1
                     }
                   },
-                  "Text": "付费购买",
+                  "Text": "Paid Purchase",
                   "TextColor3": "#ffffff",
                   "TextScaled": false,
                   "TextSize": 24,
@@ -1132,7 +1132,7 @@
                       "scale": 1
                     }
                   },
-                  "Text": "装备",
+                  "Text": "Equip",
                   "TextColor3": "#ffffff",
                   "TextScaled": false,
                   "TextSize": 24,
@@ -1353,7 +1353,7 @@
                       "scale": 1
                     }
                   },
-                  "Text": "卸载",
+                  "Text": "Unequip",
                   "TextColor3": "#ffffff",
                   "TextScaled": false,
                   "TextSize": 24,

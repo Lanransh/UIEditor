@@ -1,7 +1,7 @@
 import { lstat, mkdir, readdir, readFile, realpath, rename, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { robloxStrategy } from '../src/editor/roblox';
-import type { TemplateStyle } from '../src/shared/project';
+import type { TemplateStyle, TemplateStylePreview } from '../src/shared/project';
 import type { UIDocument } from '../src/shared/uiDocument';
 
 export interface StyleFile { path: string; content: Buffer }
@@ -45,7 +45,7 @@ function validateDocumentLinks(files: StyleFile[]) {
 
 // Snapshot the allowlisted package before creating any project files. Documents
 // and resources are copied byte-for-byte; user-authored prompts are never rewritten.
-export async function readTemplateStyle(directory: string): Promise<{ files: StyleFile[]; description: string; templateCount: number; preview: UIDocument }> {
+export async function readTemplateStyle(directory: string): Promise<{ files: StyleFile[]; description: string; templateCount: number; preview: UIDocument; templates: TemplateStylePreview['templates'] }> {
   try { await regular(dirname(directory), true); await regular(directory, true); }
   catch (error) { throw new Error(`无法读取模板风格 ${basename(directory)}：${(error as Error).message}`); }
   const root = await realpath(directory);
@@ -115,7 +115,14 @@ export async function readTemplateStyle(directory: string): Promise<{ files: Sty
     return relative(resolve('style-project'), resolve('style-project', 'AgentWorkspace', decodeURIComponent(link)));
   }).find(path => documents.has(path));
   const previewPath = linkedTemplate ?? templates.map(file => file.path).sort((a, b) => a.localeCompare(b, 'zh-CN'))[0];
-  return { files, description, templateCount: templates.length, preview: documents.get(previewPath)! };
+  return { files, description, templateCount: templates.length, preview: documents.get(previewPath)!,
+    templates: [...documents].sort(([a], [b]) => a.localeCompare(b, 'zh-CN')).map(([path, document]) => ({ path: relative('template-references', path), document })) };
+}
+
+export async function previewTemplateStyle(root: string, id: unknown): Promise<TemplateStylePreview> {
+  const directory = styleDirectory(root, id);
+  const { templates } = await readTemplateStyle(directory);
+  return { directory, templates };
 }
 
 export async function listTemplateStyles(root: string): Promise<TemplateStyle[]> {

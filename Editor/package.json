@@ -25,6 +25,7 @@
     "test:templates": "npm run build && node tests/template-assets-smoke.mjs",
     "test:styles": "npm run build && tsx --test tests/template-styles.test.ts tests/projects.test.ts && tsx tests/project-template-style-smoke.ts && tsx tests/project-template-clone-smoke.ts",
     "test:styles:packaged": "tsx tests/project-template-style-smoke.ts --packaged",
+    "test:style-library": "npm run build && tsx --test tests/style-preview.test.ts tests/template-styles.test.ts && node tests/style-library-smoke.mjs",
     "package": "npm run build && node scripts/package.mjs"
   },
   "devDependencies": {

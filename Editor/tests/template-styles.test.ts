@@ -4,7 +4,7 @@ import fs, { mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile }
 import { syncBuiltinESMExports } from 'node:module';
 import { join, resolve, sep } from 'node:path';
 import { createProject, describeError, openProject } from '../electron/projects';
-import { listTemplateStyles, projectStylePath, readTemplateStyle, seedTemplateStyles, styleDirectory, templateStylesDirectory } from '../electron/template-styles';
+import { listTemplateStyles, previewTemplateStyle, projectStylePath, readTemplateStyle, seedTemplateStyles, styleDirectory, templateStylesDirectory } from '../electron/template-styles';
 import { robloxStrategy } from '../src/editor/roblox';
 import { writeDocument } from '../electron/documents';
 
@@ -70,6 +70,27 @@ test('风格缩略图优先按规范首个模板链接选择，没有链接时�
   await writeFile(join(style, 'Game-DESIGN.md'), '# 风格\n\n说明');
   assert.equal((await listTemplateStyles(library))[0].preview?.name, 'FirstFile');
   assert.equal((await readTemplateStyle(style)).templateCount, 2);
+});
+
+test('画风查看返回全部校验过的模板和实际目录，每次重新读盘且不修改原件', async t => {
+  const { root, library, style } = await fixture(t);
+  const document = robloxStrategy.createDocument('Close');
+  await writeDocument(join(style, 'template-references', 'Close.rbxui.json'), document);
+  const before = await readTemplateStyle(style);
+  const preview = await previewTemplateStyle(library, '定制 风格');
+  assert.equal(preview.directory, style);
+  assert.deepEqual(preview.templates.map(item => item.path).sort(), ['Close.rbxui.json', join('窗口', 'Small.rbxui.json')].sort());
+  assert.deepEqual(preview.templates.find(item => item.path === 'Close.rbxui.json')!.document, document);
+  for (const file of before.files) assert.deepEqual(await readFile(join(style, file.path)), file.content);
+  document.name = 'UpdatedClose';
+  await writeDocument(join(style, 'template-references', 'Close.rbxui.json'), document);
+  assert.equal((await previewTemplateStyle(library, '定制 风格')).templates.find(item => item.path === 'Close.rbxui.json')!.document.name, document.name);
+  await assert.rejects(previewTemplateStyle(library, '../outside'), /标识无效/);
+  await assert.rejects(previewTemplateStyle(library, '不存在'), /无法读取/);
+  await writeFile(join(style, 'template-references', 'Close.rbxui.json'), '{}');
+  await assert.rejects(previewTemplateStyle(library, '定制 风格'), /模板损坏/);
+  await symlink(style, join(root, 'linked'), 'junction');
+  await assert.rejects(previewTemplateStyle(root, 'linked'), /链接/);
 });
 
 test('整套独立复制：模板子目录、提示词原始字节、文字规范、二进制资源、skills；移动和重开保持相对引用', async t => {
@@ -246,15 +267,21 @@ test('随应用提供的 多彩棋格风格：7 个鲜明配色模板和完整�
     const document = robloxStrategy.validate(JSON.parse(file.content.toString('utf8')));
     const checkStyle = (node: typeof document.root) => {
       assert.notEqual(node.name, 'BackgroundImg', `${file.path} 不应包含展示背景`);
+      if (typeof node.properties.Text === 'string') {
+        assert.doesNotMatch(node.properties.Text, /\p{Script=Han}/u, `${file.path} ${node.name} 使用英文文案`);
+      }
       if (colors[node.name]) assert.equal(node.properties.BackgroundColor3, colors[node.name], `${file.path} ${node.name}`);
       if (['TitleTxt', 'CloseBtn', 'ButtonTxt', 'ProgressTxt'].includes(node.name)) {
         assert.equal(node.properties.TextColor3, '#ffffff', `${file.path} ${node.name} 使用白字描边`);
         assert.equal(node.children.find(child => child.name === 'TextStroke')?.properties.Enabled, true);
+      }
+      if (node.name === 'CloseBtn') {
+        assert.deepEqual(node.properties.Position, { x: { scale: 0, offset: 0 }, y: { scale: 0, offset: -8 } }, `${file.path} 关闭字符补偿字形偏移`);
       }
       node.children.forEach(checkStyle);
     };
     checkStyle(document.root);
   }
   const design = await readFile(join(project.path, 'AgentWorkspace', 'Game-DESIGN.md'), 'utf8');
-  for (const rule of ['GothamBold', '30', 'CloseSurfaceImg', 'CloseBtn', 'PaidPurchaseBtn', '#D03BF2', '#DF1A23', '标题不固定红色', '进度值 / 目标值']) assert.ok(design.includes(rule), rule);
+  for (const rule of ['GothamBold', '30', 'CloseSurfaceImg', 'CloseBtn', 'PaidPurchaseBtn', '#D03BF2', '#DF1A23', '标题不固定红色', 'Current / Target']) assert.ok(design.includes(rule), rule);
 });

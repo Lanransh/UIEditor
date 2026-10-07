@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { AlertTriangle, ArrowLeft, Clock3, Folder, FolderOpen, FolderPlus, Layers3, Settings, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Clock3, Folder, FolderOpen, FolderPlus, Layers3, Palette, Settings, Trash2 } from 'lucide-react';
 import type { Project, ProjectAPI, RecentProjectView, Result } from './shared/project';
 import { useDocumentEditor } from './editor/useDocumentEditor';
 import { NodeTree, NodeProperties } from './editor/NodePanels';
@@ -11,6 +11,7 @@ import { NewInterfaceDialog } from './editor/NewInterfaceDialog';
 import { NewProjectDialog } from './editor/NewProjectDialog';
 import { RobloxImportDialog } from './editor/RobloxImportDialog';
 import { McpSettings } from './editor/McpSettings';
+import { StyleLibraryDialog } from './editor/StyleLibraryDialog';
 
 declare global { interface Window { projects: ProjectAPI } }
 
@@ -24,6 +25,7 @@ export function App() {
 function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
   const [mcpSettings, setMcpSettings] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
+  const [viewingStyles, setViewingStyles] = useState(false);
   const [recent, setRecent] = useState<RecentProjectView[] | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(true);
@@ -97,6 +99,7 @@ function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
       <div className="hub-actions">
         <button className="primary" disabled={busy} onClick={() => setCreatingProject(true)}><FolderPlus size={19} />创建工程</button>
         <button className="secondary" disabled={busy} onClick={() => void open(() => window.projects.open())}><FolderOpen size={19} />打开工程</button>
+        <button className="secondary" disabled={busy} onClick={() => setViewingStyles(true)}><Palette size={19} />画风库</button>
       </div>
       <p className="creation-hint">选择父文件夹后，将自动创建 UIEditorWorkspace 工程目录。</p>
     </header>
@@ -110,6 +113,7 @@ function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
     </div>
     <footer className="hub-footer"><span>UI 编辑器 · 基础版</span><span>本地工程 / Roblox</span></footer>
     {mcpSettings && <McpSettings onClose={() => setMcpSettings(false)} />}
+    {viewingStyles && <StyleLibraryDialog onClose={() => setViewingStyles(false)} />}
     {creatingProject && <NewProjectDialog recent={recent ?? []} onCancel={() => setCreatingProject(false)} onCreate={source => { setCreatingProject(false); void open(() => window.projects.create(source)); }} />}
   </main>;
 }

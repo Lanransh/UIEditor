@@ -13,6 +13,7 @@ const api: ProjectAPI = {
   },
   create: templateSource => ipcRenderer.invoke('project:create', templateSource),
   listStyles: () => ipcRenderer.invoke('project:list-styles'),
+  previewStyle: id => ipcRenderer.invoke('project:preview-style', id),
   open: () => ipcRenderer.invoke('project:open'),
   openRecent: (path) => ipcRenderer.invoke('project:open-recent', path),
   listRecent: () => ipcRenderer.invoke('project:list-recent'),

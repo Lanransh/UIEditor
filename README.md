@@ -88,6 +88,7 @@ npm run dev
 | `npm run test:assets` | 构建并验证图片库、共用属性面板、单一 Roblox ID、保存重开及资产 MCP |
 | `npm run test:templates` | 构建并验证项目模板与文件夹隔离、缩略图、独立副本、重启持久化、UI库互移与保存路径 |
 | `npm run test:styles` | 构建并验证风格库、整套独立复制、失败清理、风格选择和历史克隆互斥、重开提示词保护 |
+| `npm run test:style-library` | 构建并验证 Hub 画风库入口、全部模板预览、小组件聚焦、缩放刷新、只读保护与错误重试 |
 | `npm run test:styles:packaged` | 验证已打包应用的风格库位置和新建项目流程；可指定 UI_EDITOR_PACKAGED_EXECUTABLE |
 | `node tests/runtime-smoke.mjs --packaged` | 验证已打包 exe 的离线 Luau 运行 |
 | `npm run package` | 构建 Windows x64 应用到 ToolRuntime |

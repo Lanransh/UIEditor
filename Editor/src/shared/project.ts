@@ -34,6 +34,11 @@ export interface TemplateStyle {
   problem?: string;
 }
 
+export interface TemplateStylePreview {
+  directory: string;
+  templates: { path: string; document: UIDocument }[];
+}
+
 export type CreateProjectSource = { kind: 'style'; id: string } | { kind: 'recent'; path: string };
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
@@ -43,6 +48,7 @@ export interface ProjectAPI {
   onActivated(callback: (project: Project) => void): () => void;
   create(source?: string | CreateProjectSource): Promise<Result<Project | null>>;
   listStyles(): Promise<Result<TemplateStyle[]>>;
+  previewStyle(id: string): Promise<Result<TemplateStylePreview>>;
   open(): Promise<Result<Project | null>>;
   openRecent(path: string): Promise<Result<Project>>;
   listRecent(): Promise<Result<RecentProjectView[]>>;

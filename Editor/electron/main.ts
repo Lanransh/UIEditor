@@ -19,7 +19,7 @@ import { openInterface, saveInterface } from './automation-files';
 import { createCodexMcpSettingsStore } from './codex-mcp-settings.cjs';
 import { ImageAssetStore } from './image-assets';
 import { ensureWorkspaceLauncher } from './workspace-launcher';
-import { listTemplateStyles, seedTemplateStyles, styleDirectory, templateStylesDirectory } from './template-styles';
+import { listTemplateStyles, previewTemplateStyle, seedTemplateStyles, styleDirectory, templateStylesDirectory } from './template-styles';
 import { resolveImageAssets, type ImageAssetUpdate, type ImageLibrary } from '../src/shared/imageAssets';
 
 const runtime = process.env.UI_EDITOR_USER_DATA
@@ -263,6 +263,10 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       return result.canceled ? undefined : result.filePaths[0];
     }
     handle('project:list-styles', styles);
+    handle('project:preview-style', async id => {
+      if (app.isPackaged) await seedTemplateStyles(join(process.resourcesPath, 'TemplateStyles'), stylesRoot);
+      return previewTemplateStyle(stylesRoot, id);
+    });
     handle('project:create', async input => {
       let source: string | undefined;
       let style: string | undefined;
