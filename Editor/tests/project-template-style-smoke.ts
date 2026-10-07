@@ -60,7 +60,7 @@ try {
   assert.ok(style && !style.problem);
   assert.equal(style.templateCount, 7);
   assert.equal(style.preview?.root.name, 'SmallWindowUI');
-  const library = packaged ? join(dirname(dirname(executable)), 'TemplateStyles') : resolve('../TemplateStyles');
+  const library = packaged ? join(dirname(executable), 'resources', 'TemplateStyles') : resolve('../TemplateStyles');
   const snapshot = await readTemplateStyle(join(library, '多彩棋格风格'));
   const source = join(root, '风格项目');
   await mkdir(source);

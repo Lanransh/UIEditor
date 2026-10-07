@@ -12,7 +12,7 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 - 批处理和打包默认使用与参考工程相同的 npm Electron 镜像；可通过 `ELECTRON_MIRROR` 环境变量覆盖。
 - 可将 Windows 便携 Node.js 放到 `ToolRuntime/Runtime/nodejs/`，批处理优先使用其中的 `node.exe` 和 `npm.cmd`。
 - 打包入口：`ToolRuntime/UIEditor-win32-x64/UIEditor.exe`。运行打包应用无需额外安装 Node.js；分发时需保留整个应用目录，不能只复制 exe。
-- app.asar 只收集 `dist`、`dist-electron` 和 `package.json`，Luau、MCP 与模板风格种子通过额外资源复制；运行依赖已由 Vite/esbuild 打入构建产物，不再复制或扫描 `node_modules`。打包过程显示阶段与耗时，首次下载、解压 Electron 仍需等待。
+- app.asar 只收集 `dist`、`dist-electron` 和 `package.json`，Luau、MCP 与模板风格通过额外资源复制；运行依赖已由 Vite/esbuild 打入构建产物，不再复制或扫描 `node_modules`。打包过程显示阶段与耗时，首次下载、解压 Electron 仍需等待。
 
 ## 使用
 
@@ -26,15 +26,16 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 
 ### 模板风格与项目 AI
 
-开发版的统一风格库为仓库根目录 `TemplateStyles/`；
-打包版可编辑库为应用文件夹旁的 `TemplateStyles/`（默认 `ToolRuntime/TemplateStyles/`）。
+唯一维护源为仓库根目录 `TemplateStyles/`，开发版直接读取；
+打包版直接读取应用内的 `resources/TemplateStyles/`，不再使用外置副本。
 每个二级文件夹是一套风格，必要文件是 `AGENTS.md`、`Game-DESIGN.md`
 及 `template-references/**/*.rbxui.json`；资源和 skills 按需提供。
 规则及相对引用约定见 [风格库说明](TemplateStyles/README.md)。
 当前 **多彩棋格风格** 包含 7 个鲜明配色独立模板，标题可按主题选色，
 保留 Stud 平铺纹理，不包含 TemplatePage 展示页或全画布展示背景。
 
-风格由用户维护，重新打包只带种子，不覆盖已有同名风格目录。
+修改维护源后重新构建打包并运行新版 App，新建工程即使用新版，无需手动同步。
+旧 `ToolRuntime/TemplateStyles/` 不再读取且不自动清理；其中的定制画风需纳入维护源。
 新工程是独立副本：库修改不更新已有项目，项目修改不回写库；
 打开工程不覆盖项目定制提示词。移动时带上整个 UIEditorWorkspace 即可。
 缺文档、坏模板、资源链接不闭合、链接目录或权限错误会给出具体反馈；
@@ -102,7 +103,7 @@ npm run dev
 - `Editor/src/`：React Hub、静态 UI 工作台、策略与共享接口类型。
 - `Editor/electron/`：文件管理、原生目录选择、受限 IPC 和应用生命周期。
 - `Editor/scripts/`、`Editor/tests/`：开发、打包脚本及自动化验证。
-- `TemplateStyles/`：可维护的风格制作包；打包作为种子，新建项目原样复制。
+- `TemplateStyles/`：风格制作包的唯一维护源；打包版直接读取分发资源，新建项目原样复制。
 - `ToolRuntime/`：打包应用和运行数据，详见[运行目录说明](ToolRuntime/README.md)。
 - `Docs/`：[设计文档](Docs/design/README.md)，记录当前行为、数据格式与职责边界。
 

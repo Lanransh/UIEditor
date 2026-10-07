@@ -1,4 +1,4 @@
-import { lstat, mkdir, readdir, readFile, realpath, rename, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { lstat, readdir, readFile, realpath } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { robloxStrategy } from '../src/editor/roblox';
 import type { TemplateStyle, TemplateStylePreview } from '../src/shared/project';
@@ -8,7 +8,7 @@ export interface StyleFile { path: string; content: Buffer }
 const ignored = new Set(['node_modules', '.git', '.cache', 'Runtime', 'test-results', 'dist', 'dist-electron']);
 
 export function templateStylesDirectory(packaged: boolean, applicationPath: string, executablePath: string): string {
-  return join(packaged ? dirname(dirname(executablePath)) : dirname(applicationPath), 'TemplateStyles');
+  return packaged ? join(dirname(executablePath), 'resources', 'TemplateStyles') : join(dirname(applicationPath), 'TemplateStyles');
 }
 
 async function regular(path: string, directory: boolean) {
@@ -142,28 +142,4 @@ export async function listTemplateStyles(root: string): Promise<TemplateStyle[]>
     styles.push(style);
   }
   return styles.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
-}
-
-// Shipped styles are seeds, not an authority over user-maintained folders. Skip
-// a whole existing style (including broken/customized ones), never merge into it.
-export async function seedTemplateStyles(source: string, target: string): Promise<void> {
-  await regular(source, true);
-  await mkdir(target, { recursive: true });
-  await regular(target, true);
-  for (const entry of await readdir(source, { withFileTypes: true })) {
-    if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
-    const destination = styleDirectory(target, entry.name);
-    if (await lstat(destination).catch(error => { if (error.code === 'ENOENT') return null; throw error; })) continue;
-    const { files } = await readTemplateStyle(join(source, entry.name));
-    const staging = await mkdtemp(join(target, '.seed-'));
-    try {
-      for (const file of files) {
-        const path = join(staging, file.path);
-        await mkdir(dirname(path), { recursive: true });
-        await writeFile(path, file.content, { flag: 'wx' });
-      }
-      // Another instance may have created it while the snapshot was written.
-      if (!await lstat(destination).catch(error => { if (error.code === 'ENOENT') return null; throw error; })) await rename(staging, destination);
-    } finally { await rm(staging, { recursive: true, force: true }); }
-  }
 }

@@ -9,20 +9,22 @@
 
 ## 风格库与路径
 
-- 开发版：仓库根目录 `TemplateStyles/`。
-- 打包资源：`UIEditor-win32-x64/resources/TemplateStyles/` 是分发种子。
-- 打包可编辑库：应用目录的父目录 `TemplateStyles/`，默认
-  `ToolRuntime/TemplateStyles/`，位于 packager 替换范围之外。
-- 第一次发现只补充完全不存在的风格文件夹，先写隐藏临时目录再发布；
-  已有同名风格整套跳过，包括损坏或用户修改的目录。
-  重新打包、启动和再次发现不合并、不覆盖、不清空用户风格。
+- 唯一维护源：仓库根目录 `TemplateStyles/`，开发版直接读取。
+- 打包版直接读取 `UIEditor-win32-x64/resources/TemplateStyles/`，
+  这是维护源在打包时生成的分发副本，不另建外置画风库。
+- 修改维护源后，重新构建打包并运行新版 App，画风查看、预览和新建工程
+  均读取本次打包的内容，无需手动同步。只运行旧 App 不会更新打包资源。
+- 旧的 `ToolRuntime/TemplateStyles/` 不再读取，也不自动迁移、删除或覆盖；
+  仅存在于旧外置库中的定制画风不会出现在新库，需要纳入维护源后重新打包。
+- 工程在创建时保存独立快照：使用版本 1 创建的工程在画风更新到版本 2 后
+  仍保留版本 1；新版只影响之后新建的工程，重开不更新已有工程内容。
 - 运行数据重定向 `UI_EDITOR_USER_DATA` 不改变风格库位置。
 
 文件夹名作为风格 ID 和显示名称；说明取 `Game-DESIGN.md` 首个非空、
 非标题行，不增加固定样式配置。每套风格的文件/节点名称自由，
 实际文件和规范负责用途映射，程序不硬编码窗口与按钮名。
 
-当前种子 **多彩棋格风格** 从实际 UIEditor 模板取得，保留 7 份独立模板：
+当前画风 **多彩棋格风格** 从实际 UIEditor 模板取得，保留 7 份独立模板：
 SmallWindow、MediumWindow、LargeWindow、Title、CloseButton、
 OperationButtonExamples、ProgressBar。不包含用户要求删除的
 TemplatePage 展示页；没有修改来源工程原件。
@@ -136,7 +138,8 @@ App 检查不证明 Studio/设备显示或真实业务正确。
 
 `tests/template-styles.test.ts` 覆盖发现、损坏、访问受限、完整原样复制、
 独立性、移动、已有目标保护、相对引用、链接拒绝、复制失败回滚、
-开发/打包路径及种子不覆盖。
+开发/打包的单一读取路径、外置旧副本隔离，以及更新后新工程使用新版、
+已有工程保留原快照。
 `npm run test:styles` 构建后运行相关单元测试、真实风格选择与历史克隆冒烟；
 `npm run test:styles:packaged` 验证已打包应用的同一流程。
 可使用 UI_EDITOR_PACKAGE_OUTPUT/ UI_EDITOR_PACKAGED_EXECUTABLE 隔离打包验证，

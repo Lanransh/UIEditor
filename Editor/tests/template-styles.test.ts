@@ -4,7 +4,7 @@ import fs, { mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile }
 import { syncBuiltinESMExports } from 'node:module';
 import { join, resolve, sep } from 'node:path';
 import { createProject, describeError, openProject } from '../electron/projects';
-import { listTemplateStyles, previewTemplateStyle, projectStylePath, readTemplateStyle, seedTemplateStyles, styleDirectory, templateStylesDirectory } from '../electron/template-styles';
+import { listTemplateStyles, previewTemplateStyle, projectStylePath, readTemplateStyle, styleDirectory, templateStylesDirectory } from '../electron/template-styles';
 import { robloxStrategy } from '../src/editor/roblox';
 import { writeDocument } from '../electron/documents';
 
@@ -221,26 +221,49 @@ test('访问受限明确反馈，复制中途失败清理已创建的文件和�
   assert.ok((await readFile(join(style, 'AGENTS.md'), 'utf8')).includes('作者风格'));
 });
 
-test('开发/打包路径及种子保护：不覆盖定制或损坏的风格，不复制链接和运行目录', async t => {
-  const { root, library, style } = await fixture(t);
+test('打包画风更新后新建工程读取新版，不使用外置旧副本或修改已有工程', async t => {
+  const { root, style, agents, design } = await fixture(t);
+  const application = join(root, 'ToolRuntime', 'UIEditor-win32-x64');
+  const resources = join(application, 'resources', 'TemplateStyles');
+  const external = join(root, 'ToolRuntime', 'TemplateStyles');
+  await fs.cp(style, join(resources, '定制 风格'), { recursive: true });
+  await fs.cp(style, join(external, '定制 风格'), { recursive: true });
+  const active = templateStylesDirectory(true, join(application, 'resources', 'app.asar'), join(application, 'UIEditor.exe'));
+  const firstParent = join(root, 'first');
+  await mkdir(firstParent);
+  const first = (await createProject(firstParent, undefined, styleDirectory(active, '定制 风格'))).project;
+  const templatePath = join('template-references', '窗口', 'Small.rbxui.json');
+  const originalTemplate = await readFile(join(first.path, templatePath));
+  const updatedAgents = '# Updated UI assistant\nAll display text must be English. Use the question-mark placeholder for content icons.\n';
+  const updatedDesign = '# Updated style\nEnglish-only UI; builtin:roblox:placeholder for all content icons.\n';
+  await writeFile(join(resources, '定制 风格', 'AGENTS.md'), updatedAgents);
+  await writeFile(join(resources, '定制 风格', 'Game-DESIGN.md'), updatedDesign);
+  await writeDocument(join(resources, '定制 风格', templatePath), robloxStrategy.createDocument('UpdatedWindow'));
+  assert.equal((await listTemplateStyles(active))[0].description, 'English-only UI; builtin:roblox:placeholder for all content icons.');
+  assert.equal((await previewTemplateStyle(active, '定制 风格')).directory, join(resources, '定制 风格'));
+  const nextParent = join(root, 'next');
+  await mkdir(nextParent);
+  const next = (await createProject(nextParent, undefined, styleDirectory(active, '定制 风格'))).project;
+  assert.equal(await readFile(join(next.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), updatedAgents);
+  assert.equal(await readFile(join(next.path, 'AgentWorkspace', 'Game-DESIGN.md'), 'utf8'), updatedDesign);
+  assert.deepEqual(await readFile(join(next.path, templatePath)), await readFile(join(resources, '定制 风格', templatePath)));
+  await openProject(first.path);
+  assert.equal(await readFile(join(first.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), agents);
+  assert.equal(await readFile(join(first.path, 'AgentWorkspace', 'Game-DESIGN.md'), 'utf8'), design);
+  assert.deepEqual(await readFile(join(first.path, templatePath)), originalTemplate);
+  assert.equal(await readFile(join(external, '定制 风格', 'Game-DESIGN.md'), 'utf8'), design);
+});
+
+test('开发直接读取仓库画风，打包直接读取应用资源，不回退到外置目录', async t => {
+  const { root, style } = await fixture(t);
   assert.equal(templateStylesDirectory(false, join(root, 'Editor'), join(root, 'electron.exe')), join(root, 'TemplateStyles'));
-  assert.equal(templateStylesDirectory(true, join(root, 'ToolRuntime', 'UIEditor-win32-x64', 'resources', 'app.asar'), join(root, 'ToolRuntime', 'UIEditor-win32-x64', 'UIEditor.exe')), join(root, 'ToolRuntime', 'TemplateStyles'));
-  const target = join(root, 'portable', 'TemplateStyles');
-  await seedTemplateStyles(library, target);
-  const copied = join(target, '定制 风格', 'AGENTS.md');
-  assert.deepEqual(await readFile(copied), await readFile(join(style, 'AGENTS.md')));
-  await writeFile(copied, '用户定制');
-  await writeFile(join(style, 'AGENTS.md'), '# seed update');
-  await seedTemplateStyles(library, target);
-  assert.equal(await readFile(copied, 'utf8'), '用户定制');
-  await rm(join(target, '定制 风格', 'Game-DESIGN.md'));
-  await seedTemplateStyles(library, target);
-  assert.ok(!(await readdir(join(target, '定制 风格'))).includes('Game-DESIGN.md'));
-  await assert.rejects(readFile(join(target, '定制 风格', 'Runtime', 'secret.txt')));
-  const outside = join(root, 'outside');
-  await mkdir(outside);
-  await symlink(outside, join(root, 'linked-library'), 'junction');
-  await assert.rejects(seedTemplateStyles(library, join(root, 'linked-library')), /链接/);
+  const application = join(root, 'ToolRuntime', 'UIEditor-win32-x64');
+  const active = templateStylesDirectory(true, join(application, 'resources', 'app.asar'), join(application, 'UIEditor.exe'));
+  assert.equal(active, join(application, 'resources', 'TemplateStyles'));
+  await fs.cp(style, join(root, 'ToolRuntime', 'TemplateStyles', '定制 风格'), { recursive: true });
+  assert.deepEqual(await listTemplateStyles(active), []);
+  await assert.rejects(previewTemplateStyle(active, '定制 风格'), /无法读取/);
+  assert.equal((await listTemplateStyles(join(root, 'ToolRuntime', 'TemplateStyles'))).length, 1);
 });
 
 test('随应用提供的 多彩棋格风格：7 个鲜明配色模板和完整工作规则，排除展示页，项目内链接闭合', async t => {

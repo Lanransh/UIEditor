@@ -19,7 +19,7 @@ import { openInterface, saveInterface } from './automation-files';
 import { createCodexMcpSettingsStore } from './codex-mcp-settings.cjs';
 import { ImageAssetStore } from './image-assets';
 import { ensureWorkspaceLauncher } from './workspace-launcher';
-import { listTemplateStyles, previewTemplateStyle, seedTemplateStyles, styleDirectory, templateStylesDirectory } from './template-styles';
+import { listTemplateStyles, previewTemplateStyle, styleDirectory, templateStylesDirectory } from './template-styles';
 import { resolveImageAssets, type ImageAssetUpdate, type ImageLibrary } from '../src/shared/imageAssets';
 
 const runtime = process.env.UI_EDITOR_USER_DATA
@@ -64,10 +64,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     window.webContents.on('will-navigate', (event) => event.preventDefault());
     const recent = new RecentProjects(runtime);
     const stylesRoot = templateStylesDirectory(app.isPackaged, app.getAppPath(), process.execPath);
-    // Seeding is deferred to discovery so errors appear in the dialog, not as an
-    // unhandled startup failure. Existing projects never trigger a style copy.
     async function styles() {
-      if (app.isPackaged) await seedTemplateStyles(join(process.resourcesPath, 'TemplateStyles'), stylesRoot);
       return listTemplateStyles(stylesRoot);
     }
     let activeProject: Project | null = null;
@@ -264,7 +261,6 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     }
     handle('project:list-styles', styles);
     handle('project:preview-style', async id => {
-      if (app.isPackaged) await seedTemplateStyles(join(process.resourcesPath, 'TemplateStyles'), stylesRoot);
       return previewTemplateStyle(stylesRoot, id);
     });
     handle('project:create', async input => {
