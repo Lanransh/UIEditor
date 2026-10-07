@@ -192,7 +192,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
       execute('插入图片资产', value => insertNode(value, parent.id, node, strategy)); select(node.id);
     } else editNode(selected.id, node => applyImageAsset(node, asset), '应用图片资产');
   }
-  const editor = { projectPath: project.path, strategy, document, hasDocument, history, selected, select, editNode, execute, add, reparent, pickImage,
+  const editor = { projectId: project.manifest.id, projectName: project.name, projectPath: project.path, strategy, document, hasDocument, history, selected, select, editNode, execute, add, reparent, pickImage,
     inspectedAssetId, inspectAsset, clearAssetInspection, setAssetConfigurationDirty,
     imageAssets, assetsLoading, refreshImages, configureImage, importImage, useImage,
     newDocument, openDocument, openTemplate, saveTemplate, moveAsset, save: (saveAs = false) => run(async () => { await save(saveAs); }),

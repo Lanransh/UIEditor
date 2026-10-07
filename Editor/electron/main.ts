@@ -10,9 +10,12 @@ import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocume
 import { robloxStrategy } from '../src/editor/roblox';
 import { LuauSession, RuntimeError } from './runtime';
 import { ToolkitClient } from './toolkit';
+import { AutomationReader } from './automation-reader';
+import { getNode, nodeTree, findNodes, integer } from '../src/shared/automation';
+import type { UIDocument } from '../src/shared/uiDocument';
 import { startBridge } from './automation-bridge';
 import { executeCode, getCodeAdapter } from './code-executor';
-import { openInterface, saveInterface, listInterfaces } from './automation-files';
+import { openInterface, saveInterface } from './automation-files';
 import { createCodexMcpSettingsStore } from './codex-mcp-settings.cjs';
 import { ImageAssetStore } from './image-assets';
 import { ensureWorkspaceLauncher } from './workspace-launcher';
@@ -60,6 +63,27 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     window.webContents.on('will-navigate', (event) => event.preventDefault());
     const recent = new RecentProjects(runtime);
     let activeProject: Project | null = null;
+    const reader = new AutomationReader(runtime, recent, () => automationReady ? activeProject : null);
+    const previews = new Map<Electron.WebContents, { document: UIDocument; ready(): void }>();
+    async function savedScreenshot(document: UIDocument, target: object) {
+      const preview = new BrowserWindow({ width: 1280, height: 720, useContentSize: true, show: false, skipTaskbar: true, focusable: false,
+        webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false } });
+      preview.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+      preview.webContents.on('will-navigate', event => event.preventDefault());
+      const url = new URL(source); url.searchParams.set('uiePreview', '1');
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const ready = new Promise<void>((resolve, reject) => {
+          timer = setTimeout(() => reject(new Error('模板截图渲染超时。')), 10000);
+          previews.set(preview.webContents, { document, ready: resolve });
+        });
+        // Attach the readiness wait before navigation so a load failure cannot leave a rejected promise unhandled.
+        await Promise.all([preview.loadURL(url.href), ready]);
+        const captured = await preview.webContents.capturePage({ x: 0, y: 0, width: 1280, height: 720 });
+        const image = captured.resize({ width: 1280, height: 720, quality: 'best' });
+        return { png: image.toPNG().toString('base64'), metadata: { width: image.getSize().width, height: image.getSize().height, zoom: 1, target, view: 'saved-design' } };
+      } finally { if (timer) clearTimeout(timer); previews.delete(preview.webContents); preview.destroy(); }
+    }
     let documentPath: string | null = null;
     let dirty = false;
     let allowClose = false;
@@ -80,6 +104,30 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       if (reply.ok) item.resolve(reply.value); else item.reject(new Error(reply.error));
     });
     const bridge = await startBridge(discoveryPath, async request => {
+      const a = request.arguments;
+      if (request.name === 'uie.project.list') return reader.listProjects();
+      if (request.name === 'uie.document.list' && (a.projectId !== undefined || a.library === 'permanent' || !automationReady)) return reader.listDocuments(a);
+      if (a.target !== undefined) {
+        const saved = await reader.read(a.target);
+        switch (request.name) {
+          case 'uie.nodes.get': return { target: saved.target, ...(a.format === 'tree' ? nodeTree(saved.document, a) : { node: getNode(saved.document, a) }) };
+          case 'uie.nodes.find': return { target: saved.target, ...findNodes(saved.document, a) };
+          case 'uie.scripts.get': return { target: saved.target, scripts: a.kind === undefined ? saved.document.scripts : { [String(a.kind)]: saved.document.scripts[a.kind as 'source' | 'integration'] } };
+          case 'uie.debug.screenshot': return savedScreenshot(saved.document, saved.target);
+        }
+      }
+      if (['uie.assets.search', 'uie.assets.get'].includes(request.name) && (a.projectId !== undefined || a.library === 'permanent')) {
+        const { assets, projectId } = await reader.images(a);
+        if (request.name === 'uie.assets.get') {
+          const asset = assets.find(asset => asset.id === a.id);
+          if (!asset) throw new Error('图片资产不存在。');
+          return { projectId, asset: { ...asset, permission: 'unverified' } };
+        }
+        const query = String(a.query ?? '').toLowerCase();
+        const matches = assets.filter(asset => `${asset.name} ${asset.tags}`.toLowerCase().includes(query));
+        const offset = integer(a.offset, 0, 0, 10000), limit = integer(a.limit, 50, 1, 200);
+        return { projectId, assets: matches.slice(offset, offset + limit).map(({ previewImage: _, ...asset }) => asset), total: matches.length, nextOffset: offset + limit < matches.length ? offset + limit : null };
+      }
       if (!automationReady || window.isDestroyed()) {
         if (request.name === 'uie.debug.get_diagnostics') return { connected: true, state: 'hub', console: consoleLogs, consoleCursor };
         throw new Error('请先打开工程，当前没有编辑会话。');
@@ -95,6 +143,12 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     window.on('closed', () => { cancelAutomation(); bridge.close(); });
     window.webContents.on('render-process-gone', cancelAutomation);
     ipcMain.handle('automation:invoke', async (event, input) => {
+      const preview = previews.get(event.sender);
+      if (preview && event.senderFrame === event.sender.mainFrame && new URL(event.senderFrame.url).searchParams.get('uiePreview') === '1') {
+        if (input?.operation === 'preview:document') return preview.document;
+        if (input?.operation === 'preview:ready') { preview.ready(); return null; }
+        throw new Error('截图窗口只允许读取预览。');
+      }
       if (!trusted(event)) throw new Error('无效来源。');
       const argument = input?.argument;
       switch (input?.operation) {
@@ -106,8 +160,8 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
           return executeCode(getCodeAdapter(activeProject.manifest.mode), nativeDirectory, argument.document, argument.language, argument.source, assets).catch(error => ({ error: error.message, stage: error.stage ?? 'execution', logs: error.logs ?? [] }));
         }
         case 'file:open': { if (!activeProject || !automationReady) throw new Error('请先打开工程。'); const result = await openInterface(activeProject.path, argument.relativePath); documentPath = result.path; return result; }
+        case 'file:list': return reader.listDocuments(argument ?? {});
         case 'file:new': if (!automationReady) throw new Error('请先打开工程。'); documentPath = null; return null;
-        case 'file:list': if (!activeProject || !automationReady) throw new Error('请先打开工程。'); return listInterfaces(activeProject.path);
         case 'file:save': {
           if (!activeProject || !automationReady) throw new Error('请先打开工程。');
           const target = argument.relativePath ?? (documentPath ? relative(join(activeProject.path, 'interfaces'), documentPath) : null);

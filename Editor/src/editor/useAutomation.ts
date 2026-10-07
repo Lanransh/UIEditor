@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { DocumentEditor } from './useDocumentEditor';
-import { getNode, findNodes, integer, type AutomationRequest } from '../shared/automation';
+import { getNode, nodeTree, findNodes, integer, type AutomationRequest } from '../shared/automation';
 import { findNode, allNodes, type UIDocument } from '../shared/uiDocument';
 import { getCapabilities } from './automationCapabilities';
 import { documentCommand } from './commands';
@@ -28,7 +28,7 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
       const resolved = () => resolveImageAssets(e.history.inspect().state, e.imageAssets);
       const dirty = () => e.hasDocument && JSON.stringify(resolved()) !== f.saved();
       const relativePath = () => { const root = e.projectPath.replaceAll('\\', '/') + '/interfaces/', path = f.path()?.replaceAll('\\', '/'); return path?.toLowerCase().startsWith(root.toLowerCase()) ? path.slice(root.length) : null; };
-      const state = () => ({ ...stamp(), projectType: e.strategy.mode, state: e.runtime.inspect().sessionId ? 'runtime' : 'edit', dirty: dirty(), relativePath: relativePath() });
+      const state = () => ({ ...stamp(), projectId: e.projectId, projectName: e.projectName, documentId: e.hasDocument ? e.history.inspect().state.id : null, projectType: e.strategy.mode, state: e.runtime.inspect().sessionId ? 'runtime' : 'edit', dirty: dirty(), relativePath: relativePath() });
       const readDocument = () => {
         if (a.view !== undefined && a.view !== 'design' && a.view !== 'runtime') throw new Error('view 必须是 design 或 runtime。');
         const runtime = e.runtime.inspect();
@@ -42,7 +42,7 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
           case 'uie.assets.search': case 'uie.assets.get': {
             const assets = await e.refreshImages();
             if (request.name === 'uie.assets.get') {
-              const asset = assets.find(asset => asset.id === a.id); if (!asset) throw new Error('图片资产不存在。');
+              const asset = assets.find(asset => asset.id === a.id && (a.library === undefined || asset.library === a.library)); if (!asset) throw new Error('图片资产不存在。');
               return { ...stamp(), asset: { ...asset, permission: 'unverified' } };
             }
             const query = String(a.query ?? '').toLowerCase();
@@ -63,7 +63,7 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
             } finally { f.busy(false); }
           }
           case 'uie.editor.get_capabilities': return { ...stamp(), ...getCapabilities(e.strategy) };
-          case 'uie.nodes.get': { const view = readDocument(); return { ...stamp(), ...('runtimeSessionId' in view ? { runtimeSessionId: view.runtimeSessionId, frameSequence: view.frameSequence } : {}), node: getNode(view.document, a) }; }
+          case 'uie.nodes.get': { const view = readDocument(); return { ...stamp(), ...('runtimeSessionId' in view ? { runtimeSessionId: view.runtimeSessionId, frameSequence: view.frameSequence } : {}), ...(a.format === 'tree' ? nodeTree(view.document, a) : { node: getNode(view.document, a) }) }; }
           case 'uie.nodes.find': { const view = readDocument(); return { ...stamp(), ...('runtimeSessionId' in view ? { runtimeSessionId: view.runtimeSessionId, frameSequence: view.frameSequence } : {}), ...findNodes(view.document, a) }; }
           case 'uie.code.execute': {
             writable(); if (a.dryRun !== undefined && typeof a.dryRun !== 'boolean') throw new Error('dryRun 必须是布尔值。');
@@ -87,7 +87,7 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
             e.history.execute(documentCommand(String(a.label ?? 'AI 修改脚本'), value => ({ ...value, scripts }), e.strategy));
             return { ...state(), changed: e.history.inspect().revision !== beforeRevision };
           }
-          case 'uie.document.list': return { ...stamp(), interfaces: await window.automation.invoke('file:list') };
+          case 'uie.document.list': return { ...stamp(), ...await window.automation.invoke('file:list', a) };
           case 'uie.document.new': case 'uie.document.open': {
             writable(); if (dirty() && a.discardChanges !== true) throw new Error('当前界面未保存，请先保存或明确 discardChanges。');
             f.busy(true);
