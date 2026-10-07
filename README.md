@@ -63,6 +63,7 @@ npm run dev
 | `npm run test:mcp` | 构建并通过真实 stdio MCP 验证制作、查询、历史、运行与保存 |
 | `npm run test:mcp:packaged` | 验证已打包程序的 MCP 完整链路，需先 package |
 | `npm run test:assets` | 构建并验证图片库、共用属性面板、单一 Roblox ID、保存重开及资产 MCP |
+| `npm run test:templates` | 构建并验证模板参考、缩略图、跨工程副本、重启持久化、UI库互移与保存路径 |
 | `node tests/runtime-smoke.mjs --packaged` | 验证已打包 exe 的离线 Luau 运行 |
 | `npm run package` | 构建 Windows x64 应用到 ToolRuntime |
 

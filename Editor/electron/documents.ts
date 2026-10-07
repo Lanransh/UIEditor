@@ -1,25 +1,54 @@
-import { readFile, writeFile, mkdir, rename, unlink, stat, readdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rename, unlink, stat, readdir, copyFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
 import { dirname, basename, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { robloxStrategy } from '../src/editor/roblox';
 import type { UIDocument } from '../src/shared/uiDocument';
-import type { DocumentAsset } from '../src/shared/documents';
+import type { DocumentAsset, DocumentLibrary } from '../src/shared/documents';
 
-export async function listDocumentAssets(projectPath: string): Promise<DocumentAsset[]> {
-  const directory = join(projectPath, 'interfaces');
-  const entries = await readdir(directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
-    if (error.code === 'ENOENT') return [];
-    throw error;
-  });
-  return entries.filter(entry => entry.isFile() && entry.name.toLowerCase().endsWith('.rbxui.json'))
-    .map(entry => ({ name: entry.name.slice(0, -11), path: join(directory, entry.name) }))
-    .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+export function documentAssetDirectory(rootPath: string, library: DocumentLibrary): string {
+  return join(rootPath, { project: 'interfaces', templates: 'template-references', permanent: 'ui-assets' }[library]);
 }
 
-export async function openDocumentAsset(projectPath: string, path: unknown) {
-  const asset = (await listDocumentAssets(projectPath)).find(item => item.path === path);
-  if (!asset) throw new Error('界面资产不在当前工程中，请刷新后重试。');
+export async function listDocumentAssets(rootPath: string, library: DocumentLibrary = 'project'): Promise<DocumentAsset[]> {
+  const directory = documentAssetDirectory(rootPath, library);
+  async function collect(directory: string): Promise<DocumentAsset[]> {
+    const entries = await readdir(directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === 'ENOENT') return [];
+      throw error;
+    });
+    const assets: DocumentAsset[] = [];
+    for (const entry of entries) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) assets.push(...await collect(path));
+      else if (entry.isFile() && entry.name.toLowerCase().endsWith('.rbxui.json')) {
+        assets.push({ name: entry.name.slice(0, -11), path });
+      }
+    }
+    return assets;
+  }
+  return (await collect(directory)).sort((a, b) => a.name.localeCompare(b.name, 'zh-CN') || a.path.localeCompare(b.path, 'zh-CN'));
+}
+
+export async function openDocumentAsset(rootPath: string, path: unknown, library: DocumentLibrary = 'project') {
+  const asset = (await listDocumentAssets(rootPath, library)).find(item => item.path === path);
+  if (!asset) throw new Error(library === 'templates' ? '界面资产不在模板参考库中，请刷新后重试。' : library === 'permanent' ? '界面资产不在永久UI库中，请刷新后重试。' : '界面资产不在当前工程中，请刷新后重试。');
   return { path: asset.path, document: await readDocument(asset.path) };
+}
+
+export async function moveDocumentAsset(sourceRoot: string, path: unknown, sourceLibrary: DocumentLibrary, targetRoot: string, targetLibrary: DocumentLibrary): Promise<DocumentAsset> {
+  if (sourceLibrary === targetLibrary) throw new Error('请选择其他资产文件夹。');
+  const source = await openDocumentAsset(sourceRoot, path, sourceLibrary);
+  const target = join(documentAssetDirectory(targetRoot, targetLibrary), basename(source.path));
+  await mkdir(dirname(target), { recursive: true });
+  try { await copyFile(source.path, target, constants.COPYFILE_EXCL); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error('目标文件夹已有同名UI，请先改名后再移动。');
+    throw error;
+  }
+  try { await unlink(source.path); }
+  catch (error) { await unlink(target); throw error; }
+  return { path: target, name: basename(target).slice(0, -11) };
 }
 
 export function safeFileName(name: string): string {

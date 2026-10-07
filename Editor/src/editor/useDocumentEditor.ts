@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Project } from '../shared/project';
-import type { DocumentAPI } from '../shared/documents';
+import type { DocumentAPI, DocumentLibrary } from '../shared/documents';
 import { findNode, updateNode, type UIDocument, type UINode } from '../shared/uiDocument';
 import { useEditorHistory } from '../history/useEditorHistory';
 import { useHistoryShortcuts } from '../history/useHistoryShortcuts';
@@ -59,9 +59,9 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   function editNode(id: string, edit: (node: UINode) => UINode, label = '修改属性') {
     execute(label, value => ({ ...value, root: updateNode(value.root, id, edit) }));
   }
-  async function save(saveAs = false): Promise<boolean> {
+  async function save(saveAs = false, projectUI = false): Promise<boolean> {
     if (!hasDocument) return false;
-    const result = await window.documents.save(document, saveAs);
+    const result = await window.documents.save(document, saveAs, projectUI);
     if (!result.ok) { setError(result.error); return false; }
     if (!result.value) return false;
     fileState.current = { path: result.value.path, saved: JSON.stringify(result.value.document) };
@@ -98,6 +98,27 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
     const result = await window.documents.open(path);
     if (!result.ok) { setError(result.error); return; }
     if (result.value) reset(strategy.validate(result.value.document), result.value.path);
+  });
+  const openTemplate = (path: string, library: 'templates' | 'permanent' = 'templates') => run(async () => {
+    if (!await consent()) return;
+    const result = await window.documents.openTemplate(path, library);
+    if (!result.ok) { setError(result.error); return; }
+    reset(strategy.validate(result.value.document), null);
+  });
+  const saveTemplate = () => run(async () => {
+    if (!hasDocument) return;
+    const result = await window.documents.saveTemplate(document);
+    if (!result.ok) { setError(result.error); return; }
+    if (result.value) setError('');
+  });
+  const moveAsset = (assetPath: string, source: DocumentLibrary, target: DocumentLibrary) => run(async () => {
+    const result = await window.documents.moveAsset(assetPath, source, target);
+    if (!result.ok) { setError(result.error); return; }
+    if (fileState.current.path === assetPath) {
+      fileState.current = { ...fileState.current, path: result.value.path };
+      setPath(result.value.path);
+    }
+    setError('');
   });
   const back = () => run(async () => { if (await consent()) onBack(); });
   useEffect(() => window.documents.onCloseRequest(() => { void run(async () => { if (await consent()) window.documents.close(); }); }));
@@ -174,7 +195,8 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   const editor = { projectPath: project.path, strategy, document, hasDocument, history, selected, select, editNode, execute, add, reparent, pickImage,
     inspectedAssetId, inspectAsset, clearAssetInspection, setAssetConfigurationDirty,
     imageAssets, assetsLoading, refreshImages, configureImage, importImage, useImage,
-    newDocument, openDocument, save: (saveAs = false) => run(async () => { await save(saveAs); }), back, dirty, path, error, busy: busy || runtime.active || assetsLoading, runtime };
+    newDocument, openDocument, openTemplate, saveTemplate, moveAsset, save: (saveAs = false) => run(async () => { await save(saveAs); }),
+    saveProjectUI: () => run(async () => { await save(false, true); }), back, dirty, path, error, busy: busy || runtime.active || assetsLoading, runtime };
   useAutomation(editor, { reset, saved: () => fileState.current.saved, path: () => fileState.current.path, busy: value => { operating.current = value; setBusy(value); }, markSaved: (value, file) => { fileState.current = { path: file, saved: JSON.stringify(value) }; setPath(file); setSaved(fileState.current.saved); } });
   return editor;
 }

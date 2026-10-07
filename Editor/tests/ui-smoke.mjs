@@ -88,19 +88,27 @@ try {
   await page.getByRole('button', { name: '折叠 主面板', exact: true }).click();
   // Adding targets the hovered row even while a different node is selected, and expands it.
   await add('TextLabel', '主面板'); await input('节点名称', '标题'); await input('Text', '在线奖励');
+  const liveThumbnail = page.getByRole('img', { name: '在线奖励 缩略图', exact: true });
+  await liveThumbnail.locator('.preview-text-fill').getByText('在线奖励', { exact: true }).waitFor();
+  assert.equal(await liveThumbnail.locator('.node-selection, button').count(), 0);
   await page.getByRole('button', { name: '选择节点 UICorner', exact: true }).waitFor();
   await undo(); await undo(); await undo();
   assert.equal(await page.getByRole('button', { name: '选择节点 TextLabel', exact: true }).count(), 0);
   await page.keyboard.press('Control+y');
   await select('TextLabel'); await input('节点名称', '标题'); await input('Text', '在线奖励');
   await select('主面板'); await add('ImageLabel'); await input('节点名称', '奖励图标'); await input('Position.y.offset', 100);
-  assert.ok(await page.getByText('缺少预览图片', { exact: true }).isVisible());
+  assert.ok(await page.getByTestId('ui-artboard').getByText('缺少预览图片', { exact: true }).isVisible());
   const imageFile = join(root, '图标.png');
   await writeFile(imageFile, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6ioAAAAASUVORK5CYII=', 'base64'));
   await dialogs(imageFile); await page.getByRole('button', { name: '选择预览图片', exact: true }).click();
   await page.getByText('图标.png', { exact: true }).waitFor();
   await select('主面板'); await add('TextButton'); await input('节点名称', '领取'); await input('Text', '领取奖励'); await input('Position.y.offset', 260);
-  const saved = await savedDocument();
+  // Tree context save writes the whole interface to the project without a save dialog.
+  await dialogs(null, null);
+  await page.getByRole('button', { name: '选择节点 领取', exact: true }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '保存为项目UI', exact: true }).click();
+  await dirty(false);
+  const saved = JSON.parse(await readFile(file, 'utf8'));
   await page.getByRole('button', { name: 'UI 资产 在线奖励', exact: true }).waitFor();
   assert.equal(saved.root.children[0].children.length, 4);
   assert.equal(saved.root.children[0].children[2].previewImage.name, '图标.png');
@@ -222,8 +230,20 @@ try {
   await page.waitForFunction(() => !document.querySelector('fieldset')?.disabled);
   assert.equal(await page.getByLabel('界面名称', { exact: true }).inputValue(), '第二个界面');
   const secondFile = join(parent, 'UIEditorWorkspace', 'interfaces', '第二个界面.rbxui.json');
-  await dialogs(null, secondFile); await menu('保存'); await dirty(false);
+  await dialogs(null, null);
+  await page.getByRole('button', { name: 'UI 资产 第二个界面（未保存）', exact: true }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '保存为项目UI', exact: true }).click();
+  await dirty(false);
   assert.notEqual(JSON.parse(await readFile(secondFile, 'utf8')).id, saved.id);
+  const existing = await readFile(file, 'utf8');
+  await input('界面名称', '在线奖励');
+  await dialogs(null, null, 1);
+  await menu('保存为项目UI');
+  await page.waitForFunction(() => !document.querySelector('fieldset')?.disabled);
+  await dirty(true);
+  assert.equal(await readFile(file, 'utf8'), existing);
+  await input('界面名称', '第二个界面');
+  await menu('保存为项目UI'); await dirty(false);
   await input('界面名称', '第二个界面修改');
   await dialogs(null, secondFile, 2); await openAsset('在线奖励');
   assert.equal(await page.getByLabel('界面名称', { exact: true }).inputValue(), '第二个界面修改');
@@ -232,10 +252,38 @@ try {
   // Reopening the project rebuilds the asset list from disk.
   await menu('返回 Hub');
   await page.getByRole('button', { name: '打开 中文 工程', exact: true }).click();
+  const nestedFile = join(parent, 'UIEditorWorkspace', 'interfaces', 'Templates', 'NestedTemplate.rbxui.json');
+  await mkdir(join(parent, 'UIEditorWorkspace', 'interfaces', 'Templates'), { recursive: true });
+  await writeFile(nestedFile, JSON.stringify({ ...saved, name: 'NestedTemplate' }));
+  await writeFile(join(parent, 'UIEditorWorkspace', 'interfaces', 'Templates', 'Broken.rbxui.json'), '{bad');
+  // Re-entering the project discovers nested assets and opens them through the card.
+  await menu('返回 Hub');
+  await page.getByRole('button', { name: '打开 中文 工程', exact: true }).click();
+  const savedThumbnail = page.getByRole('img', { name: 'NestedTemplate 缩略图', exact: true });
+  await savedThumbnail.locator('.preview-text-fill').getByText('领取奖励', { exact: true }).waitFor();
+  await page.getByRole('img', { name: 'Broken 缩略图', exact: true }).getByText('预览不可用', { exact: true }).waitFor();
+  assert.equal(await page.getByLabel('界面名称', { exact: true }).count(), 0);
+  assert.equal(await savedThumbnail.locator('[role="button"], .node-selection').count(), 0);
+  const filters = await page.locator('filter').evaluateAll(elements => elements.map(element => element.id));
+  assert.equal(new Set(filters).size, filters.length);
+  const outsidePreview = await page.evaluate(path => window.documents.previewAsset(path), join(root, 'outside.rbxui.json'));
+  assert.equal(outsidePreview.ok, false);
+  await page.locator('.document-assets').screenshot({ path: join(output, 'ui-asset-thumbnails.png') });
+  await openAsset('NestedTemplate');
+  await page.waitForFunction(() => document.querySelector('[aria-label="界面名称"]')?.value === 'NestedTemplate');
+  assert.equal(await page.getByLabel('界面名称', { exact: true }).inputValue(), 'NestedTemplate');
+  await select('领取');
+  assert.equal(await page.getByLabel('Text', { exact: true }).inputValue(), '领取奖励');
   await openAsset('在线奖励'); await select('领取');
   assert.equal(await page.getByLabel('Text', { exact: true }).inputValue(), '领取金币');
   await page.getByRole('button', { name: '适应窗口', exact: true }).click();
   await page.screenshot({ path: join(output, 'roblox-static-ui.png') });
+  // Only the main canvas becomes interactive during a running preview.
+  await page.getByRole('button', { name: '运行', exact: true }).click();
+  await page.getByTestId('ui-artboard').getByRole('button', { name: '领取', exact: true }).waitFor();
+  assert.equal(await page.locator('.ui-document-thumbnail [role="button"], .ui-document-thumbnail .node-selection').count(), 0);
+  await page.getByRole('button', { name: '停止', exact: true }).click();
+  await page.waitForFunction(() => !document.querySelector('fieldset')?.disabled);
 
   // The real native close event must respect cancel and save.
   await input('Text', '关闭前保存'); await dialogs(null, file, 2);

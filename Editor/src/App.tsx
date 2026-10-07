@@ -214,6 +214,8 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
           <button disabled={editor.busy} onClick={() => setCreatingInterface(true)}>新建界面</button>
           <button disabled={editor.busy} onClick={() => void editor.openDocument()}>打开界面</button>
           <button aria-label="保存" disabled={editor.busy || !editor.hasDocument} onClick={() => void editor.save()}>保存 <span>Ctrl+S</span></button>
+          <button disabled={editor.busy || !editor.hasDocument} onClick={() => void editor.saveProjectUI()}>保存为项目UI</button>
+          <button disabled={editor.busy || !editor.hasDocument} onClick={() => void editor.saveTemplate()}>保存为模板参考</button>
           <button aria-label="另存为" disabled={editor.busy || !editor.hasDocument} onClick={() => void editor.save(true)}>另存为 <span>Ctrl+Shift+S</span></button>
           <button disabled={editor.busy || !editor.hasDocument} onClick={() => setImportingRoblox(true)}>导入 Roblox</button>
           <button disabled={editor.busy} onClick={() => void editor.back()}><ArrowLeft size={15} />返回 Hub</button>
@@ -274,7 +276,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
       </nav>
       <div className="assets-body" hidden={bottomTab === 'output'}>
         <nav className="asset-libraries" aria-label="资产库">
-          {(bottomTab === 'images' ? ['永久图片', '项目图片'] : ['永久UI', '项目UI']).map(library => <button key={library} className={assetLibrary === library ? 'selected' : ''} aria-pressed={assetLibrary === library} title={library.startsWith('项目') ? project.path : '跨项目复用的资产'} onClick={() => changeAssetLibrary(library)}><Folder size={16} />{library}</button>)}
+          {(bottomTab === 'images' ? ['永久图片', '项目图片'] : ['永久UI', '项目UI', '模板参考']).map(library => <button key={library} className={assetLibrary === library ? 'selected' : ''} aria-pressed={assetLibrary === library} title={library.startsWith('项目') ? project.path : '跨项目复用的资产'} onClick={() => changeAssetLibrary(library)}><Folder size={16} />{library}</button>)}
         </nav>
         {bottomTab === 'images' ? <ImageAssets editor={editor} library={imageLibrary} selectedId={selectedAssetId} select={changeSelectedAsset} /> : <DocumentAssets editor={editor} library={uiLibrary} />}
       </div>

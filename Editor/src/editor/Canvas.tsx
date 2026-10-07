@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import { findParent, updateNode, type UIDocument, type UDim, type UDim2, type UINode, type Vector2 } from '../shared/uiDocument';
 import type { DocumentEditor } from './useDocumentEditor';
-import type { PreviewRect } from './strategy';
+import type { PreviewRect, ProjectStrategy } from './strategy';
 import { auxiliary, isObject, layoutComponent } from './roblox';
 import { pixels } from './layout';
 import { channels, gradientStyle, imageGradient, rgba, scrollGeometry } from './appearance';
@@ -103,70 +103,6 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
     draftRef.current = null; setDraft(null);
     if (viewport.current?.hasPointerCapture(event.pointerId)) viewport.current.releasePointerCapture(event.pointerId);
   }
-  function renderNode(node: UINode, rect: PreviewRect) {
-    if (!node.properties.Visible) return null;
-    const p = node.properties;
-    const corner = auxiliary(node, 'UICorner')?.properties.CornerRadius as UDim | undefined;
-    const stroke = auxiliary(node, 'UIStroke')?.properties;
-    const gradient = auxiliary(node, 'UIGradient')?.properties;
-    const textNode = node.className.startsWith('Text');
-    const selected = !capturing && !editor.runtime.active && (editor.selected.id === node.id || (editor.strategy.nodes[editor.selected.className].category === 'component' && findParent(shown.root, editor.selected.id)?.id === node.id));
-    const resizeLocked = layoutComponent(findParent(shown.root, node.id)!)?.className === 'UIGridLayout';
-    const radius = corner ? Math.max(0, pixels(corner, Math.min(rect.width, rect.height))) : 0;
-    const style: CSSProperties = {
-      position: 'absolute', left: rect.x, top: rect.y, width: rect.width, height: rect.height,
-      transform: `translate(${rect.width * rect.scale / 2}px, ${rect.height * rect.scale / 2}px) rotate(${p.Rotation}deg) translate(${-rect.width * rect.scale / 2}px, ${-rect.height * rect.scale / 2}px) scale(${rect.scale})`, transformOrigin: '0 0',
-      zIndex: p.ZIndex as number, borderRadius: radius,
-      backgroundColor: gradient?.Enabled ? 'transparent' : rgba(p.BackgroundColor3 as string, p.BackgroundTransparency as number),
-      outline: stroke?.Enabled && !textNode ? `${stroke.Thickness}px solid ${rgba(stroke.Color as string, stroke.Transparency as number)}` : undefined,
-      opacity: node.className === 'CanvasGroup' ? 1 - (p.GroupTransparency as number) : 1,
-    };
-    const scroll = node.className === 'ScrollingFrame';
-    const canvas = p.CanvasSize as UDim2 | undefined;
-    const contentWidth = scroll ? Math.max(rect.width, pixels(canvas!.x, rect.width)) : rect.width;
-    const contentHeight = scroll ? Math.max(rect.height, pixels(canvas!.y, rect.height)) : rect.height;
-    const scrollPosition = scroll ? p.CanvasPosition as Vector2 : { x: 0, y: 0 };
-    const scrollbar = scrollGeometry(rect.width, rect.height, contentWidth, contentHeight, scroll ? p.ScrollBarThickness as number : 0, scrollPosition.x, scrollPosition.y);
-    const childRects = editor.strategy.layout(node, contentWidth, contentHeight);
-    const textSize = p.TextScaled ? auxiliary(node, 'UITextSizeConstraint')?.properties : undefined;
-    const fontSize = Math.min(textSize ? textSize.MaxTextSize as number : 100, Math.max(textSize ? textSize.MinTextSize as number : 1, p.TextScaled ? Math.min(rect.height * .7, rect.width / Math.max(1, String(p.Text).length) * 1.5) : p.TextSize as number));
-    const contentStyle: CSSProperties = { position: 'absolute', inset: 0, overflow: p.ClipsDescendants || node.className === 'CanvasGroup' ? 'hidden' : 'visible', borderRadius: radius };
-    const textStyle: CSSProperties = { fontSize, fontFamily: p.Font === 'Arial' ? 'Arial, sans-serif' : String(p.Font).startsWith('Gotham') ? 'Segoe UI, sans-serif' : 'Segoe UI, Microsoft YaHei, sans-serif', fontWeight: p.Font === 'GothamBold' ? 700 : undefined, whiteSpace: p.TextWrapped ? 'pre-wrap' : 'pre', textAlign: String(p.TextXAlignment).toLowerCase() as CSSProperties['textAlign'], justifyContent: p.TextYAlignment === 'Top' ? 'flex-start' : p.TextYAlignment === 'Bottom' ? 'flex-end' : 'center' };
-    const tileSize = p.TileSize as UDim2 | undefined;
-    const text = (p.Text as string) || (node.className === 'TextBox' ? p.PlaceholderText as string : '');
-    const imageFilterId = `image-${node.id}`;
-    const tint = node.className.startsWith('Image') ? channels(p.ImageColor3 as string) : [1, 1, 1];
-    const thickness = scroll ? p.ScrollBarThickness as number : 0;
-    const scrollTexture = (length: number, horizontal = false) => <div style={{ position: 'absolute', width: thickness, height: length, top: horizontal ? thickness : 0, transform: horizontal ? 'rotate(-90deg)' : undefined, transformOrigin: '0 0', backgroundImage: `url("${scrollTop}"), url("${scrollBottom}"), url("${scrollMiddle}")`, backgroundSize: `100% ${thickness}px, 100% ${thickness}px, 100% ${Math.max(0, length - 2 * thickness)}px`, backgroundPosition: 'top, bottom, center', backgroundRepeat: 'no-repeat' }} />;
-    const button = ['TextButton', 'ImageButton'].includes(node.className);
-    const disabled = editor.runtime.frame?.disabled.includes(node.id);
-    return <div key={node.id} data-node-id={node.id} data-class-name={node.className} className="preview-node" style={{ ...style, cursor: editor.runtime.active && button ? disabled ? 'not-allowed' : 'pointer' : undefined }}
-      role={editor.runtime.active && button ? 'button' : undefined} aria-label={editor.runtime.active && button ? node.name : undefined} aria-disabled={editor.runtime.active && button ? disabled : undefined} tabIndex={editor.runtime.active && button && !disabled ? 0 : undefined}
-      onClick={event => { if (editor.runtime.active && button) { event.stopPropagation(); if (!disabled) void editor.runtime.activate(node.id); } }}
-      onKeyDown={event => { if (editor.runtime.active && button && ['Enter', ' '].includes(event.key)) { event.preventDefault(); event.stopPropagation(); if (!disabled && !event.repeat) void editor.runtime.activate(node.id); } }}
-      onPointerDown={event => { if (editor.runtime.active) { event.stopPropagation(); return; } start(event, space || event.button === 1 ? 'pan' : 'move', space || event.button === 1 ? undefined : node); }}>
-      <div style={contentStyle}>
-        {gradient?.Enabled && <div className="preview-background" style={{ position: 'absolute', inset: 0, borderRadius: radius, pointerEvents: 'none', ...gradientStyle(gradient, p.BackgroundColor3 as string, p.BackgroundTransparency as number, rect.width, rect.height) }} />}
-        {textNode && stroke?.Enabled && <div className="preview-text preview-text-stroke" style={{ ...textStyle, color: 'transparent', WebkitTextStroke: `${2 * (stroke.Thickness as number)}px ${rgba(stroke.Color as string, stroke.Transparency as number)}` }}>{text}</div>}
-        {textNode && <div className="preview-text preview-text-fill" style={{ ...textStyle, color: rgba(p.TextColor3 as string, p.TextTransparency as number), ...(gradient?.Enabled ? { ...gradientStyle(gradient, p.TextColor3 as string, p.TextTransparency as number, rect.width, rect.height), backgroundClip: 'text', color: 'transparent' } : {}) }}>{text}</div>}
-        {node.className.startsWith('Image') && (node.previewImage ? <>
-          <svg width="0" height="0" aria-hidden="true" style={{ position: 'absolute' }}><defs><filter id={imageFilterId} colorInterpolationFilters="sRGB" x="0" y="0" width="100%" height="100%">
-            <feColorMatrix type="matrix" values={`${tint[0]} 0 0 0 0 0 ${tint[1]} 0 0 0 0 0 ${tint[2]} 0 0 0 0 0 1 0`} result="tinted" />
-            {gradient?.Enabled && <><feImage href={imageGradient(gradient, rect.width, rect.height)} result="gradient" preserveAspectRatio="none" /><feComposite in="tinted" in2="gradient" operator="arithmetic" k1="1" k2="0" k3="0" k4="0" /></>}
-          </filter></defs></svg>
-          <div className="preview-image" style={{ opacity: 1 - (p.ImageTransparency as number), filter: `url("#${imageFilterId}")`, backgroundImage: `url("${node.previewImage.dataUrl}")`, backgroundSize: p.ScaleType === 'Tile' ? `${Math.max(.01, pixels(tileSize!.x, rect.width))}px ${Math.max(.01, pixels(tileSize!.y, rect.height))}px` : p.ScaleType === 'Stretch' ? '100% 100%' : p.ScaleType === 'Crop' ? 'cover' : 'contain', backgroundPosition: p.ScaleType === 'Tile' ? 'left top' : undefined, backgroundRepeat: p.ScaleType === 'Tile' ? 'repeat' : 'no-repeat' }} />
-        </> : <div className="preview-image-missing">▧<small>缺少预览图片</small></div>)}
-        {scroll && scrollbar.vertical && <div className="preview-scrollbar vertical" style={{ width: thickness, height: scrollbar.thumbHeight, top: scrollbar.top }}>{scrollTexture(scrollbar.thumbHeight)}</div>}
-        {scroll && scrollbar.horizontal && <div className="preview-scrollbar horizontal" style={{ height: thickness, width: scrollbar.thumbWidth, left: scrollbar.left }}>{scrollTexture(scrollbar.thumbWidth, true)}</div>}
-        <div style={{ position: 'absolute', width: contentWidth, height: contentHeight, left: scroll ? -scrollbar.x : 0, top: scroll ? -scrollbar.y : 0 }}>
-          {node.children.filter(isObject).map(child => renderNode(child, childRects.get(child.id)!))}
-        </div>
-        {node.className === 'CanvasGroup' && p.GroupColor3 !== '#ffffff' && <div style={{ position: 'absolute', inset: 0, backgroundColor: p.GroupColor3 as string, mixBlendMode: 'multiply', pointerEvents: 'none' }} />}
-      </div>
-      {selected && <div className="node-selection">{!resizeLocked && <button className="node-resize" aria-label="拖动调整尺寸" onPointerDown={event => start(event, 'resize', node)} />}</div>}
-    </div>;
-  }
-  const rectangles = editor.strategy.layout(shown.root, 1280, 720);
   return <section className="canvas" aria-label="Roblox 画布">
     <div className="canvas-heading"><span>1280 × 720 · {editor.document.name}</span><div className="canvas-tools"><button disabled={editor.busy && !editor.runtime.active} onClick={fit}>适应窗口</button><select aria-label="画布缩放" disabled={editor.busy && !editor.runtime.active} value={zoom} onChange={event => setZoom(Number(event.target.value))}><option value={zoom}>{Math.round(zoom * 100)}%</option>{[.25, .5, .75, 1, 1.5, 2].filter(value => value !== zoom).map(value => <option key={value} value={value}>{value * 100}%</option>)}</select></div></div>
     <div ref={viewport} data-zoom={zoom} className={`canvas-viewport${space ? ' panning' : ''}`} onDragOver={event => { if (!editor.busy && event.dataTransfer.types.includes('application/x-uie-image-asset')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }} onDrop={event => {
@@ -186,9 +122,87 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
       } else setPan({ x: pan.x - event.deltaX, y: pan.y - event.deltaY });
     }}>
       <div className="ui-artboard" data-testid="ui-artboard" style={{ width: 1280, height: 720, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
-        {shown.root.properties.Enabled && shown.root.children.filter(isObject).map(node => renderNode(node, rectangles.get(node.id)!))}
+        <DocumentPreview document={shown} strategy={editor.strategy} selected={!capturing && !editor.runtime.active ? editor.selected : undefined} runtime={editor.runtime}
+          onNodePointerDown={(event, node) => { if (editor.runtime.active) { event.stopPropagation(); return; } start(event, space || event.button === 1 ? 'pan' : 'move', space || event.button === 1 ? undefined : node); }}
+          onResize={(event, node) => start(event, 'resize', node)} />
       </div>
       {!capturing && <div className="canvas-hint">{editor.runtime.active ? '运行模式 · 点击按钮执行脚本' : '空白处拖动 / 空格或中键平移 · Ctrl+滚轮缩放 · 静态设计'}</div>}
     </div>
   </section>;
+}
+
+export function DocumentPreview({ document: shown, strategy, selected: selection, runtime, onNodePointerDown, onResize }: {
+  document: UIDocument;
+  strategy: ProjectStrategy;
+  selected?: UINode;
+  runtime?: Pick<DocumentEditor['runtime'], 'active' | 'frame' | 'activate'>;
+  onNodePointerDown?: (event: PointerEvent, node: UINode) => void;
+  onResize?: (event: PointerEvent, node: UINode) => void;
+}) {
+  const filterPrefix = useId();
+  function renderNode(node: UINode, rect: PreviewRect) {
+    if (!node.properties.Visible) return null;
+    const p = node.properties;
+    const corner = auxiliary(node, 'UICorner')?.properties.CornerRadius as UDim | undefined;
+    const stroke = auxiliary(node, 'UIStroke')?.properties;
+    const gradient = auxiliary(node, 'UIGradient')?.properties;
+    const textNode = node.className.startsWith('Text');
+    const selected = selection && (selection.id === node.id || (strategy.nodes[selection.className].category === 'component' && findParent(shown.root, selection.id)?.id === node.id));
+    const resizeLocked = layoutComponent(findParent(shown.root, node.id)!)?.className === 'UIGridLayout';
+    const radius = corner ? Math.max(0, pixels(corner, Math.min(rect.width, rect.height))) : 0;
+    const style: CSSProperties = {
+      position: 'absolute', left: rect.x, top: rect.y, width: rect.width, height: rect.height,
+      transform: `translate(${rect.width * rect.scale / 2}px, ${rect.height * rect.scale / 2}px) rotate(${p.Rotation}deg) translate(${-rect.width * rect.scale / 2}px, ${-rect.height * rect.scale / 2}px) scale(${rect.scale})`, transformOrigin: '0 0',
+      zIndex: p.ZIndex as number, borderRadius: radius,
+      backgroundColor: gradient?.Enabled ? 'transparent' : rgba(p.BackgroundColor3 as string, p.BackgroundTransparency as number),
+      outline: stroke?.Enabled && !textNode ? `${stroke.Thickness}px solid ${rgba(stroke.Color as string, stroke.Transparency as number)}` : undefined,
+      opacity: node.className === 'CanvasGroup' ? 1 - (p.GroupTransparency as number) : 1,
+    };
+    const scroll = node.className === 'ScrollingFrame';
+    const canvas = p.CanvasSize as UDim2 | undefined;
+    const contentWidth = scroll ? Math.max(rect.width, pixels(canvas!.x, rect.width)) : rect.width;
+    const contentHeight = scroll ? Math.max(rect.height, pixels(canvas!.y, rect.height)) : rect.height;
+    const scrollPosition = scroll ? p.CanvasPosition as Vector2 : { x: 0, y: 0 };
+    const scrollbar = scrollGeometry(rect.width, rect.height, contentWidth, contentHeight, scroll ? p.ScrollBarThickness as number : 0, scrollPosition.x, scrollPosition.y);
+    const childRects = strategy.layout(node, contentWidth, contentHeight);
+    const textSize = p.TextScaled ? auxiliary(node, 'UITextSizeConstraint')?.properties : undefined;
+    const fontSize = Math.min(textSize ? textSize.MaxTextSize as number : 100, Math.max(textSize ? textSize.MinTextSize as number : 1, p.TextScaled ? Math.min(rect.height * .7, rect.width / Math.max(1, String(p.Text).length) * 1.5) : p.TextSize as number));
+    const contentStyle: CSSProperties = { position: 'absolute', inset: 0, overflow: p.ClipsDescendants || node.className === 'CanvasGroup' ? 'hidden' : 'visible', borderRadius: radius };
+    const textStyle: CSSProperties = { fontSize, fontFamily: p.Font === 'Arial' ? 'Arial, sans-serif' : String(p.Font).startsWith('Gotham') ? 'Segoe UI, sans-serif' : 'Segoe UI, Microsoft YaHei, sans-serif', fontWeight: p.Font === 'GothamBold' ? 700 : undefined, whiteSpace: p.TextWrapped ? 'pre-wrap' : 'pre', textAlign: String(p.TextXAlignment).toLowerCase() as CSSProperties['textAlign'], justifyContent: p.TextYAlignment === 'Top' ? 'flex-start' : p.TextYAlignment === 'Bottom' ? 'flex-end' : 'center' };
+    const tileSize = p.TileSize as UDim2 | undefined;
+    const text = (p.Text as string) || (node.className === 'TextBox' ? p.PlaceholderText as string : '');
+    const imageFilterId = `${filterPrefix}-image-${node.id}`;
+    const tint = node.className.startsWith('Image') ? channels(p.ImageColor3 as string) : [1, 1, 1];
+    const thickness = scroll ? p.ScrollBarThickness as number : 0;
+    const scrollTexture = (length: number, horizontal = false) => <div style={{ position: 'absolute', width: thickness, height: length, top: horizontal ? thickness : 0, transform: horizontal ? 'rotate(-90deg)' : undefined, transformOrigin: '0 0', backgroundImage: `url("${scrollTop}"), url("${scrollBottom}"), url("${scrollMiddle}")`, backgroundSize: `100% ${thickness}px, 100% ${thickness}px, 100% ${Math.max(0, length - 2 * thickness)}px`, backgroundPosition: 'top, bottom, center', backgroundRepeat: 'no-repeat' }} />;
+    const button = ['TextButton', 'ImageButton'].includes(node.className);
+    const disabled = runtime?.frame?.disabled.includes(node.id);
+    return <div key={node.id} data-node-id={runtime ? node.id : undefined} data-class-name={runtime ? node.className : undefined} className="preview-node" style={{ ...style, cursor: runtime?.active && button ? disabled ? 'not-allowed' : 'pointer' : undefined }}
+      role={runtime?.active && button ? 'button' : undefined} aria-label={runtime?.active && button ? node.name : undefined} aria-disabled={runtime?.active && button ? disabled : undefined} tabIndex={runtime?.active && button && !disabled ? 0 : undefined}
+      onClick={event => { if (runtime?.active && button) { event.stopPropagation(); if (!disabled) void runtime.activate(node.id); } }}
+      onKeyDown={event => { if (runtime?.active && button && ['Enter', ' '].includes(event.key)) { event.preventDefault(); event.stopPropagation(); if (!disabled && !event.repeat) void runtime.activate(node.id); } }}
+      onPointerDown={event => onNodePointerDown?.(event, node)}>
+      <div style={contentStyle}>
+        {gradient?.Enabled && <div className="preview-background" style={{ position: 'absolute', inset: 0, borderRadius: radius, pointerEvents: 'none', ...gradientStyle(gradient, p.BackgroundColor3 as string, p.BackgroundTransparency as number, rect.width, rect.height) }} />}
+        {textNode && stroke?.Enabled && <div className="preview-text preview-text-stroke" style={{ ...textStyle, color: 'transparent', WebkitTextStroke: `${2 * (stroke.Thickness as number)}px ${rgba(stroke.Color as string, stroke.Transparency as number)}` }}>{text}</div>}
+        {textNode && <div className="preview-text preview-text-fill" style={{ ...textStyle, color: rgba(p.TextColor3 as string, p.TextTransparency as number), ...(gradient?.Enabled ? { ...gradientStyle(gradient, p.TextColor3 as string, p.TextTransparency as number, rect.width, rect.height), backgroundClip: 'text', color: 'transparent' } : {}) }}>{text}</div>}
+        {node.className.startsWith('Image') && (node.previewImage ? <>
+          <svg width="0" height="0" aria-hidden="true" style={{ position: 'absolute' }}><defs><filter id={imageFilterId} colorInterpolationFilters="sRGB" x="0" y="0" width="100%" height="100%">
+            <feColorMatrix type="matrix" values={`${tint[0]} 0 0 0 0 0 ${tint[1]} 0 0 0 0 0 ${tint[2]} 0 0 0 0 0 1 0`} result="tinted" />
+            {gradient?.Enabled && <><feImage href={imageGradient(gradient, rect.width, rect.height)} result="gradient" preserveAspectRatio="none" /><feComposite in="tinted" in2="gradient" operator="arithmetic" k1="1" k2="0" k3="0" k4="0" /></>}
+          </filter></defs></svg>
+          <div className="preview-image" style={{ opacity: 1 - (p.ImageTransparency as number), filter: `url("#${imageFilterId}")`, backgroundImage: `url("${node.previewImage.dataUrl}")`, backgroundSize: p.ScaleType === 'Tile' ? `${Math.max(.01, pixels(tileSize!.x, rect.width))}px ${Math.max(.01, pixels(tileSize!.y, rect.height))}px` : p.ScaleType === 'Stretch' ? '100% 100%' : p.ScaleType === 'Crop' ? 'cover' : 'contain', backgroundPosition: p.ScaleType === 'Tile' ? 'left top' : undefined, backgroundRepeat: p.ScaleType === 'Tile' ? 'repeat' : 'no-repeat' }} />
+        </> : <div className="preview-image-missing">▧<small>缺少预览图片</small></div>)}
+        {scroll && scrollbar.vertical && <div className="preview-scrollbar vertical" style={{ width: thickness, height: scrollbar.thumbHeight, top: scrollbar.top }}>{scrollTexture(scrollbar.thumbHeight)}</div>}
+        {scroll && scrollbar.horizontal && <div className="preview-scrollbar horizontal" style={{ height: thickness, width: scrollbar.thumbWidth, left: scrollbar.left }}>{scrollTexture(scrollbar.thumbWidth, true)}</div>}
+        <div style={{ position: 'absolute', width: contentWidth, height: contentHeight, left: scroll ? -scrollbar.x : 0, top: scroll ? -scrollbar.y : 0 }}>
+          {node.children.filter(isObject).map(child => renderNode(child, childRects.get(child.id)!))}
+        </div>
+        {node.className === 'CanvasGroup' && p.GroupColor3 !== '#ffffff' && <div style={{ position: 'absolute', inset: 0, backgroundColor: p.GroupColor3 as string, mixBlendMode: 'multiply', pointerEvents: 'none' }} />}
+      </div>
+      {selected && <div className="node-selection">{!resizeLocked && <button className="node-resize" aria-label="拖动调整尺寸" onPointerDown={event => onResize?.(event, node)} />}</div>}
+    </div>;
+  }
+  const rectangles = strategy.layout(shown.root, 1280, 720);
+  return <>{shown.root.properties.Enabled && shown.root.children.filter(isObject).map(node => renderNode(node, rectangles.get(node.id)!))}</>;
 }
