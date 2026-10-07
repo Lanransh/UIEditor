@@ -95,7 +95,7 @@ function ProjectHub({ onOpen }: { onOpen: (project: Project) => void }) {
       <h1 id="hub-title">选择工程</h1>
       <p>创建或打开一个 Roblox 工程，开始你的 UI 设计。</p>
       <div className="hub-actions">
-        <button className="primary" disabled={busy} onClick={() => recent?.length ? setCreatingProject(true) : void open(() => window.projects.create())}><FolderPlus size={19} />创建工程</button>
+        <button className="primary" disabled={busy} onClick={() => setCreatingProject(true)}><FolderPlus size={19} />创建工程</button>
         <button className="secondary" disabled={busy} onClick={() => void open(() => window.projects.open())}><FolderOpen size={19} />打开工程</button>
       </div>
       <p className="creation-hint">选择父文件夹后，将自动创建 UIEditorWorkspace 工程目录。</p>

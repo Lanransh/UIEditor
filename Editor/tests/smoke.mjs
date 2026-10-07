@@ -93,9 +93,11 @@ try {
   await page.screenshot({ path: join(output, 'hub-empty.png') });
   await dialogResult(null);
   await clickReady('创建工程');
+  await clickReady('下一步');
   await page.getByRole('heading', { name: '选择工程', exact: true }).waitFor();
   await dialogResult(parent);
   await clickReady('创建工程');
+  await clickReady('下一步');
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
   assert.equal(await page.getByRole('tree', { name: 'Roblox 节点' }).count(), 0);
   assert.equal(await page.getByLabel('节点名称', { exact: true }).count(), 0);

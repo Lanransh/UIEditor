@@ -37,6 +37,7 @@ async function undo() { await page.locator('.canvas-heading').click(); await pag
 try {
   await dialogs(parent);
   await page.getByRole('button', { name: '创建工程', exact: true }).click();
+  await page.getByRole('dialog', { name: '创建工程', exact: true }).getByRole('button', { name: '下一步', exact: true }).click();
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
   await dialogs(null); await menu('打开界面');
   await page.getByText('请打开一个工程', { exact: true }).waitFor();

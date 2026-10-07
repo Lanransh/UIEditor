@@ -23,6 +23,8 @@
     "test:mcp:packaged": "tsx tests/automation-smoke.ts --packaged",
     "test:assets": "npm run build && node tests/image-assets-smoke.mjs",
     "test:templates": "npm run build && node tests/template-assets-smoke.mjs",
+    "test:styles": "npm run build && tsx --test tests/template-styles.test.ts tests/projects.test.ts && tsx tests/project-template-style-smoke.ts && tsx tests/project-template-clone-smoke.ts",
+    "test:styles:packaged": "tsx tests/project-template-style-smoke.ts --packaged",
     "package": "npm run build && node scripts/package.mjs"
   },
   "devDependencies": {

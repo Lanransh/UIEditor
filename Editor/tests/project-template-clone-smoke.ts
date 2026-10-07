@@ -35,6 +35,8 @@ try {
   await mkdir(sourceParent);
   await pick(sourceParent);
   await create();
+  await dialog.getByRole('radio', { name: '空白工程（不使用风格）', exact: true }).waitFor();
+  await dialog.getByRole('button', { name: '下一步', exact: true }).click();
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
   assert.equal(await dialog.count(), 0);
   const source = join(sourceParent, 'UIEditorWorkspace');
@@ -45,7 +47,7 @@ try {
 
   await create();
   await dialog.waitFor();
-  assert.ok(await dialog.getByRole('radio', { name: '不克隆模板参考', exact: true }).isChecked());
+  assert.ok(await dialog.getByRole('radio', { name: '空白工程（不使用风格）', exact: true }).isChecked());
   assert.equal(await dialog.getByRole('combobox').count(), 0);
   assert.ok(!(await dialog.innerText()).includes(source));
   await dialog.getByRole('button', { name: '取消' }).click();
@@ -96,7 +98,7 @@ try {
   await page.getByRole('alert').filter({ hasText: 'JSON' }).waitFor();
   assert.deepEqual(await readdir(failedParent), []);
   assert.deepEqual(errors, []);
-  console.log('PASS: 首次创建、有历史时可选克隆、默认不克隆、取消/Escape、目录选择取消、模板独立复制及资产显示、拒绝未知来源、损坏模板提示及清理。');
+  console.log('PASS: 首次显示来源选择、有历史时可选克隆、默认空白、取消/Escape、目录选择取消、模板独立复制及资产显示、拒绝未知来源、损坏模板提示及清理。');
   console.log(`Screenshot: ${join(root, 'clone-dialog.png')}`);
 } finally {
   await application.close();

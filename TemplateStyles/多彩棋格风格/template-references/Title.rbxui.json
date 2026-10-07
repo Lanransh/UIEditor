@@ -1,0 +1,263 @@
+{
+  "canvas": {
+    "height": 720,
+    "width": 1280
+  },
+  "format": "roblox-ui",
+  "id": "e65d76e2-8128-4abd-b90b-d18323f4fd25",
+  "name": "Title",
+  "root": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [],
+            "className": "UICorner",
+            "id": "796cd265-f259-4af2-888c-c88ad90da334",
+            "name": "UICorner",
+            "properties": {
+              "CornerRadius": {
+                "offset": 2,
+                "scale": 0
+              }
+            }
+          },
+          {
+            "children": [],
+            "className": "UIStroke",
+            "id": "9ec0f745-b4d4-4f9c-820b-9eedaed9e507",
+            "name": "UIStroke",
+            "properties": {
+              "Color": "#000000",
+              "Enabled": true,
+              "Thickness": 3,
+              "Transparency": 0
+            }
+          },
+          {
+            "children": [],
+            "className": "ImageLabel",
+            "id": "2c43bd43-54b0-4d70-907a-de563c78de3e",
+            "name": "StudTileImg",
+            "previewImage": {
+              "dataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAAACXBIWXMAACE4AAAhOAFFljFgAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAAAgdJREFUeAHt3M1KAlEUwPFjn7TpA6woq0WLFkLv5ELwxXyOniFoIZkaWpGbwijCSpvObUaI0Ijo3nOV/w8OTbNR599c29wRAQAAAAAAAAAAAAAAADBrchJIkiTutZZ1jnQOdRYkLgOdK52zXC73KoEECaAXf05/rEp68Q8kbpc6TZ0HDZGIZ3MSxmr2WjsSv31J3+tadtd65X0Z0A+xJOmScyDxLTs/cRHcktkXj0LcAccS55o/ye2X40XxLMRF2ZPp8KZzLel3wMhMBJj0IU4kMpVKZaterxfdcaFQuK9Wq13xbJrWZK9KpdJOq9XKj37vdDqbGuRdD+/Fo1D/BUWv3W5vfD+nd0NePCNAZjgczv/m3H8jgDECGCOAMQIYI4AxAhgjgDECGCOAMQIYI4AxAhgjgDECGCOAMQIYI4AxAhgjgDECGCOAMQIYI4AxAhgjgDECGCOAMQIYI4AxAhgjgDECGAuxRcltfvu+T8ztSh/tycqH2AgRqxB3wOWYc7duT1atVtuO+eInSfIknoUIUNfpSHonuHFBLsbtyYpNt9vtiWchlqAXnXOdhkyRwWDw1mg0rsQz73dA9sCLR53h1/PFYvFOIuUuvt6hp3ro/akpwR5X42TPjVjR+Vz3y+XybrPZXI/le6Df7z/re7zr9Xo3+tf/IgAAAAAAAAAAAAAAAADwBx/xiIkJsM5B3AAAAABJRU5ErkJggg==",
+              "name": "StudTile.png"
+            },
+            "properties": {
+              "AnchorPoint": {
+                "x": 0,
+                "y": 0
+              },
+              "BackgroundColor3": "#ffffff",
+              "BackgroundTransparency": 1,
+              "ClipsDescendants": false,
+              "Image": "rbxassetid://82793028306773",
+              "ImageColor3": "#ffffff",
+              "ImageTransparency": 0,
+              "LayoutOrder": 0,
+              "Position": {
+                "x": {
+                  "offset": 0,
+                  "scale": 0
+                },
+                "y": {
+                  "offset": 0,
+                  "scale": 0
+                }
+              },
+              "Rotation": 0,
+              "ScaleType": "Tile",
+              "Size": {
+                "x": {
+                  "offset": 0,
+                  "scale": 1
+                },
+                "y": {
+                  "offset": 0,
+                  "scale": 1
+                }
+              },
+              "TileSize": {
+                "x": {
+                  "offset": 27,
+                  "scale": 0
+                },
+                "y": {
+                  "offset": 27,
+                  "scale": 0
+                }
+              },
+              "Visible": true,
+              "ZIndex": 3
+            }
+          },
+          {
+            "children": [],
+            "className": "Frame",
+            "id": "205ccb5c-2472-4074-bd43-695ab1e85ce8",
+            "name": "TopHighlightImg",
+            "properties": {
+              "AnchorPoint": {
+                "x": 0,
+                "y": 0
+              },
+              "BackgroundColor3": "#ffffff",
+              "BackgroundTransparency": 0.58,
+              "ClipsDescendants": false,
+              "LayoutOrder": 0,
+              "Position": {
+                "x": {
+                  "offset": 0,
+                  "scale": 0
+                },
+                "y": {
+                  "offset": 0,
+                  "scale": 0
+                }
+              },
+              "Rotation": 0,
+              "Size": {
+                "x": {
+                  "offset": 320,
+                  "scale": 0
+                },
+                "y": {
+                  "offset": 2,
+                  "scale": 0
+                }
+              },
+              "Visible": true,
+              "ZIndex": 4
+            }
+          },
+          {
+            "children": [],
+            "className": "Frame",
+            "id": "14c23459-0623-4361-be27-35479734536a",
+            "name": "LeftHighlightImg",
+            "properties": {
+              "AnchorPoint": {
+                "x": 0,
+                "y": 0
+              },
+              "BackgroundColor3": "#ffffff",
+              "BackgroundTransparency": 0.75,
+              "ClipsDescendants": false,
+              "LayoutOrder": 0,
+              "Position": {
+                "x": {
+                  "offset": 0,
+                  "scale": 0
+                },
+                "y": {
+                  "offset": 0,
+                  "scale": 0
+                }
+              },
+              "Rotation": 0,
+              "Size": {
+                "x": {
+                  "offset": 2,
+                  "scale": 0
+                },
+                "y": {
+                  "offset": 70,
+                  "scale": 0
+                }
+              },
+              "Visible": true,
+              "ZIndex": 4
+            }
+          },
+          {
+            "children": [],
+            "className": "Frame",
+            "id": "f6f1118e-27a6-418b-9a46-3d5867295b6f",
+            "name": "BottomEdgeImg",
+            "properties": {
+              "AnchorPoint": {
+                "x": 0,
+                "y": 0
+              },
+              "BackgroundColor3": "#1f0004",
+              "BackgroundTransparency": 0.2,
+              "ClipsDescendants": false,
+              "LayoutOrder": 0,
+              "Position": {
+                "x": {
+                  "offset": 0,
+                  "scale": 0
+                },
+                "y": {
+                  "offset": 66,
+                  "scale": 0
+                }
+              },
+              "Rotation": 0,
+              "Size": {
+                "x": {
+                  "offset": 320,
+                  "scale": 0
+                },
+                "y": {
+                  "offset": 4,
+                  "scale": 0
+                }
+              },
+              "Visible": true,
+              "ZIndex": 4
+            }
+          }
+        ],
+        "className": "Frame",
+        "id": "42745f47-a361-4268-8e4c-fdead998ada9",
+        "name": "TitleImg",
+        "properties": {
+          "AnchorPoint": {
+            "x": 0,
+            "y": 0
+          },
+          "BackgroundColor3": "#df1a23",
+          "BackgroundTransparency": 0,
+          "ClipsDescendants": true,
+          "LayoutOrder": 0,
+          "Position": {
+            "x": {
+              "offset": 480,
+              "scale": 0
+            },
+            "y": {
+              "offset": 325,
+              "scale": 0
+            }
+          },
+          "Rotation": 0,
+          "Size": {
+            "x": {
+              "offset": 320,
+              "scale": 0
+            },
+            "y": {
+              "offset": 70,
+              "scale": 0
+            }
+          },
+          "Visible": true,
+          "ZIndex": 2
+        }
+      }
+    ],
+    "className": "ScreenGui",
+    "id": "07869e4c-29e7-4321-88ad-d40a0cab7d75",
+    "name": "TitleUI",
+    "properties": {
+      "DisplayOrder": 0,
+      "Enabled": true
+    }
+  },
+  "scripts": {
+    "integration": "local FX = _G.FX\nlocal CTitleUIPreviewCompClass = FX.Class(\"CTitleUIPreviewCompClass\", \"CTitleUIBaseCompClass\")\n\n-- 初始化本次运行的模拟数据。\n-- @param owner table 编辑器提供的组件宿主，传递给父类\nfunction CTitleUIPreviewCompClass:Ctor(owner)\n    CTitleUIPreviewCompClass.Super.Ctor(self, owner)\n    self.Config = {}\n    self.State = {}\nend\n\n-- 提供展示配置，业务标识与文案分开保存。\n-- @return table 界面配置\nfunction CTitleUIPreviewCompClass:GetUIConfig()\n    return self.Config\nend\n\n-- 提供模拟状态，不能作为真实发奖依据。\n-- @return table 当前显示状态\nfunction CTitleUIPreviewCompClass:GetUIState()\n    return self.State\nend\n\n-- 数据就绪后触发首帧展示。\nfunction CTitleUIPreviewCompClass:BindUIData()\n    self:RefreshUI()\nend\n\n-- 处理展示层动作；只更新模拟数据，再调用 RefreshUI。\n-- @param action string 动作名称\n-- @param payload table 动作必要参数，例如稳定奖励 ID\nfunction CTitleUIPreviewCompClass:OnUIAction(action, payload)\nend\n\nreturn CTitleUIPreviewCompClass",
+    "source": "local FX = _G.FX\nlocal FXLoader = FX.Loader\nlocal CTitleUIBaseCompClass = FX.Class(\"CTitleUIBaseCompClass\", \"FCUICompClass\")\n\n-- 先用 FXLoader:PlayerGui(\"实际ScreenGui名\") 获取界面，再用 Here(root, \"Panel.Button\") 查子节点。\nfunction CTitleUIBaseCompClass:OnReady()\nend\n\n-- 根据接入类数据刷新展示，不在这里创建视觉效果。\n-- @param state table 接入类提供的显示状态\nfunction CTitleUIBaseCompClass:Render(state)\nend\n\nreturn CTitleUIBaseCompClass"
+  },
+  "version": 3
+}

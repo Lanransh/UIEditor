@@ -20,6 +20,7 @@ try {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
   }, root);
   await page.getByRole('button', { name: '创建工程', exact: true }).click();
+  await page.getByRole('dialog', { name: '创建工程', exact: true }).getByRole('button', { name: '下一步', exact: true }).click();
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
   assert.equal(await readFile(join(workspace, '.gitignore'), 'utf8'), '/Run.bat\n');
   assert.ok((await readFile(join(workspace, 'Run.bat'), 'utf8')).includes('UI_EDITOR_OPEN_WORKSPACE=%~dp0'));

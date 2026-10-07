@@ -72,6 +72,7 @@ try {
   await page.getByRole('button', { name: '关闭', exact: true }).click();
   await app.evaluate(({ dialog }, parent) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [parent] }); dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false }); }, parent);
   await page.getByRole('button', { name: '创建工程', exact: true }).click();
+  await page.getByRole('dialog', { name: '创建工程', exact: true }).getByRole('button', { name: '下一步', exact: true }).click();
   await page.getByRole('button', { name: '运行', exact: true }).waitFor();
   const capability = await call('uie.editor.get_capabilities'); assert.equal(capability.authoring.language, 'luau'); assert.ok(capability.nodes.TextButton);
   const initial = await state('full');

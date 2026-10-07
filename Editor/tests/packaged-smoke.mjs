@@ -1,7 +1,7 @@
 import { _electron as electron } from 'playwright';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { mkdir, mkdtemp } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { listPackage } from '@electron/asar';
 
 await mkdir(resolve('test-results'), { recursive: true });
@@ -33,6 +33,13 @@ try {
   assert.equal(runtime.preferences.contextIsolation, true);
   assert.equal(runtime.preferences.nodeIntegration, false);
   assert.equal(runtime.preferences.sandbox, true);
-  await page.screenshot({ path: resolve('test-results/packaged-hub.png') });
+  const png = await app.evaluate(async ({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    const [width, height] = window.getContentSize();
+    const image = await window.webContents.capturePage({ x: 0, y: 0, width, height }, { stayHidden: true, stayAwake: true });
+    return image.toPNG().toString('base64');
+  });
+  await writeFile(resolve('test-results/packaged-hub.png'), Buffer.from(png, 'base64'));
+  assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().every(window => !window.isVisible() && !window.isFocused())), true);
   console.log('PASS: packaged exe, Hub, IPC, ToolRuntime paths, sandbox and context isolation.');
 } finally { await app.close(); }

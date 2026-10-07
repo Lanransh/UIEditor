@@ -1,0 +1,150 @@
+{
+  "canvas": {
+    "height": 720,
+    "width": 1280
+  },
+  "format": "roblox-ui",
+  "id": "a36412ab-885f-4ddb-aa4d-291dc42e6a9d",
+  "name": "CloseButton",
+  "root": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [],
+            "className": "UICorner",
+            "id": "0c0fedd7-9a87-47a9-8569-fb1e46d84f2c",
+            "name": "UICorner",
+            "properties": {
+              "CornerRadius": {
+                "offset": 6,
+                "scale": 0
+              }
+            }
+          },
+          {
+            "children": [],
+            "className": "UIStroke",
+            "id": "01ddadc2-68a8-4c99-ab06-7bc9025778b3",
+            "name": "UIStroke",
+            "properties": {
+              "Color": "#000000",
+              "Enabled": true,
+              "Thickness": 3,
+              "Transparency": 0
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "className": "UIStroke",
+                "id": "c3200bd2-2408-4a5c-8f7d-c0306cf29516",
+                "name": "TextStroke",
+                "properties": {
+                  "Color": "#000000",
+                  "Enabled": true,
+                  "Thickness": 2,
+                  "Transparency": 0
+                }
+              }
+            ],
+            "className": "TextButton",
+            "id": "11aa3242-6680-48ea-aea1-7d2fcc37a954",
+            "name": "CloseBtn",
+            "properties": {
+              "AnchorPoint": {
+                "x": 0,
+                "y": 0
+              },
+              "BackgroundColor3": "#ffffff",
+              "BackgroundTransparency": 1,
+              "ClipsDescendants": false,
+              "Font": "GothamBold",
+              "LayoutOrder": 0,
+              "Position": {
+                "x": {
+                  "offset": 0,
+                  "scale": 0
+                },
+                "y": {
+                  "offset": -2,
+                  "scale": 0
+                }
+              },
+              "Rotation": 0,
+              "Size": {
+                "x": {
+                  "offset": 52,
+                  "scale": 0
+                },
+                "y": {
+                  "offset": 52,
+                  "scale": 0
+                }
+              },
+              "Text": "×",
+              "TextColor3": "#ffffff",
+              "TextScaled": false,
+              "TextSize": 52,
+              "TextTransparency": 0,
+              "TextWrapped": false,
+              "TextXAlignment": "Center",
+              "TextYAlignment": "Center",
+              "Visible": true,
+              "ZIndex": 3
+            }
+          }
+        ],
+        "className": "Frame",
+        "id": "86d0259c-a6d0-4abe-b494-92bf85c0d435",
+        "name": "CloseSurfaceImg",
+        "properties": {
+          "AnchorPoint": {
+            "x": 0,
+            "y": 0
+          },
+          "BackgroundColor3": "#55ce35",
+          "BackgroundTransparency": 0,
+          "ClipsDescendants": false,
+          "LayoutOrder": 0,
+          "Position": {
+            "x": {
+              "offset": 614,
+              "scale": 0
+            },
+            "y": {
+              "offset": 334,
+              "scale": 0
+            }
+          },
+          "Rotation": 0,
+          "Size": {
+            "x": {
+              "offset": 52,
+              "scale": 0
+            },
+            "y": {
+              "offset": 52,
+              "scale": 0
+            }
+          },
+          "Visible": true,
+          "ZIndex": 2
+        }
+      }
+    ],
+    "className": "ScreenGui",
+    "id": "5fe05025-f64b-4dcc-9b28-51fb78317b8f",
+    "name": "CloseButtonUI",
+    "properties": {
+      "DisplayOrder": 0,
+      "Enabled": true
+    }
+  },
+  "scripts": {
+    "integration": "local FX = _G.FX\nlocal CCloseButtonUIPreviewCompClass = FX.Class(\"CCloseButtonUIPreviewCompClass\", \"CCloseButtonUIBaseCompClass\")\n\n-- 模拟模板保留按钮，方便重复检查动作。\n-- @param action string 动作名\n-- @param payload table 必要参数\nfunction CCloseButtonUIPreviewCompClass:OnUIAction(action, payload)\n    print(\"Template preview: \" .. action)\nend\n\nreturn CCloseButtonUIPreviewCompClass",
+    "source": "local FX = _G.FX\nlocal FXLoader = FX.Loader\nlocal CCloseButtonUIBaseCompClass = FX.Class(\"CCloseButtonUIBaseCompClass\", \"FCUICompClass\")\n\n-- 独立模板只发出关闭动作，窗口宿主决定关闭范围。\nfunction CCloseButtonUIBaseCompClass:OnReady()\n    local root = FXLoader:PlayerGui(\"CloseButtonUI\")\n    local close = FXLoader:Here(root, \"CloseSurfaceImg.CloseBtn\")\n    self:TrackConnection(close.Activated:Connect(function()\n        self:EmitUIAction(\"Close\", {})\n    end))\nend\n\nreturn CCloseButtonUIBaseCompClass"
+  },
+  "version": 3
+}

@@ -2,6 +2,8 @@
 
 本目录用于通过运行中的 `ui-editor` MCP 制作、检查和测试界面。实际界面保存在编辑器当前打开的工程；不直接修改工程 JSON 或运行数据。
 
+如果当前项目有 `AgentWorkspace/AGENTS.md` 和 `Game-DESIGN.md`，先使用项目入口、规范及实际模板；本目录仅作通用接口参考，不以这里的默认蓝色窗口或签到示例覆盖项目风格。选择整套风格创建的项目已经包含独立提示词、规范及必要 skills，无需依赖本目录。
+
 制作前阅读 [Game-DESIGN.md](Game-DESIGN.md)，Stud 风格使用 [.agents/skills/roblox-stud-ui/SKILL.md](.agents/skills/roblox-stud-ui/SKILL.md)。Figma 提示词是视觉参考，交付以当前 UIEditor 工程内可编辑的界面为准。
 
 ## 角色与参考优先

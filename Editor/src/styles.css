@@ -193,6 +193,8 @@ svg { flex-shrink: 0; }
 .template-source-list label.selected { border-color: #167764; background: #edf7f4; }
 .template-source-list label.unavailable { opacity: .55; cursor: default; }
 .template-source-list small { display: block; margin-top: 4px; color: #62716e; }
+.template-style-thumbnail { flex: 0 0 124px; width: 124px; height: 76px; }
+.template-style-description { flex: 1; min-width: 0; }
 .new-interface-dialog p { font-size: 12px; color: #62716e; }
 .new-interface-classes { display: flex; flex-direction: column; gap: 8px; font: 12px Consolas, monospace; overflow-wrap: anywhere; }
 .new-interface-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }

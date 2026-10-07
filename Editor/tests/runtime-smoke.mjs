@@ -31,6 +31,7 @@ try {
     dialog.showMessageBox = async () => ({ response: 0 });
   }, { parent, file });
   await page.getByRole('button', { name: '创建工程', exact: true }).click();
+  await page.getByRole('dialog', { name: '创建工程', exact: true }).getByRole('button', { name: '下一步', exact: true }).click();
   assert.equal(await page.getByRole('button', { name: 'UI 资产', exact: true }).getAttribute('aria-pressed'), 'true');
   assert.equal(await page.getByRole('log').isVisible(), false);
   await page.getByRole('button', { name: '文件', exact: true }).click();

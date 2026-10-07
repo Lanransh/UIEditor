@@ -12,17 +12,39 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 - 批处理和打包默认使用与参考工程相同的 npm Electron 镜像；可通过 `ELECTRON_MIRROR` 环境变量覆盖。
 - 可将 Windows 便携 Node.js 放到 `ToolRuntime/Runtime/nodejs/`，批处理优先使用其中的 `node.exe` 和 `npm.cmd`。
 - 打包入口：`ToolRuntime/UIEditor-win32-x64/UIEditor.exe`。运行打包应用无需额外安装 Node.js；分发时需保留整个应用目录，不能只复制 exe。
-- 打包只收集 `dist`、`dist-electron` 和 `package.json`，Luau 与 MCP 通过额外资源复制；运行依赖已由 Vite/esbuild 打入构建产物，不再复制或扫描 `node_modules`。打包过程显示阶段与耗时，首次下载、解压 Electron 仍需等待。
+- app.asar 只收集 `dist`、`dist-electron` 和 `package.json`，Luau、MCP 与模板风格种子通过额外资源复制；运行依赖已由 Vite/esbuild 打入构建产物，不再复制或扫描 `node_modules`。打包过程显示阶段与耗时，首次下载、解压 Electron 仍需等待。
 
 ## 使用
 
-1. 点击“创建工程”，选择父文件夹。程序创建固定的 `UIEditorWorkspace/project.json`，不要求输入名称。
-2. 工程创建后进入工作台，默认包含空 ScreenGui。鼠标移到左侧节点行，点击右侧“+”展开类型列表，选择类型即添加子节点；右侧编辑名称、父节点和属性，中间为 1280×720 画布。
+1. 点击“创建工程”，先选择整套模板风格，再选择父文件夹。程序创建固定的 `UIEditorWorkspace/project.json`，不要求输入名称；风格模板及子目录复制到 `template-references/`，AI 提示词、详细规范、资源和 skills 原样复制到项目 `AgentWorkspace/`。默认也可选择空白工程；有历史时保留仅克隆模板的兼容入口，与风格选择互斥。
+2. 工程创建后进入工作台，通过“文件 → 新建界面”创建 ScreenGui 或在底部“模板参考”中打开独立副本。鼠标移到左侧节点行，点击右侧“+”展开类型列表，选择类型即添加子节点；右侧编辑名称、父节点和属性，中间为 1280×720 画布。
 3. 点击“打开工程”选择已有的 `UIEditorWorkspace` 文件夹，或点击最近工程卡片。
 4. 同一父目录已有有效工程时，会询问是否打开；已有无效目录时不覆盖内容。
 5. 历史卡片的垃圾桶仅移出记录，不删除工程。工程移动后使用“打开工程”重新登记。
 
 创建或打开工程会生成工作区 `Run.bat`，双击可直接打开该工程；移动工程或更换编辑器位置后，重新打开工程以更新启动路径。工作区 `.gitignore` 仅追加 `/Run.bat`，工程 `project.json`、UI 文件和项目图片资产均可提交。已有忽略规则保留，用户自建 Run.bat 不会被覆盖。
+
+### 模板风格与项目 AI
+
+开发版的统一风格库为仓库根目录 `TemplateStyles/`；
+打包版可编辑库为应用文件夹旁的 `TemplateStyles/`（默认 `ToolRuntime/TemplateStyles/`）。
+每个二级文件夹是一套风格，必要文件是 `AGENTS.md`、`Game-DESIGN.md`
+及 `template-references/**/*.rbxui.json`；资源和 skills 按需提供。
+规则及相对引用约定见 [风格库说明](TemplateStyles/README.md)。
+当前 **多彩棋格风格** 包含 7 个鲜明配色独立模板，标题可按主题选色，
+保留 Stud 平铺纹理，不包含 TemplatePage 展示页或全画布展示背景。
+
+风格由用户维护，重新打包只带种子，不覆盖已有同名风格目录。
+新工程是独立副本：库修改不更新已有项目，项目修改不回写库；
+打开工程不覆盖项目定制提示词。移动时带上整个 UIEditorWorkspace 即可。
+缺文档、坏模板、资源链接不闭合、链接目录或权限错误会给出具体反馈；
+复制失败清理本次创建内容，目标已有文件不会被覆盖。
+
+在 Codex 中以项目 `UIEditorWorkspace/AgentWorkspace/` 为 AI 工作目录，
+启用 `ui-editor` MCP 并在 App 中打开该项目，只需描述界面需求。
+项目入口要求 AI 先读规范及实际模板结构，按用途自动选择窗口和组件，
+沿用本风格的字体、字号、加粗、语义色与纹理，通过 MCP 制作、测试、
+截图、保存和重开。不能用模拟领取/购买状态代替真实资格校验、支付或发奖。
 
 使用“文件 → 保存”或 Ctrl+S 保存，默认文件为 `interfaces/自定义名称.rbxui.json`；通过“打开界面”重新编辑。节点支持复制、删除、调整层级、画布拖动和尺寸调整，Ctrl+Z 撤销。空白处拖动、空格或中键平移，Ctrl+滚轮缩放，“适应窗口”重新居中。布局组件控制的子节点不能直接拖动。图片属性可保存 Roblox 资源 ID，并选择本地预览图嵌入文件。
 
@@ -36,7 +58,7 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 
 ## 开发与验证
 
-Hub 右上角“设置”提供 Codex MCP 配置以启用 `ui-editor`。AI 在当前打开的工程内通过节点查询和代码事务制作界面，用 `uie.scripts.get/set` 直接读写交互代码和接入代码，再运行、模拟点击、读取日志和截图。执行结果可在 App 内撤销重做，MCP 不提供 undo/redo。工作入口为 `ToolRuntime/AgentWorkspace/UIEditor_Roblox`，接口与边界见 [MCP 自动化](Docs/design/mcp-automation.md)。
+Hub 右上角“设置”提供 Codex MCP 配置以启用 `ui-editor`。AI 在当前打开的工程内通过节点查询和代码事务制作界面，用 `uie.scripts.get/set` 直接读写交互代码和接入代码，再运行、模拟点击、读取日志和截图。执行结果可在 App 内撤销重做，MCP 不提供 undo/redo。风格项目从项目 `AgentWorkspace` 开始；`ToolRuntime/AgentWorkspace/UIEditor_Roblox` 保留通用说明和示例供空白/兼容工程使用，不覆盖项目风格。接口与边界见 [MCP 自动化](Docs/design/mcp-automation.md)。
 
 ```powershell
 cd Editor
@@ -65,6 +87,8 @@ npm run dev
 | `npm run test:mcp:packaged` | 验证已打包程序的 MCP 完整链路，需先 package |
 | `npm run test:assets` | 构建并验证图片库、共用属性面板、单一 Roblox ID、保存重开及资产 MCP |
 | `npm run test:templates` | 构建并验证项目模板与文件夹隔离、缩略图、独立副本、重启持久化、UI库互移与保存路径 |
+| `npm run test:styles` | 构建并验证风格库、整套独立复制、失败清理、风格选择和历史克隆互斥、重开提示词保护 |
+| `npm run test:styles:packaged` | 验证已打包应用的风格库位置和新建项目流程；可指定 UI_EDITOR_PACKAGED_EXECUTABLE |
 | `node tests/runtime-smoke.mjs --packaged` | 验证已打包 exe 的离线 Luau 运行 |
 | `npm run package` | 构建 Windows x64 应用到 ToolRuntime |
 
@@ -77,6 +101,7 @@ npm run dev
 - `Editor/src/`：React Hub、静态 UI 工作台、策略与共享接口类型。
 - `Editor/electron/`：文件管理、原生目录选择、受限 IPC 和应用生命周期。
 - `Editor/scripts/`、`Editor/tests/`：开发、打包脚本及自动化验证。
+- `TemplateStyles/`：可维护的风格制作包；打包作为种子，新建项目原样复制。
 - `ToolRuntime/`：打包应用和运行数据，详见[运行目录说明](ToolRuntime/README.md)。
 - `Docs/`：[设计文档](Docs/design/README.md)，记录当前行为、数据格式与职责边界。
 

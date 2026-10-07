@@ -16,6 +16,7 @@ import { openInterface, saveInterface, listInterfaces } from './automation-files
 import { createCodexMcpSettingsStore } from './codex-mcp-settings.cjs';
 import { ImageAssetStore } from './image-assets';
 import { ensureWorkspaceLauncher } from './workspace-launcher';
+import { listTemplateStyles, seedTemplateStyles, styleDirectory, templateStylesDirectory } from './template-styles';
 import { resolveImageAssets, type ImageAssetUpdate, type ImageLibrary } from '../src/shared/imageAssets';
 
 const runtime = process.env.UI_EDITOR_USER_DATA
@@ -59,6 +60,13 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     window.webContents.on('will-navigate', (event) => event.preventDefault());
     const recent = new RecentProjects(runtime);
+    const stylesRoot = templateStylesDirectory(app.isPackaged, app.getAppPath(), process.execPath);
+    // Seeding is deferred to discovery so errors appear in the dialog, not as an
+    // unhandled startup failure. Existing projects never trigger a style copy.
+    async function styles() {
+      if (app.isPackaged) await seedTemplateStyles(join(process.resourcesPath, 'TemplateStyles'), stylesRoot);
+      return listTemplateStyles(stylesRoot);
+    }
     let activeProject: Project | null = null;
     let documentPath: string | null = null;
     let dirty = false;
@@ -200,11 +208,21 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       const result = await dialog.showOpenDialog(window, { title, properties: ['openDirectory'] });
       return result.canceled ? undefined : result.filePaths[0];
     }
-    handle('project:create', async templateSource => {
-      const source = templateSource === undefined ? undefined : await recent.resolveRecent(templateSource);
+    handle('project:list-styles', styles);
+    handle('project:create', async input => {
+      let source: string | undefined;
+      let style: string | undefined;
+      if (typeof input === 'string') source = await recent.resolveRecent(input);
+      else if (input !== undefined) {
+        if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('模板来源无效。');
+        const value = input as Record<string, unknown>;
+        if (value.kind === 'recent' && Object.keys(value).every(key => ['kind', 'path'].includes(key))) source = await recent.resolveRecent(value.path);
+        else if (value.kind === 'style' && Object.keys(value).every(key => ['kind', 'id'].includes(key))) style = styleDirectory(stylesRoot, value.id);
+        else throw new Error('模板来源无效；模板风格与历史工程克隆不能同时使用。');
+      }
       const parent = await pick('选择父文件夹 — 将自动创建 UIEditorWorkspace');
       if (!parent) return null;
-      const result = await createProject(parent, source);
+      const result = await createProject(parent, source, style);
       if (result.kind === 'existing') {
         const answer = await dialog.showMessageBox(window, { type: 'question', title: '工程已存在', message: '此位置已有有效工程，是否打开？', detail: result.project.path, buttons: ['打开工程', '取消'], defaultId: 0, cancelId: 1 });
         if (answer.response !== 0) return null;

@@ -3,6 +3,7 @@ import { basename, dirname, join, resolve, relative, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { WORKSPACE_DIRECTORY, type Project, type ProjectManifest, type RecentProject } from '../src/shared/project';
 import { listDocumentAssets, readDocument } from './documents';
+import { projectStylePath, readTemplateStyle } from './template-styles';
 
 function code(error: unknown): string | undefined {
   return (error as NodeJS.ErrnoException)?.code;
@@ -39,7 +40,8 @@ export async function openProject(directory: string): Promise<Project> {
 
 export type CreateResult = { kind: 'created' | 'existing'; project: Project };
 
-export async function createProject(parent: string, templateSource?: string): Promise<CreateResult> {
+export async function createProject(parent: string, templateSource?: string, styleSource?: string): Promise<CreateResult> {
+  if (templateSource !== undefined && styleSource !== undefined) throw new Error('模板风格与历史工程克隆不能同时使用。');
   const directory = join(await realpath(parent), WORKSPACE_DIRECTORY);
   try {
     await mkdir(directory);
@@ -55,14 +57,22 @@ export async function createProject(parent: string, templateSource?: string): Pr
   const templateFiles: string[] = [];
   const templateDirectories = new Set<string>();
   try {
-    const templates: { path: string; content: string }[] = [];
+    const templates: { path: string; content: string | Buffer }[] = [];
+    if (styleSource !== undefined) {
+      const style = await readTemplateStyle(styleSource);
+      for (const item of style.files) {
+        templates.push({ path: projectStylePath(item.path), content: item.content });
+      }
+      await mkdir(join(directory, 'interfaces'));
+      templateDirectories.add(join(directory, 'interfaces'));
+    }
     if (templateSource !== undefined) {
       const source = await openProject(templateSource);
       const root = join(source.path, 'template-references');
       const info = await lstat(root).catch(error => { if (code(error) === 'ENOENT') return null; throw error; });
       if (info && (!info.isDirectory() || info.isSymbolicLink())) throw new Error('来源工程的模板参考目录无效。');
       for (const asset of await listDocumentAssets(source.path, 'templates')) {
-        templates.push({ path: relative(root, asset.path), content: JSON.stringify(await readDocument(asset.path), null, 2) + '\n' });
+        templates.push({ path: join('template-references', relative(root, asset.path)), content: JSON.stringify(await readDocument(asset.path), null, 2) + '\n' });
       }
     }
     const { open } = await import('node:fs/promises');
@@ -71,7 +81,7 @@ export async function createProject(parent: string, templateSource?: string): Pr
     try { await handle.writeFile(JSON.stringify(manifest, null, 2) + '\n', 'utf8'); }
     finally { await handle.close(); }
     for (const template of templates) {
-      const target = join(directory, 'template-references', template.path);
+      const target = join(directory, template.path);
       let folder = directory;
       for (const part of relative(directory, dirname(target)).split(sep)) {
         folder = join(folder, part);
@@ -87,10 +97,15 @@ export async function createProject(parent: string, templateSource?: string): Pr
     }
     return { kind: 'created', project: await openProject(directory) };
   } catch (error) {
-    for (const path of templateFiles.reverse()) await unlink(path).catch(() => {});
-    for (const path of [...templateDirectories].reverse()) await rmdir(path).catch(() => {});
-    if (fileCreated) await unlink(file).catch(() => {});
-    await rmdir(directory).catch(() => {});
+    const cleanupErrors: string[] = [];
+    const cleanup = async (path: string, remove: (path: string) => Promise<void>) => {
+      await remove(path).catch(problem => { cleanupErrors.push(`${path}：${describeError(problem)}`); });
+    };
+    for (const path of templateFiles.reverse()) await cleanup(path, unlink);
+    for (const path of [...templateDirectories].reverse()) await cleanup(path, rmdir);
+    if (fileCreated) await cleanup(file, unlink);
+    await cleanup(directory, rmdir);
+    if (cleanupErrors.length) throw new Error(`${describeError(error)}\n无法完全清理本次创建内容，请检查：\n${cleanupErrors.join('\n')}`);
     throw error;
   }
 }
