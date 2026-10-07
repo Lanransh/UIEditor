@@ -41,7 +41,7 @@ try {
     assert.equal(await page.getByRole('button', { name: '创建', exact: true }).isEnabled(), false);
   }
   await page.getByRole('button', { name: '取消', exact: true }).click();
-  assert.equal(await page.getByLabel('界面名称', { exact: true }).inputValue(), 'Untitled');
+  await page.getByText('请打开一个工程', { exact: true }).waitFor();
   await page.getByRole('button', { name: '文件', exact: true }).click();
   await page.getByRole('button', { name: '新建界面', exact: true }).click();
   await newName.fill('OnlineReward');

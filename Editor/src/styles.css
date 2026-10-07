@@ -157,6 +157,7 @@ svg { flex-shrink: 0; }
 .workspace-tabs button { padding: 6px 14px; border: 0; border-radius: 4px; background: transparent; color: inherit; }
 .workspace-tabs button[aria-pressed="true"] { background: #d7eeea; color: #167764; }
 .workspace-editor-content { display: flex; flex: 1; min-height: 0; }
+.workspace-empty { flex: 1; display: grid; place-items: center; color: var(--muted); font-size: 16px; }
 .workspace-canvas { display: flex; flex: 1; min-width: 0; min-height: 0; }
 .workspace-canvas[hidden] { display: none; }
 .workspace-script { display: flex; flex: 1; min-width: 0; min-height: 0; }

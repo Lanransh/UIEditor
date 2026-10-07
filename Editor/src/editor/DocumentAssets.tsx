@@ -42,7 +42,7 @@ export function DocumentAssets({ editor, library }: { editor: DocumentEditor; li
   }, [menu]);
 
   if (library !== '项目UI') return <div className="assets-empty" role="status">暂无{library}</div>;
-  const entries = editor.path ? assets : [{ name: editor.document.name, path: null }, ...assets];
+  const entries = editor.path || !editor.hasDocument ? assets : [{ name: editor.document.name, path: null }, ...assets];
   return <div className="document-assets" aria-label="UI 界面资产" aria-busy={loading || editor.busy}>
     {error && <div className="asset-error" role="alert">{error}<button disabled={editor.busy} onClick={() => refresh(value => value + 1)}>重试</button></div>}
     <div className="asset-grid">

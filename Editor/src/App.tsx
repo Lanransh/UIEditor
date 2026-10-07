@@ -146,12 +146,12 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
   useEffect(() => { if (editor.runtime.active) setWorkspaceTab('design'); }, [editor.runtime.active]);
   const content = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState({ width: window.innerWidth, height: window.innerHeight - 63 });
-  const [sizes, setSizes] = useState({ tree: window.innerWidth <= 1000 ? 180 : 210, properties: window.innerWidth <= 1000 ? 190 : 230, assets: Math.min(240, Math.max(150, window.innerHeight * .25)) });
+  const [sizes, setSizes] = useState({ tree: (window.innerWidth <= 1000 ? 180 : 210) / window.innerWidth, properties: (window.innerWidth <= 1000 ? 190 : 230) / window.innerWidth, assets: Math.min(240, Math.max(150, window.innerHeight * .25)) });
   const [dragging, setDragging] = useState<keyof typeof sizes | null>(null);
   const drag = useRef<{ panel: keyof typeof sizes; pointerId: number; start: number; size: number } | null>(null);
   const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
-  const tree = clamp(sizes.tree, 160, bounds.width - 180 - 240 - 12);
-  const properties = clamp(sizes.properties, 180, bounds.width - tree - 240 - 12);
+  const tree = clamp(sizes.tree * bounds.width, 160, bounds.width - 180 - 240 - 12);
+  const properties = clamp(sizes.properties * bounds.width, 180, bounds.width - tree - 240 - 12);
   const assets = clamp(sizes.assets, 120, bounds.height - 260 - 6);
   const current = { tree, properties, assets };
   const limits = { tree: [160, bounds.width - properties - 240 - 12], properties: [180, bounds.width - tree - 240 - 12], assets: [120, bounds.height - 260 - 6] };
@@ -163,7 +163,8 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
   }, []);
 
   function resize(panel: keyof typeof sizes, value: number) {
-    setSizes({ ...current, [panel]: clamp(value, limits[panel][0], limits[panel][1]) });
+    const next = { ...current, [panel]: clamp(value, limits[panel][0], limits[panel][1]) };
+    setSizes({ tree: next.tree / bounds.width, properties: next.properties / bounds.width, assets: next.assets });
   }
 
   function separator(panel: keyof typeof sizes, label: string) {
@@ -212,9 +213,9 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
         <div className="workspace-menu-items" onClick={event => event.currentTarget.parentElement?.removeAttribute('open')}>
           <button disabled={editor.busy} onClick={() => setCreatingInterface(true)}>新建界面</button>
           <button disabled={editor.busy} onClick={() => void editor.openDocument()}>打开界面</button>
-          <button aria-label="保存" disabled={editor.busy} onClick={() => void editor.save()}>保存 <span>Ctrl+S</span></button>
-          <button aria-label="另存为" disabled={editor.busy} onClick={() => void editor.save(true)}>另存为 <span>Ctrl+Shift+S</span></button>
-          <button disabled={editor.busy} onClick={() => setImportingRoblox(true)}>导入 Roblox</button>
+          <button aria-label="保存" disabled={editor.busy || !editor.hasDocument} onClick={() => void editor.save()}>保存 <span>Ctrl+S</span></button>
+          <button aria-label="另存为" disabled={editor.busy || !editor.hasDocument} onClick={() => void editor.save(true)}>另存为 <span>Ctrl+Shift+S</span></button>
+          <button disabled={editor.busy || !editor.hasDocument} onClick={() => setImportingRoblox(true)}>导入 Roblox</button>
           <button disabled={editor.busy} onClick={() => void editor.back()}><ArrowLeft size={15} />返回 Hub</button>
         </div>
       </details>
@@ -238,11 +239,11 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
     {editor.error && <div className="editor-error" role="alert">{editor.error}</div>}
     <div className="workspace-content" ref={content}>
     <div className="workspace-body">
-      <aside className="panel" aria-label="节点树"><h2><Layers3 size={16} />节点树</h2><NodeTree editor={editor} /></aside>
+      <aside className="panel" aria-label="节点树"><h2><Layers3 size={16} />节点树</h2>{editor.hasDocument && <NodeTree editor={editor} />}</aside>
       {separator('tree', '调整节点树宽度')}
       <section className="workspace-editor" aria-label="界面工作区">
         <div className="runtime-toolbar">
-          <button disabled={!editor.runtime.active && editor.busy} onClick={() => {
+          <button disabled={!editor.hasDocument || (!editor.runtime.active && editor.busy)} onClick={() => {
             if (editor.runtime.active) void editor.runtime.stop();
             else { setWorkspaceTab('design'); void editor.runtime.start(); }
           }}>{editor.runtime.active ? '停止' : '运行'}</button>
@@ -252,14 +253,16 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
             <button disabled={!editor.runtime.ready} onClick={() => void editor.runtime.hide()}>隐藏</button>
           </>}
         </div>
-        <nav className="workspace-tabs" aria-label="工作区页签">{(['design', 'source', 'integration'] as const).map((tab, index) => <button key={tab} aria-pressed={workspaceTab === tab} onClick={() => setWorkspaceTab(tab)}>{['界面', '交互脚本', '接入脚本'][index]}</button>)}</nav>
+        <nav className="workspace-tabs" aria-label="工作区页签">{(['design', 'source', 'integration'] as const).map((tab, index) => <button key={tab} aria-pressed={workspaceTab === tab} disabled={!editor.hasDocument} onClick={() => setWorkspaceTab(tab)}>{['界面', '交互脚本', '接入脚本'][index]}</button>)}</nav>
         <div className="workspace-editor-content">
+          {!editor.hasDocument ? <div className="workspace-empty" role="status">请打开一个工程</div> : <>
           <div hidden={workspaceTab !== 'design'} className="workspace-canvas"><DocumentCanvas editor={editor} visible={workspaceTab === 'design'} /></div>
           {(['source', 'integration'] as const).map(mode => <div key={mode} hidden={workspaceTab !== mode} className="workspace-script"><ScriptPanel editor={editor} mode={mode} /></div>)}
+          </>}
         </div>
       </section>
       {separator('properties', '调整属性面板宽度')}
-      <aside className="panel properties" aria-label="属性面板"><h2>属性面板</h2>{inspectedAsset ? <ImageAssetProperties key={inspectedAsset.id} editor={editor} asset={inspectedAsset} /> : <NodeProperties editor={editor} />}</aside>
+      <aside className="panel properties" aria-label="属性面板"><h2>属性面板</h2>{inspectedAsset ? <ImageAssetProperties key={inspectedAsset.id} editor={editor} asset={inspectedAsset} /> : editor.hasDocument ? <NodeProperties editor={editor} /> : null}</aside>
     </div>
     {separator('assets', '调整资产目录高度')}
     <section className="panel assets" aria-label="底部面板">
@@ -278,6 +281,6 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
       <div className="bottom-output" hidden={bottomTab !== 'output'}><RuntimeOutput editor={editor} /></div>
     </section>
     </div>
-    <footer className="workspace-status"><span><i />{editor.dirty ? '界面有未保存修改' : editor.path ? '界面已保存' : '新界面尚未保存'}</span><span title={editor.path ?? project.path}>Roblox · {editor.path?.split(/[\\/]/).at(-1) ?? '1280 × 720'}</span></footer>
+    <footer className="workspace-status"><span><i />{!editor.hasDocument ? '尚未打开界面' : editor.dirty ? '界面有未保存修改' : editor.path ? '界面已保存' : '新界面尚未保存'}</span><span title={editor.path ?? project.path}>Roblox · {editor.path?.split(/[\\/]/).at(-1) ?? (editor.hasDocument ? '1280 × 720' : project.name)}</span></footer>
   </main>;
 }

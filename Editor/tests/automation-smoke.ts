@@ -69,6 +69,8 @@ try {
   await page.getByRole('button', { name: '运行', exact: true }).waitFor();
   const capability = await call('uie.editor.get_capabilities'); assert.equal(capability.authoring.language, 'luau'); assert.ok(capability.nodes.TextButton);
   const initial = await state('full');
+  assert.equal(initial.document, null);
+  assert.equal((await state()).nodeCount, 0);
   await mutate('uie.document.new', { name: 'OnlineReward' });
   const blank = await state('full');
   const fixture = rewardExample();

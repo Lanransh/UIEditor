@@ -37,14 +37,14 @@ async function clickReady(name) {
 }
 async function checkWorkspaceLayout() {
   const tree = await page.getByRole('complementary', { name: '节点树', exact: true }).boundingBox();
-  const canvas = await page.getByRole('region', { name: 'Roblox 画布', exact: true }).boundingBox();
+  const canvas = await page.getByRole('region', { name: '界面工作区', exact: true }).boundingBox();
   const properties = await page.getByRole('complementary', { name: '属性面板', exact: true }).boundingBox();
   const assets = await page.getByRole('region', { name: '底部面板', exact: true }).boundingBox();
   assert.ok(tree && canvas && properties && assets);
   assert.ok(tree.x + tree.width <= canvas.x);
   assert.ok(canvas.x + canvas.width <= properties.x);
   assert.ok(assets.y >= Math.max(tree.y + tree.height, canvas.y + canvas.height, properties.y + properties.height));
-  assert.equal(assets.width, await page.evaluate(() => innerWidth));
+  assert.ok(Math.abs(assets.width - await page.evaluate(() => innerWidth)) < 1);
 }
 async function checkWorkspaceResize() {
   const cases = [
@@ -62,8 +62,8 @@ async function checkWorkspaceResize() {
       await page.mouse.move(box.x + box.width / 2 + dx * direction, box.y + box.height / 2 + dy * direction, { steps: 5 });
       await page.mouse.up();
       const expected = before + (direction === 1 ? Math.abs(dx || dy) : 0);
-      await page.waitForFunction(({ name, expected }) => Number(document.querySelector(`[role="separator"][aria-label="${name}"]`).getAttribute('aria-valuenow')) === Math.round(expected), { name, expected }, { timeout: 5000 });
-      assert.ok(Math.abs((await panel.boundingBox())[dimension] - expected) < 1);
+      await page.waitForFunction(({ name, expected }) => Math.abs(Number(document.querySelector(`[role="separator"][aria-label="${name}"]`).getAttribute('aria-valuenow')) - expected) < 2, { name, expected }, { timeout: 5000 });
+      assert.ok(Math.abs((await panel.boundingBox())[dimension] - expected) < 2);
       await checkWorkspaceLayout();
     }
   }
@@ -80,11 +80,11 @@ async function checkWorkspaceResize() {
     await page.mouse.down();
     await page.mouse.move(dx > 0 ? 2000 : dx < 0 ? -1000 : box.x + box.width / 2, dy < 0 ? -1000 : box.y + box.height / 2, { steps: 5 });
     await page.mouse.up();
-    assert.equal(await divider.getAttribute('aria-valuenow'), await divider.getAttribute('aria-valuemax'));
+    assert.equal(Number(await divider.getAttribute('aria-valuenow')), Math.round(Number(await divider.getAttribute('aria-valuemax'))));
     await checkWorkspaceLayout();
   }
   assert.equal(await page.locator('.workspace.resizing').count(), 0);
-  const canvas = await page.getByRole('region', { name: 'Roblox 画布' }).boundingBox();
+  const canvas = await page.getByRole('region', { name: '界面工作区' }).boundingBox();
   assert.ok(canvas.width >= 240 && canvas.height >= 180);
 }
 try {
@@ -96,19 +96,23 @@ try {
   await page.getByRole('heading', { name: '选择工程', exact: true }).waitFor();
   await dialogResult(parent);
   await clickReady('创建工程');
-  await page.getByRole('tree', { name: 'Roblox 节点' }).waitFor();
-  assert.equal(await page.getByLabel('节点名称', { exact: true }).inputValue(), 'ScreenGui');
+  await page.getByText('请打开一个工程', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('tree', { name: 'Roblox 节点' }).count(), 0);
+  assert.equal(await page.getByLabel('节点名称', { exact: true }).count(), 0);
+  assert.ok(await page.getByRole('button', { name: '运行', exact: true }).isDisabled());
+  await page.keyboard.press('Control+s');
+  assert.equal(await page.getByRole('tree', { name: 'Roblox 节点' }).count(), 0);
   await page.getByRole('button', { name: 'UI 资产', exact: true }).waitFor();
   await checkWorkspaceLayout();
   const libraries = page.getByRole('navigation', { name: '资产库', exact: true });
   assert.equal(await libraries.getByRole('button', { name: '项目UI', exact: true }).getAttribute('aria-pressed'), 'true');
-  await page.getByRole('button', { name: 'UI 资产 Untitled（未保存）', exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'UI 资产 Untitled（未保存）', exact: true }).count(), 0);
   await libraries.getByRole('button', { name: '永久UI', exact: true }).click();
   await page.getByRole('status').filter({ hasText: '暂无永久UI' }).waitFor();
   assert.equal(await libraries.getByRole('button', { name: '项目UI', exact: true }).getAttribute('aria-pressed'), 'false');
   assert.equal(await libraries.getByRole('button', { name: '永久UI', exact: true }).getAttribute('aria-pressed'), 'true');
   await libraries.getByRole('button', { name: '项目UI', exact: true }).click();
-  await page.getByRole('button', { name: 'UI 资产 Untitled（未保存）', exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'UI 资产 Untitled（未保存）', exact: true }).count(), 0);
   await clickReady('编辑');
   assert.ok(await page.getByRole('button', { name: /^撤销/ }).isDisabled());
   assert.ok(await page.getByRole('button', { name: /^重做/ }).isDisabled());
@@ -122,6 +126,23 @@ try {
   const manifest = JSON.parse(await readFile(join(workspace, 'project.json'), 'utf8'));
   assert.equal(manifest.mode, 'roblox');
   await page.screenshot({ path: join(output, 'workspace.png') });
+  // Each column keeps its share when the window grows, including after a manual resize.
+  const treeDivider = page.getByRole('separator', { name: '调整节点树宽度' });
+  await treeDivider.press('ArrowRight');
+  const widths = () => page.evaluate(() => ['.workspace-body > .panel', '.workspace-editor', '.panel.properties'].map(selector => document.querySelector(selector).getBoundingClientRect().width));
+  const beforeWidths = await widths(), beforeWidth = await page.evaluate(() => innerWidth);
+  const originalSize = await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getSize());
+  await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1600, 1000));
+  await page.waitForFunction(width => innerWidth > width + 100, beforeWidth);
+  await page.waitForFunction(({ beforeWidths, beforeWidth }) => {
+    const tree = document.querySelector('.workspace-body > .panel').getBoundingClientRect().width;
+    return Math.abs(tree / innerWidth - beforeWidths[0] / beforeWidth) < .001;
+  }, { beforeWidths, beforeWidth });
+  const afterWidths = await widths(), afterWidth = await page.evaluate(() => innerWidth);
+  for (let i = 0; i < 3; i++) assert.ok(Math.abs(afterWidths[i] / afterWidth - beforeWidths[i] / beforeWidth) < .003);
+  await application.evaluate(({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0].setSize(...size), originalSize);
+  await page.waitForFunction(width => innerWidth === width, beforeWidth);
+  await page.waitForFunction(width => Math.abs(document.querySelector('.workspace-body > .panel').getBoundingClientRect().width - width) < 1, beforeWidths[0]);
   await checkWorkspaceResize();
   await page.screenshot({ path: join(output, 'workspace-resized.png') });
   await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(900, 600));
@@ -129,7 +150,7 @@ try {
   await page.waitForFunction(() => document.documentElement.scrollWidth <= innerWidth, null, { timeout: 5000 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await checkWorkspaceLayout();
-  const smallCanvas = await page.getByRole('region', { name: 'Roblox 画布' }).boundingBox();
+  const smallCanvas = await page.getByRole('region', { name: '界面工作区' }).boundingBox();
   assert.ok(smallCanvas.width >= 240 && smallCanvas.height >= 180);
   await page.screenshot({ path: join(output, 'workspace-small.png') });
   const fixture = await build({ entryPoints: ['tests/fixtures/history.tsx'], bundle: true, write: false, format: 'iife', jsx: 'automatic' });
@@ -182,19 +203,19 @@ try {
   await application.close();
   await launch();
   await clickReady('打开 中文 工程');
-  await page.getByRole('tree', { name: 'Roblox 节点' }).waitFor();
+  await page.getByText('请打开一个工程', { exact: true }).waitFor();
   await clickReady('返回 Hub');
   await dialogResult(parent, 1);
   await clickReady('创建工程');
   await page.getByRole('heading', { name: '选择工程', exact: true }).waitFor();
   await dialogResult(parent, 0);
   await clickReady('创建工程');
-  await page.getByRole('tree', { name: 'Roblox 节点' }).waitFor();
+  await page.getByText('请打开一个工程', { exact: true }).waitFor();
   assert.equal(JSON.parse(await readFile(join(workspace, 'project.json'), 'utf8')).id, manifest.id);
   await clickReady('返回 Hub');
   await dialogResult(workspace);
   await clickReady('打开工程');
-  await page.getByRole('tree', { name: 'Roblox 节点' }).waitFor();
+  await page.getByText('请打开一个工程', { exact: true }).waitFor();
   await clickReady('返回 Hub');
   await page.getByRole('button', { name: '打开 中文 工程', exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: '打开 中文 工程', exact: true }).count(), 1);

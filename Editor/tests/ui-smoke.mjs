@@ -54,6 +54,12 @@ async function dragNode(source, target, ratio) {
 try {
   await dialogs(parent);
   await page.getByRole('button', { name: '创建工程', exact: true }).click();
+  await page.getByText('请打开一个工程', { exact: true }).waitFor();
+  await dialogs(null); await menu('打开界面');
+  await page.getByText('请打开一个工程', { exact: true }).waitFor();
+  await menu('新建界面');
+  await page.getByRole('textbox', { name: '新界面名称', exact: true }).fill('OnlineRewards');
+  await page.getByRole('button', { name: '创建', exact: true }).click();
   await page.getByRole('tree', { name: 'Roblox 节点' }).waitFor();
   assert.deepEqual(await page.getByTestId('ui-artboard').evaluate(element => ({ width: element.offsetWidth, height: element.offsetHeight })), { width: 1280, height: 720 });
   await input('界面名称', '在线奖励');

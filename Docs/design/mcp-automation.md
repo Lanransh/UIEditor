@@ -8,7 +8,7 @@
 
 ## 工具与查询
 
-固定工具包含 editor.get_state/get_capabilities、nodes.get/find、code.execute、scripts.get/set、document.list/new/open/save、runtime.control/click、debug.get_diagnostics/screenshot 和 assets.search/get/configure，均带 uie 前缀。不提供选中节点、MCP undo/redo 或制作代码内部的历史 API。图片查询、配置和 ui.assets.apply 见 [图片资产](image-assets.md)。
+固定工具包含 editor.get_state/get_capabilities、nodes.get/find、code.execute、scripts.get/set、document.list/new/open/save、runtime.control/click、debug.get_diagnostics/screenshot 和 assets.search/get/configure，均带 uie 前缀。不提供选中节点、MCP undo/redo 或制作代码内部的历史 API。尚未新建或打开界面时，get_state 返回 nodeCount=0，full 详情的 document 为 null；文档编辑、保存、运行及截图要求先新建或打开界面。图片查询、配置和 ui.assets.apply 见 [图片资产](image-assets.md)。
 
 scripts.get 读取交互代码 source、接入代码 integration，可用 kind 指定其中一份，省略时读取两份。scripts.set 要求 sessionId/revision，可传 source、integration 或同时传两者，未传字段保持原值。源码长度及结构校验沿用文档边界；语法错误允许保存并在运行时反馈。运行中禁止修改源码。code.execute 内的 ui.scripts.get/set 仍可将源码与节点修改组合提交。
 
