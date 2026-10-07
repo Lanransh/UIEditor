@@ -12,7 +12,7 @@ export const robloxAutomation: AutomationCapabilities = {
   },
   runtime: {
     language: 'luau', version: '0.694', actions: ['run', 'stop', 'reset'], event: 'Activated', clickableNodeTypes: ['TextButton', 'ImageButton'], scripts: ['source', 'integration'],
-    api: ['_G.FX.Class', 'FX.Loader:PlayerGui("ScreenGui.Child")', 'FX.Loader:Here(root,"Child.Descendant")', 'FCUICompClass', 'OnReady', 'Render', 'GetUIConfig', 'GetUIState', 'RefreshUI', 'OnUIAction', 'EmitUIAction', 'TrackConnection', 'SetButtonEnabled'],
+    api: ['_G.FX.Class', 'FX.Loader:PlayerGui("ScreenGui.Child")', 'FX.Loader:Here(root,"Child.Descendant")', 'CUIEditorUICompClass', 'OnReady', 'Render', 'GetUIConfig', 'GetUIState', 'RefreshUI', 'OnUIAction', 'EmitUIAction', 'TrackConnection', 'SetButtonEnabled'],
   },
 };
 export function getCapabilities(strategy: ProjectStrategy) {

@@ -15,6 +15,7 @@
     "test": "tsx --test tests/*.test.ts",
     "test:smoke": "npm run build && node tests/smoke.mjs && node tests/ui-smoke.mjs",
     "test:display": "node tests/roblox-display.mjs",
+    "test:roblox-import": "npm run build && node tests/roblox-import-smoke.mjs",
     "test:packaged": "node tests/packaged-smoke.mjs",
     "test:runtime": "npm run build && node tests/runtime-smoke.mjs",
     "build:mcp": "node scripts/build-mcp.mjs",

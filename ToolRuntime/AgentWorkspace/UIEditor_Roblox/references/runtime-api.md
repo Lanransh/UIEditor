@@ -2,7 +2,7 @@
 
 文档 scripts.source 返回交互类，scripts.integration 返回继承交互类的模拟接入类。两份源码通过制作 API 写入；App 内运行，不是实际游戏接入。
 
-交互类继承 FCUICompClass：OnReady 先用 `local root = FX.Loader:PlayerGui("StudDailyLoginUI")` 获取实际命名的 ScreenGui，再用 `FX.Loader:Here(root, "WelfareBox.PopupPanelImg.HintTxt")` 查子节点。也可直接调用 `FX.Loader:PlayerGui("StudDailyLoginUI.WelfareBox.PopupPanelImg.HintTxt")`。PlayerGui 仅模拟当前文档的界面；Here 从指定节点的子节点开始，PlayerGui 从界面名开始。只接受 `.` 分隔，斜杠、空路径和空段报错。生成代码不通过 GetRootNode 获取节点。TrackConnection 管理 Activated:Connect；Render(state) 更新支持属性；EmitUIAction(name,payload) 交给接入类。
+交互类继承 CUIEditorUICompClass：OnReady 先用 `local root = FX.Loader:PlayerGui("StudDailyLoginUI")` 获取实际命名的 ScreenGui，再用 `FX.Loader:Here(root, "WelfareBox.PopupPanelImg.HintTxt")` 查子节点。也可直接调用 `FX.Loader:PlayerGui("StudDailyLoginUI.WelfareBox.PopupPanelImg.HintTxt")`。PlayerGui 仅模拟当前文档的界面；Here 从指定节点的子节点开始，PlayerGui 从界面名开始。只接受 `.` 分隔，斜杠、空路径和空段报错。生成代码不通过 GetRootNode 获取节点。TrackConnection 管理 Activated:Connect；Render(state) 更新支持属性；EmitUIAction(name,payload) 交给接入类。
 
 接入类 Ctor 先调用 Super.Ctor，在自身 Config/State 定义模拟数据；OnUIAction 修改状态并 RefreshUI。App 支持有限 FX.Class，不包含完整游戏框架。停止统一清理连接。
 

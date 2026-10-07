@@ -120,11 +120,11 @@ ScrollingFrame 通过 CanvasSize 与 CanvasPosition 展示静态滚动区域，�
 
 ## Luau 展示与交互
 
-交互类使用 FX.Class 继承 FCUICompClass，负责通用展示与交互；测试接入子类继承交互类，提供临时配置、状态及动作入口，见 [运行规范](ui-runtime.md)。不提供 Controller、任意 Roblox 服务、动态节点或热更新。
+交互类使用 FX.Class 继承 CUIEditorUICompClass，负责通用展示与交互；测试接入子类继承交互类，提供临时配置、状态及动作入口，见 [运行规范](ui-runtime.md)。不提供 Controller、任意 Roblox 服务、动态节点或热更新。
 
 ## Roblox 导出与 Rojo
 
-后续处理，本轮不生成 Lua 或同步配置。
+文件菜单提供通过 Toolkit 的一次性导入，包含静态节点、交互基类和共用的公共基类；接入脚本仅用于编辑器预览，见 [Roblox 一次性导入](roblox-import.md)。
 
 ## AI 与 MCP
 

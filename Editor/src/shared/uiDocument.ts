@@ -37,7 +37,7 @@ export function emptyScripts(name = 'Untitled'): UIScripts {
   const classes = scriptClassNames(name);
   return { source: `local FX = _G.FX
 local FXLoader = FX.Loader
-local ${classes.source} = FX.Class("${classes.source}", "FCUICompClass")
+local ${classes.source} = FX.Class("${classes.source}", "CUIEditorUICompClass")
 
 -- 先用 FXLoader:PlayerGui("实际ScreenGui名") 获取界面，再用 Here(root, "Panel.Button") 查子节点。
 function ${classes.source}:OnReady()

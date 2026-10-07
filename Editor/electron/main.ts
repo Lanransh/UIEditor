@@ -9,6 +9,7 @@ import type { Project, Result, RecentProjectView } from '../src/shared/project';
 import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset } from './documents';
 import { robloxStrategy } from '../src/editor/roblox';
 import { LuauSession, RuntimeError } from './runtime';
+import { ToolkitClient } from './toolkit';
 import { startBridge } from './automation-bridge';
 import { executeCode, getCodeAdapter } from './code-executor';
 import { openInterface, saveInterface, listInterfaces } from './automation-files';
@@ -221,6 +222,18 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     handle('project:list-recent', recentViews);
     handle('project:remove-recent', async path => { await recent.remove(await recent.resolveRecent(path)); return recentViews(); });
     const requireProject = () => { if (!activeProject) throw new Error('请先打开工程。'); return activeProject; };
+    const toolkit = new ToolkitClient();
+    handle('toolkit:discover', async () => toolkit.discover());
+    handle('toolkit:submit', async argument => {
+      requireProject();
+      const value = argument as { targetId: string; document: unknown };
+      return toolkit.submit(value.targetId, resolveImageAssets(robloxStrategy.validate(value.document), await imageStore().list()));
+    });
+    handle('toolkit:task', async argument => {
+      const value = argument as { targetId: string; taskId: string; action: string };
+      return toolkit.task(value.targetId, value.taskId, value.action);
+    });
+
     handle('document:new', async () => { requireProject(); stopRuntime(); documentPath = null; return null; });
     handle('document:list-assets', async () => listDocumentAssets(requireProject().path));
     const imageStore = () => new ImageAssetStore(runtime, requireProject().path);

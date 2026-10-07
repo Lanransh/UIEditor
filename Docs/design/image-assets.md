@@ -29,7 +29,7 @@
 
 `uie.assets.search` 查询名称、标签、库并分页，返回 robloxId；`uie.assets.get` 返回详情与图片预览；`uie.assets.configure` 保存名称、标签和唯一 robloxId，省略字段保留原值，不支持 projectRobloxId 参数。AI 制作通过 `ui.assets.apply(nodeId, assetId)` 应用同一资产，随 code.execute 整笔支持撤销、dry-run 与失败回滚。制作 VM 不开放文件与网络。资产属性变化使旧 MCP 编辑会话失效，需重新读取状态。
 
-无自动上传、权限查询或 Roblox 导出功能。本地预览、ID 语法正确与配置保存均不能证明审核通过或目标游戏有权加载；配置页明确显示权限未验证。
+无自动上传或权限查询。通过 Toolkit 导入 UI 时使用解析后的资源 ID，见 [导入设计](roblox-import.md)。本地预览、ID 语法正确与配置保存均不能证明审核通过或目标游戏有权加载；配置页明确显示权限未验证。
 
 ## 检查
 

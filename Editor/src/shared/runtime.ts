@@ -41,7 +41,7 @@ export function validateScripts(value: unknown, legacy = false): UIScripts {
     for (const [name, id] of Object.entries(scripts.references)) if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(name) || typeof id !== 'string' || !id) throw new Error('节点引用无效。');
     return validateScripts({
       source: `local FX = _G.FX
-local UI = FX.Class("UIInteraction", "FCUICompClass")
+local UI = FX.Class("UIInteraction", "CUIEditorUICompClass")
 UI._References = ${luauData(scripts.references as JSONValue)}
 ${scripts.source}
 function UI:OnReady()
