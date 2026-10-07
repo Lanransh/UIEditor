@@ -6,7 +6,7 @@ import { mkdir, stat } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { createProject, describeError, openProject, RecentProjects } from './projects';
 import type { Project, Result, RecentProjectView } from '../src/shared/project';
-import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset } from './documents';
+import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset, moveDocumentAsset } from './documents';
 import { robloxStrategy } from '../src/editor/roblox';
 import { LuauSession, RuntimeError } from './runtime';
 import { startBridge } from './automation-bridge';
@@ -222,7 +222,53 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     handle('project:remove-recent', async path => { await recent.remove(await recent.resolveRecent(path)); return recentViews(); });
     const requireProject = () => { if (!activeProject) throw new Error('请先打开工程。'); return activeProject; };
     handle('document:new', async () => { requireProject(); stopRuntime(); documentPath = null; return null; });
-    handle('document:list-assets', async () => listDocumentAssets(requireProject().path));
+    const documentStorage = (library: unknown) => {
+      const project = requireProject();
+      if (library === undefined || library === 'project') return { root: project.path, library: 'project' as const };
+      if (library === 'templates') return { root: runtime, library: 'templates' as const };
+      if (library === 'permanent') return { root: runtime, library: 'permanent' as const };
+      throw new Error('UI 资产库无效。');
+    };
+    handle('document:list-assets', async library => {
+      const storage = documentStorage(library);
+      return listDocumentAssets(storage.root, storage.library);
+    });
+    // Read-only thumbnails may load concurrently without occupying the file-operation lock.
+    ipcMain.handle('document:preview-asset', async (event, argument) => {
+      if (!trusted(event)) return { ok: false, error: '无效的操作来源。' };
+      try {
+        if (!argument || typeof argument !== 'object') throw new Error('预览参数无效。');
+        const storage = documentStorage(argument.library);
+        return { ok: true, value: await openDocumentAsset(storage.root, argument.path, storage.library) };
+      }
+      catch (error) { return { ok: false, error: describeError(error) }; }
+    });
+    handle('document:open-template', async argument => {
+      if (!argument || typeof argument !== 'object' || !('library' in argument) || !('path' in argument) || !['templates', 'permanent'].includes(String(argument.library))) throw new Error('UI 资产库无效。');
+      const storage = documentStorage(argument.library);
+      const file = await openDocumentAsset(storage.root, argument.path, storage.library);
+      stopRuntime(); documentPath = null;
+      return file;
+    });
+    handle('document:move-asset', async argument => {
+      if (!argument || typeof argument !== 'object' || !('path' in argument) || !('source' in argument) || !('target' in argument)) throw new Error('移动参数无效。');
+      if (!['project', 'templates', 'permanent'].includes(String(argument.source)) || !['project', 'templates', 'permanent'].includes(String(argument.target))) throw new Error('UI 资产库无效。');
+      const source = documentStorage(argument.source), target = documentStorage(argument.target);
+      const asset = await moveDocumentAsset(source.root, argument.path, source.library, target.root, target.library);
+      if (documentPath === argument.path) documentPath = asset.path;
+      return asset;
+    });
+    handle('document:save-template', async source => {
+      requireProject();
+      const document = robloxStrategy.validate(source);
+      const path = join(runtime, 'template-references', `${safeFileName(document.name)}.rbxui.json`);
+      const exists = await stat(path).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });
+      if (exists) {
+        const answer = await dialog.showMessageBox(window, { type: 'question', title: '模板参考已存在', message: '是否覆盖同名模板参考？', detail: path, buttons: ['覆盖', '取消'], defaultId: 1, cancelId: 1 });
+        if (answer.response !== 0) return null;
+      }
+      return { path, document: await writeDocument(path, document) };
+    });
     const imageStore = () => new ImageAssetStore(runtime, requireProject().path);
     handle('images:list', async () => imageStore().list());
     handle('images:update', async input => imageStore().update(input as ImageAssetUpdate));
@@ -260,10 +306,18 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     handle('document:save', async argument => {
       const project = requireProject();
       if (!argument || typeof argument !== 'object' || !('document' in argument) || !('saveAs' in argument) || typeof argument.saveAs !== 'boolean') throw new Error('保存参数无效。');
-      // The destination is only issued by a native dialog, never by renderer input.
+      if ('projectUI' in argument && typeof argument.projectUI !== 'boolean') throw new Error('保存参数无效。');
+      // The destination is issued by the main process, never by a renderer path.
       let path = documentPath;
       const document = robloxStrategy.validate(argument.document);
-      if (!path || argument.saveAs) {
+      if ('projectUI' in argument && argument.projectUI) {
+        path = join(project.path, 'interfaces', `${safeFileName(document.name)}.rbxui.json`);
+        const exists = await stat(path).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });
+        if (exists && path !== documentPath) {
+          const answer = await dialog.showMessageBox(window, { type: 'question', title: '文件已存在', message: '是否覆盖已有项目UI？', detail: path, buttons: ['覆盖', '取消'], defaultId: 1, cancelId: 1 });
+          if (answer.response !== 0) return null;
+        }
+      } else if (!path || argument.saveAs) {
         const directory = join(project.path, 'interfaces');
         await mkdir(directory, { recursive: true });
         const result = await dialog.showSaveDialog(window, { title: '保存界面', defaultPath: join(directory, `${safeFileName(document.name)}.rbxui.json`), filters: [{ name: 'Roblox UI', extensions: ['rbxui.json'] }] });
