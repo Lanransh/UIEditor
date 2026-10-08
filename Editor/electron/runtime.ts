@@ -5,7 +5,7 @@ import { createInterface } from 'node:readline';
 import { randomUUID } from 'node:crypto';
 import { robloxStrategy } from '../src/editor/roblox';
 import { allNodes, findNode, updateNode, type PropertyValue, type UIDocument, type UINode } from '../src/shared/uiDocument';
-import { mouseEvents, validateJSON, type RuntimeFrame, type RuntimeLog } from '../src/shared/runtime';
+import { applyRuntimePatch, mouseEvents, validateJSON, type RuntimePatch, type RuntimeFrame, type RuntimeLog } from '../src/shared/runtime';
 
 export class RuntimeError extends Error {
   constructor(message: string, readonly logs: RuntimeLog[]) { super(message); }
@@ -27,6 +27,7 @@ export class LuauSession {
   private closed = false;
   private document: UIDocument;
   private disabled: string[] = [];
+  private listeners: Record<string, string[]> | undefined;
   private queue: Promise<unknown> = Promise.resolve();
   private constructor(directory: string, document: UIDocument) {
     this.document = structuredClone(document);
@@ -77,7 +78,7 @@ export class LuauSession {
           if (node.id === target.id) return enabled;
           return node.children.some(child => visible(child, enabled));
         };
-        if (!visible(this.document.root, true) || this.disabled.includes(target.id)) return { document: this.document, disabled: this.disabled, logs: [] };
+        if (!visible(this.document.root, true) || this.disabled.includes(target.id)) return { document: this.document, disabled: this.disabled, logs: [], listeners: this.listeners };
       } else if (input.type === 'mouse') {
         const target = typeof input.node === 'string' && findNode(this.document.root, input.node);
         if (!target || robloxStrategy.nodes[target.className].category !== 'object' || !mouseEvents.includes(input.event as any)
@@ -87,7 +88,7 @@ export class LuauSession {
           visible = visible && (node.className === 'ScreenGui' ? node.properties.Enabled === true : node.properties.Visible !== false);
           return node.id === target.id ? visible : node.children.some(child => shown(child, visible));
         };
-        if (!['MouseLeave', 'InputEnded'].includes(String(input.event)) && (!shown(this.document.root, true) || this.disabled.includes(target.id))) return { document: this.document, disabled: this.disabled, logs: [] };
+        if (!['MouseLeave', 'InputEnded'].includes(String(input.event)) && (!shown(this.document.root, true) || this.disabled.includes(target.id))) return { document: this.document, disabled: this.disabled, logs: [], listeners: this.listeners };
       } else if (input.type === 'set') {
         const target = typeof input.node === 'string' && findNode(this.document.root, input.node);
         if (!target || typeof input.property !== 'string' || (input.property !== 'Name' && !Object.hasOwn(target.properties, input.property))) throw new Error('无效的运行节点属性。');
@@ -112,16 +113,23 @@ export class LuauSession {
   }
   private apply(source: unknown): RuntimeFrame {
     validateJSON(source);
-    const result = source as { root: UINode; disabled: string[]; logs: { kind: string; message: string; payload?: unknown }[] };
-    if (!result.root || !Array.isArray(result.disabled) || !Array.isArray(result.logs)) throw new Error('无效的运行结果。');
+    const result = source as { root?: UINode; patch?: RuntimePatch; disabled: string[]; listeners?: Record<string, string[]>; logs: { kind: string; message: string; payload?: unknown }[] };
+    if ((!result.root && !result.patch) || (result.root && result.patch) || !Array.isArray(result.disabled) || !Array.isArray(result.logs)) throw new Error('无效的运行结果。');
     const normalize = (node: UINode) => { if (!Array.isArray(node.children) && node.children && Object.keys(node.children).length === 0) node.children = []; if (Array.isArray(node.children)) node.children.forEach(normalize); };
-    normalize(result.root);
-    const document = { ...this.document, root: result.root };
+    if (result.root) normalize(result.root);
+    const document = result.root ? { ...this.document, root: result.root } : applyRuntimePatch(this.document, result.patch);
     const validated = robloxStrategy.validate(document);
     for (const id of result.disabled) if (typeof id !== 'string' || !findNode(document.root, id)) throw new Error('无效的禁用节点。');
+    if (result.listeners !== undefined) {
+      if (!result.listeners || typeof result.listeners !== 'object' || Array.isArray(result.listeners)) throw new Error('无效的运行事件订阅。');
+      for (const [id, events] of Object.entries(result.listeners)) {
+        const node = findNode(validated.root, id);
+        if (!node || !Array.isArray(events) || events.some(event => typeof event !== 'string' || !(event === 'Activated' || mouseEvents.includes(event as any) || event.startsWith('property:') && Object.hasOwn(node.properties, event.slice(9))))) throw new Error('无效的运行事件订阅。');
+      }
+    }
     const logs = readLogs(result.logs);
-    this.document = validated; this.disabled = result.disabled;
-    return { document: validated, disabled: result.disabled, logs };
+    this.document = validated; this.disabled = result.disabled; this.listeners = result.listeners;
+    return { document: validated, disabled: result.disabled, logs, listeners: result.listeners, ...(result.patch ? { patch: result.patch } : {}) };
   }
   async stop() {
     if (this.closed) return;

@@ -96,6 +96,20 @@ try {
   await page.waitForFunction(expected => document.querySelector('.ui-artboard')?.getAttribute('style') === expected, editTransform);
   const final = await state('full');
   assert.deepEqual(final.document, initial.document); assert.equal(final.revision, initial.revision); assert.equal(final.dirty, initial.dirty);
+  // A burst over an unobserved list must not enqueue one full frame per wheel tick.
+  await mutate('uie.scripts.set', { source: 'local UI = _G.FX.Class("CMouseView", "CUIView") return UI' });
+  await mutate('uie.runtime.control', { action: 'run' });
+  await page.waitForFunction(id => !!document.querySelector(`[data-node-id="${id}"] [data-scroll-axis="y"]`), fixture.scroll.id);
+  const beforeBurst = await call('uie.nodes.get', { id: fixture.scroll.id, view: 'runtime' });
+  await page.evaluate(id => {
+    const target = document.querySelector(`[data-node-id="${id}"]`)!;
+    for (let i = 0; i < 50; i++) target.dispatchEvent(new WheelEvent('wheel', { deltaY: 2, bubbles: true, cancelable: true }));
+  }, fixture.child.id);
+  await page.waitForFunction(id => Number(document.querySelector(`[data-node-id="${id}"] [data-scroll-axis="y"]`)?.getAttribute('data-position')) === 100, fixture.scroll.id);
+  const afterBurst = await call('uie.nodes.get', { id: fixture.scroll.id, view: 'runtime' });
+  assert.equal(afterBurst.frameSequence - beforeBurst.frameSequence, 1);
+  await mutate('uie.runtime.control', { action: 'stop' });
+  await mutate('uie.scripts.set', { source: fixture.document.scripts.source });
   assert.deepEqual(errors, []);
   assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().every(w => !w.isVisible() && !w.isFocused())), true);
   console.log(`Mouse runtime and MCP smoke passed: ${root}`);

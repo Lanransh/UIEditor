@@ -1,3 +1,5 @@
+import { applyRuntimePatch } from '../src/shared/runtime';
+import { WheelInputBuffer } from '../src/editor/wheelInput';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -67,4 +69,83 @@ test('drag geometry includes ancestor rotation, scale and scroll offset', () => 
   assert.ok(Math.abs(point.y - 280) < 1e-8);
   const local = localMousePoint(runtimeGeometry(frame, robloxStrategy, child.id)!.matrix, point);
   assert.ok(Math.abs(local.x - 140) < 1e-8); assert.ok(Math.abs(local.y - 40) < 1e-8);
+});
+
+test('unobserved wheel uses one host update and none at the scroll boundary', async () => {
+  const { document, scroll, child } = mouseFixture();
+  document.scripts = robloxStrategy.createDocument('Mouse').scripts;
+  const started = await LuauSession.start(resolve('native-bin'), document);
+  let frame = started.frame, commands = 0;
+  const mouse = new RuntimeMouse(() => frame, async command => { commands++; frame = await started.session.command(command); }, robloxStrategy);
+  try {
+    await mouse.wheel(child.id, { x: 0, y: 100 });
+    assert.deepEqual(frame.patch, { [scroll.id]: { properties: { CanvasPosition: { x: 0, y: 100 } } } });
+    const { document: fullDocument, ...wire } = frame;
+    assert.ok(Buffer.byteLength(JSON.stringify(wire)) < 512);
+    assert.equal(commands, 1, 'A wheel with no script listeners must not round-trip unused mouse events');
+    assert.deepEqual(findNode(frame.document.root, scroll.id)!.properties.CanvasPosition, { x: 0, y: 100 });
+    await mouse.scroll(scroll.id, { y: 99999 }); commands = 0;
+    await mouse.wheel(child.id, { x: 0, y: 100 }); assert.equal(commands, 0);
+    await mouse.pointer('move', child.id, { x: 450, y: 80 }); assert.equal(commands, 0);
+  } finally { await started.session.stop(); }
+});
+
+test('pending wheel inputs merge without overtaking other input or losing reversals', async () => {
+  const buffer = new WheelInputBuffer(), queued: (() => Promise<void>)[] = [], values: number[] = [];
+  const schedule = (run: () => Promise<void>) => { buffer.seal(); queued.push(run); return Promise.resolve(); };
+  const run = async (delta: { x: number; y: number }) => { values.push(delta.y); };
+  for (let i = 0; i < 100; i++) buffer.push('list', { x: 0, y: 2 }, true, schedule, run);
+  assert.equal(queued.length, 1);
+  await queued.shift()!(); assert.deepEqual(values, [200]);
+  buffer.push('list', { x: 0, y: 20 }, true, schedule, run);
+  buffer.push('list', { x: 0, y: -20 }, true, schedule, run);
+  assert.equal(queued.length, 2);
+  for (const work of queued.splice(0)) await work();
+  assert.deepEqual(values, [200, 20, -20]);
+  buffer.push('list', { x: 0, y: 1 }, true, schedule, run); buffer.seal();
+  buffer.push('list', { x: 0, y: 1 }, true, schedule, run);
+  assert.equal(queued.length, 2); for (const work of queued.splice(0)) await work();
+  for (let i = 0; i < 3; i++) buffer.push('list', { x: 0, y: 1 }, false, schedule, run);
+  assert.equal(queued.length, 3); for (const work of queued.splice(0)) await work();
+});
+
+test('mouse listener discovery follows runtime connection and disconnection', async () => {
+  const { document, button, scroll, child } = mouseFixture();
+  document.scripts.source = `local FX = _G.FX
+local UI = FX.Class("CMouseView", "CUIView")
+function UI:OnReady()
+    local root = FX.Loader:PlayerGui("Mouse")
+    local connection
+    self:TrackConnection(root.Button.Activated:Connect(function()
+        if connection then connection:Disconnect() connection = nil
+        else connection = self:TrackConnection(root.List.MouseWheelBackward:Connect(function() root.Button.Text = "wheel observed" end)) end
+    end))
+end
+return UI`;
+  const started = await LuauSession.start(resolve('native-bin'), document);
+  let frame = started.frame, commands = 0;
+  const mouse = new RuntimeMouse(() => frame, async command => { commands++; frame = await started.session.command(command); }, robloxStrategy);
+  try {
+    assert.equal(mouse.canMergeWheel(child.id), true);
+    frame = await started.session.command({ type: 'event', node: button.id });
+    assert.equal(mouse.canMergeWheel(child.id), false);
+    await mouse.wheel(child.id, { x: 0, y: 10 });
+    assert.equal(findNode(frame.document.root, button.id)!.properties.Text, 'wheel observed');
+    assert.equal(commands, 2);
+    frame = await started.session.command({ type: 'event', node: button.id });
+    assert.equal(mouse.canMergeWheel(child.id), true);
+    commands = 0; await mouse.wheel(child.id, { x: 0, y: 10 }); assert.equal(commands, 1);
+  } finally { await started.session.stop(); }
+});
+
+test('runtime property deltas preserve untouched nodes and reject invalid references', () => {
+  const { document, scroll, button } = mouseFixture();
+  const changed = applyRuntimePatch(document, { [scroll.id]: { properties: { CanvasPosition: { x: 0, y: 100 } } } });
+  assert.equal(findNode(changed.root, button.id), button);
+  assert.deepEqual(scroll.properties.CanvasPosition, { x: 0, y: 0 });
+  assert.deepEqual(findNode(changed.root, scroll.id)!.properties.CanvasPosition, { x: 0, y: 100 });
+  assert.equal(applyRuntimePatch(document, {}), document);
+  assert.throws(() => applyRuntimePatch(document, { missing: { name: 'x' } }), /不存在/);
+  assert.throws(() => applyRuntimePatch(document, { [scroll.id]: { children: [] } }), /增量/);
+  assert.throws(() => applyRuntimePatch(document, { [scroll.id]: { properties: { Unsupported: 1 } } }), /增量/);
 });

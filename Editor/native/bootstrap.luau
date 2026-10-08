@@ -91,6 +91,11 @@ end
 function FX.GetClass(name) return classes[name] end
 local handlers, disabled = {}, {}
 local logs = {}
+local dirty, structureChanged = {}, true
+local function mark(id)
+    dirty[id] = dirty[id] or {}
+    return dirty[id]
+end
 local nextId, nodeCount = 0, 0
 local rendering = false
 local function nodeFor(ref)
@@ -127,7 +132,12 @@ function API:Set(ref, property, value)
     end
     local changed = not equal(node.properties[property], value)
     node.properties[property] = clone(value)
-    if changed then fire(id, "property:" .. property) end
+    if changed then
+        local change = mark(id)
+        change.properties = change.properties or {}
+        change.properties[property] = true
+        fire(id, "property:" .. property)
+    end
 end
 function API:On(ref, event, callback)
     local node, id = nodeFor(ref)
@@ -169,6 +179,7 @@ local function reparent(id, parentId)
         end
     end
     if node.parent == parentId then return end
+    structureChanged = true
     if node.parent then
         local siblings = nodes[node.parent].children
         table.remove(siblings, table.find(siblings, id))
@@ -239,6 +250,7 @@ makeProxy = function(id)
             if key == "Name" then
                 assert(type(input) == "string" and string.match(input, "%S"), "Expected non-empty node name")
                 node.name = input
+                mark(id).name = true
             elseif key == "Parent" then
                 assert(input == nil or proxyIds[input], "Parent must be a UI node or nil")
                 reparent(id, input and proxyIds[input])
@@ -393,6 +405,7 @@ function host.command(input)
     elseif input.type == "set" then
         if input.property == "Name" then
             nodeFor(input.node).name = input.value
+            mark(input.node).name = true
         else
             API:Set(input.node, input.property, input.value)
         end
@@ -424,20 +437,44 @@ function host.dispose()
     handlers = {}
 end
 function host.output()
-    local ids = {}
+    local ids, listeners, patch = {}, {}, {}
     local function snapshot(id)
         local node = nodes[id]
         local children = {}
-        for _, childId in ipairs(node.children) do table.insert(children, snapshot(childId)) end
+        for _, childId in ipairs(node.children) do
+            local child = snapshot(childId)
+            if structureChanged then table.insert(children, child) end
+        end
         if disabled[id] then table.insert(ids, id) end
+        for _, handler in ipairs(handlers[id] or {}) do
+            if handler.connection.Connected then
+                listeners[id] = listeners[id] or {}
+                if not table.find(listeners[id], handler.event) then table.insert(listeners[id], handler.event) end
+            end
+        end
+        if not structureChanged then
+            local changed = dirty[id]
+            if changed then
+                local update = {}
+                if changed.name then update.name = node.name end
+                if changed.properties then
+                    update.properties = {}
+                    for property in pairs(changed.properties) do update.properties[property] = node.properties[property] end
+                end
+                patch[id] = update
+            end
+            return nil
+        end
         return {
             id = id, name = node.name, className = node.className,
             properties = node.properties, children = children,
             previewImage = node.previewImage, imageAssetId = node.imageAssetId,
         }
     end
-    local result = { root = snapshot(root), disabled = ids, logs = logs }
-    logs = {}
+    local tree = snapshot(root)
+    local result = { disabled = ids, logs = logs, listeners = listeners }
+    if structureChanged then result.root = tree else result.patch = patch end
+    logs, dirty, structureChanged = {}, {}, false
     return result
 end
 -- Print is a host-owned closure, not stdout; messages remain framed JSON.

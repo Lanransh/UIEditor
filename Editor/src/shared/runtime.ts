@@ -1,17 +1,41 @@
 import type { Result } from './project';
-import type { UIDocument, UIScripts, JSONValue, PropertyValue } from './uiDocument';
+import type { UIDocument, UINode, UIScripts, JSONValue, PropertyValue } from './uiDocument';
 
 export interface RuntimeLog { kind: 'output' | 'warning' | 'action' | 'error' | 'input'; message: string }
-export interface RuntimeFrame { document: UIDocument; disabled: string[]; logs: RuntimeLog[] }
+export type RuntimePatch = Record<string, { name?: string; properties?: Record<string, PropertyValue> }>;
+export interface RuntimeFrame { document: UIDocument; disabled: string[]; logs: RuntimeLog[]; listeners?: Record<string, string[]>; patch?: RuntimePatch }
+export type RuntimeUpdate = RuntimeFrame | (Omit<RuntimeFrame, 'document' | 'patch'> & { patch: RuntimePatch });
 type RuntimeResult<T> = Result<T> & { logs?: RuntimeLog[] };
 export const mouseEvents = ['MouseEnter', 'MouseLeave', 'MouseMoved', 'MouseWheelForward', 'MouseWheelBackward', 'InputBegan', 'InputChanged', 'InputEnded'] as const;
 export type MouseEventName = typeof mouseEvents[number];
 export type RuntimeCommand = { type: 'mouse'; node: string; event: MouseEventName; x: number; y: number; dx: number; dy: number; button: number; wheel?: boolean; cancelled?: boolean } | { type: 'event'; node: string } | { type: 'show' | 'hide' } | { type: 'set'; node: string; property: string; value: PropertyValue };
 export interface RuntimeAPI {
   start(document: UIDocument): Promise<RuntimeResult<{ session: string; frame: RuntimeFrame }>>;
-  command(session: string, command: RuntimeCommand): Promise<RuntimeResult<RuntimeFrame>>;
+  command(session: string, command: RuntimeCommand): Promise<RuntimeResult<RuntimeUpdate>>;
   stop(session: string): Promise<Result<null>>;
   onEnded(callback: (event: { session: string; error: string; logs?: RuntimeLog[] }) => void): () => void;
+}
+// Apply only property/name deltas; structural updates still arrive as a validated full tree.
+export function applyRuntimePatch(document: UIDocument, source: unknown): UIDocument {
+  validateJSON(source);
+  if (!source || typeof source !== 'object' || Array.isArray(source)) throw new Error('运行增量必须是对象。');
+  const patch = source as RuntimePatch, pending = new Set(Object.keys(patch));
+  function visit(node: UINode): UINode {
+    const change = patch[node.id];
+    let updated = node;
+    if (change !== undefined) {
+      pending.delete(node.id);
+      if (!change || typeof change !== 'object' || Array.isArray(change) || Object.keys(change).some(key => !['name', 'properties'].includes(key))
+        || (change.name !== undefined && (typeof change.name !== 'string' || !change.name.trim()))
+        || (change.properties !== undefined && (!change.properties || typeof change.properties !== 'object' || Array.isArray(change.properties) || Object.keys(change.properties).some(key => !Object.hasOwn(node.properties, key))))) throw new Error('无效的运行节点增量。');
+      updated = { ...node, ...(change.name !== undefined ? { name: change.name } : {}), ...(change.properties ? { properties: { ...node.properties, ...change.properties } } : {}) };
+    }
+    const children = node.children.map(visit);
+    return children.some((child, index) => child !== node.children[index]) ? { ...updated, children } : updated;
+  }
+  const root = visit(document.root);
+  if (pending.size) throw new Error('运行增量引用了不存在的节点。');
+  return root === document.root ? document : { ...document, root };
 }
 export function validateJSON(value: unknown, depth = 0): JSONValue {
   if (depth > 64) throw new Error('数据嵌套超过 64 层。');

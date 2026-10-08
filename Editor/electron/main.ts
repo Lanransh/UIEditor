@@ -257,7 +257,11 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     ipcMain.handle('runtime:command', async (event, argument) => {
       if (!trusted(event) || !runtimeSession || argument?.session !== runtimeSession.id || !['event', 'mouse', 'show', 'hide', 'set'].includes(argument?.command?.type)) return { ok: false, error: '运行会话已结束。' };
       const session = runtimeSession;
-      try { return { ok: true, value: await session.command(argument.command) }; }
+      try {
+        const frame = await session.command(argument.command);
+        const { document, ...delta } = frame;
+        return { ok: true, value: frame.patch ? delta : frame };
+      }
       catch (error) { if (runtimeSession === session) stopRuntime(); return { ok: false, error: describeError(error), logs: error instanceof RuntimeError ? error.logs : [] }; }
     });
     ipcMain.handle('runtime:stop', async (event, id) => {

@@ -1,9 +1,10 @@
+import { WheelInputBuffer } from './wheelInput';
 import { RuntimeMouse } from './runtimeMouse';
 import { robloxStrategy } from './roblox';
 import type { MouseAction, Point } from '../shared/runtime-mouse';
 import { useEffect, useRef, useState } from 'react';
 import type { UIDocument, PropertyValue } from '../shared/uiDocument';
-import { type RuntimeAPI, type RuntimeCommand, type RuntimeFrame, type RuntimeLog } from '../shared/runtime';
+import { applyRuntimePatch, type RuntimeAPI, type RuntimeCommand, type RuntimeFrame, type RuntimeLog } from '../shared/runtime';
 
 declare global { interface Window { runtime: RuntimeAPI } }
 export function useRuntime(document: UIDocument) {
@@ -15,6 +16,7 @@ export function useRuntime(document: UIDocument) {
   const snapshot = useRef<UIDocument | null>(null);
   const current = useRef<{ frame: RuntimeFrame | null; logs: (RuntimeLog & { cursor: number })[]; cursor: number; sequence: number }>({ frame: null, logs: [], cursor: 0, sequence: 0 });
   const inputGeneration = useRef<number | null>(null);
+  const wheelBuffer = useRef(new WheelInputBuffer());
   const inputQueue = useRef<Promise<unknown>>(Promise.resolve());
   const mouse = useRef<RuntimeMouse | null>(null);
   if (!mouse.current) mouse.current = new RuntimeMouse(() => current.current.frame, async input => {
@@ -23,6 +25,7 @@ export function useRuntime(document: UIDocument) {
     if (!result?.ok) throw new Error(result?.error ?? '运行会话已变化。');
   }, robloxStrategy);
   function enqueue<T>(operation: () => Promise<T>) {
+    wheelBuffer.current.seal();
     const token = generation.current;
     const result = inputQueue.current.then(async () => {
       if (token !== generation.current || !session.current) return { ok: false, error: '运行会话已变化。' };
@@ -36,6 +39,7 @@ export function useRuntime(document: UIDocument) {
   function frameChanged(value: RuntimeFrame | null) { current.current.frame = value; ++current.current.sequence; setFrame(value); }
   function append(entries: RuntimeLog[]) { current.current.logs = [...current.current.logs, ...entries.map(log => ({ ...log, cursor: ++current.current.cursor }))].slice(-500); setLogs(current.current.logs); }
   async function stop() {
+    wheelBuffer.current.seal();
     const token = ++generation.current;
     const id = session.current; session.current = null;
     mouse.current!.clear(); setActive(false); frameChanged(null);
@@ -48,6 +52,7 @@ export function useRuntime(document: UIDocument) {
     return { ok: true };
   }
   async function start(source = document) {
+    wheelBuffer.current.seal();
     const token = ++generation.current;
     const previous = session.current; session.current = null;
     mouse.current!.clear(); snapshot.current = structuredClone(source);
@@ -73,7 +78,9 @@ export function useRuntime(document: UIDocument) {
       const result = await window.runtime.command(id, input);
       if (token !== generation.current) return;
       if (!result.ok) { append(result.logs ?? []); throw new Error(result.error); }
-      frameChanged(result.value); append(result.value.logs);
+      const update = result.value;
+      const frame = 'document' in update ? update : { ...update, document: applyRuntimePatch(current.current.frame!.document, update.patch) };
+      frameChanged(frame); append(update.logs);
       return { ok: true, logs: result.value.logs };
     } catch (error) {
       if (token === generation.current) {
@@ -100,7 +107,7 @@ export function useRuntime(document: UIDocument) {
     append([{ kind: 'input', message: JSON.stringify({ ...input, ...result }) }]);
     return result;
   }), pointer: (action: 'down' | 'move' | 'up' | 'cancel', id: string | null, point: Point, button = 0) => enqueue(async () => { await mouse.current!.pointer(action, id, point, button); }),
-  wheel: (id: string, delta: Point) => enqueue(async () => { await mouse.current!.wheel(id, delta); }),
+  wheel: (id: string, delta: Point) => wheelBuffer.current.push(id, delta, mouse.current!.canMergeWheel(id), enqueue, async total => { await mouse.current!.wheel(id, total); }),
   cancelMouse: () => enqueue(async () => { await mouse.current!.cancel(); }),
   inspect: () => ({ ...current.current, sessionId: session.current, interaction: mouse.current!.inspect() }) };
 }

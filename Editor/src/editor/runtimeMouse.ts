@@ -58,6 +58,8 @@ export class RuntimeMouse {
   private async emit(id: string, event: MouseEventName, point: Point, button = -1, delta: Point = { x: 0, y: 0 }, cancelled = false, wheel = false) {
     if (!this.frame() || !findNode(this.frame()!.document.root, id)) return;
     if (!['MouseLeave', 'InputEnded'].includes(event) && !this.available(id)) return;
+    const listeners = this.frame()!.listeners;
+    if (listeners && !listeners[id]?.includes(event)) return;
     await this.send({ type: 'mouse', node: id, event, x: point.x, y: point.y, dx: delta.x, dy: delta.y, button, cancelled, wheel });
   }
   point(id: string, local: Point = { x: .5, y: .5 }) {
@@ -108,6 +110,8 @@ export class RuntimeMouse {
     await this.hover(null);
   }
   private async wheelEvents(id: string, delta: Point) {
+    const events = this.frame()?.listeners?.[id] ?? [];
+    if (this.frame()?.listeners && !events.some(event => ['MouseWheelForward', 'MouseWheelBackward', 'InputChanged'].includes(event))) return;
     const point = this.point(id);
     await this.emit(id, (delta.y || delta.x) < 0 ? 'MouseWheelForward' : 'MouseWheelBackward', point, -1, delta);
     await this.emit(id, 'InputChanged', point, -1, delta, false, true);
@@ -123,8 +127,20 @@ export class RuntimeMouse {
     const p = current.node.properties, canvas = p.CanvasSize as UDim2, position = p.CanvasPosition as Vector2;
     const g = scrollGeometry(r.width, r.height, Math.max(r.width, pixels(canvas.x, r.width)), Math.max(r.height, pixels(canvas.y, r.height)), Number(p.ScrollBarThickness), position.x, position.y);
     const next = { x: Math.trunc(Math.max(0, Math.min(g.maxX, to?.x ?? position.x + (delta?.x ?? 0)))), y: Math.trunc(Math.max(0, Math.min(g.maxY, to?.y ?? position.y + (delta?.y ?? 0)))) };
-    await this.send({ type: 'set', node: id, property: 'CanvasPosition', value: next });
+    if (next.x !== position.x || next.y !== position.y) await this.send({ type: 'set', node: id, property: 'CanvasPosition', value: next });
     return { dispatched: true, reason: null, position: findNode(this.frame()!.document.root, id)?.properties.CanvasPosition, range: { x: g.maxX, y: g.maxY } };
+  }
+  canMergeWheel(id: string) {
+    const frame = this.frame();
+    if (!frame?.listeners) return false;
+    let node = findNode(frame.document.root, id);
+    while (node) {
+      const events = frame.listeners[node.id] ?? [];
+      if (events.some(event => ['MouseWheelForward', 'MouseWheelBackward', 'InputChanged', 'property:CanvasPosition'].includes(event))) return false;
+      if (node.className === 'ScrollingFrame') return true;
+      node = findParent(frame.document.root, node.id) ?? undefined;
+    }
+    return false;
   }
   async wheel(id: string, delta: Point) {
     const { node, reason } = this.target(id);
