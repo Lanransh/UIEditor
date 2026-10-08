@@ -833,7 +833,7 @@
                     "x": 0,
                     "y": 0
                   },
-                  "BackgroundColor3": "#691582",
+                  "BackgroundColor3": "#e58a25",
                   "BackgroundTransparency": 0.2,
                   "ClipsDescendants": false,
                   "LayoutOrder": 0,
@@ -936,7 +936,7 @@
                 "x": 0,
                 "y": 0
               },
-              "BackgroundColor3": "#d03bf2",
+              "BackgroundColor3": "#ffd633",
               "BackgroundTransparency": 0,
               "ClipsDescendants": true,
               "Image": "rbxassetid://82793028306773",

@@ -83,6 +83,40 @@ return UI`);
   } finally { await session.stop(); }
 });
 
+test('inspector changes update live nodes and script reads without changing the design snapshot', async () => {
+  const document = rewardExample(), original = JSON.stringify(document);
+  document.scripts.source = sourceClass(`function UI:OnReady()
+    local button = self:GetRootNode().ClaimButton
+    self:TrackConnection(button.Activated:Connect(function()
+        print(button.Text, button.Position.X.Offset, button.BackgroundColor3)
+    end))
+end`);
+  const snapshot = JSON.stringify(document);
+  const { session } = await LuauSession.start(directory, document);
+  const button = buttonId(document);
+  try {
+    let frame = await session.command({ type: 'set', node: button, property: 'Text', value: 'Temporary' });
+    assert.equal(findNode(frame.document.root, button)?.properties.Text, 'Temporary');
+    frame = await session.command({ type: 'set', node: button, property: 'Position', value: { x: { scale: 0, offset: 42 }, y: { scale: 0, offset: 84 } } });
+    frame = await session.command({ type: 'set', node: button, property: 'BackgroundColor3', value: '#123456' });
+    frame = await session.command({ type: 'set', node: button, property: 'Name', value: 'TemporaryButton' });
+    assert.equal(findNode(frame.document.root, button)?.name, 'TemporaryButton');
+    await session.command({ type: 'hide' });
+    frame = await session.command({ type: 'show' });
+    assert.equal(findNode(frame.document.root, button)?.properties.Text, 'Temporary');
+    const clicked = await session.command({ type: 'event', node: button });
+    assert.match(clicked.logs[0].message, /Temporary.*42/);
+    await assert.rejects(session.command({ type: 'set', node: button, property: 'TextSize', value: -1 }), /属性值无效/);
+    await assert.rejects(session.command({ type: 'set', node: button, property: 'Parent', value: document.root.id }), /属性/);
+    await assert.rejects(session.command({ type: 'set', node: 'missing', property: 'Text', value: 'x' }), /属性/);
+    assert.equal(findNode((await session.command({ type: 'show' })).document.root, button)?.properties.Text, 'Temporary');
+    assert.equal(JSON.stringify(document), snapshot);
+  } finally { await session.stop(); }
+  const restarted = await LuauSession.start(directory, JSON.parse(original));
+  try { assert.equal(findNode(restarted.frame.document.root, button)?.properties.Text, 'Ready'); }
+  finally { await restarted.session.stop(); }
+});
+
 test('locked and claimed states come from the integration constructor', async () => {
   for (const status of ['Locked', 'Claimed']) {
     const document = rewardExample();

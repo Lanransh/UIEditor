@@ -90,6 +90,12 @@ try {
   assert.equal(await page.getByRole('button', { name: '配置脚本', exact: true }).count(), 0);
   assert.equal(await page.getByRole('button', { name: '节点引用', exact: true }).count(), 0);
   assert.equal(await page.getByRole('button', { name: '模拟状态', exact: true }).count(), 0);
+  await page.getByRole('button', { name: '编辑', exact: true }).click();
+  const undoBeforeRun = {
+    enabled: await page.getByRole('button', { name: /^撤销/ }).isEnabled(),
+    title: await page.getByRole('button', { name: /^撤销/ }).getAttribute('title'),
+  };
+  await page.keyboard.press('Escape');
   for (let cycle = 0; cycle < 2; cycle++) {
     await page.getByRole('button', { name: '运行', exact: true }).click();
     const button = page.getByRole('button', { name: 'ClaimButton', exact: true });
@@ -114,11 +120,31 @@ try {
     assert.ok(controls && tabs && controls.y + controls.height <= tabs.y && controls.x === tabs.x, '运行控制应位于工作区页签上方');
     assert.equal(await page.locator('.runtime-toolbar button').count(), 4);
     assert.equal(await page.getByRole('button', { name: '运行', exact: true }).count(), 0);
+    await page.getByRole('button', { name: '选择节点 ClaimButton', exact: true }).click();
+    const textProperty = page.getByRole('textbox', { name: 'Text', exact: true });
+    assert.equal(await textProperty.inputValue(), 'Ready', '属性面板读取脚本更新后的运行值');
+    assert.equal(await textProperty.isEnabled(), true);
+    assert.equal(await page.getByRole('textbox', { name: '界面名称', exact: true }).isEnabled(), false);
+    assert.equal(await page.getByRole('combobox', { name: '父节点', exact: true }).isEnabled(), false);
+    assert.equal(await page.getByRole('button', { name: '为 ClaimButton 添加子节点', exact: true }).isEnabled(), false);
+    await textProperty.fill('Temporary claim');
+    await textProperty.press('Enter');
+    await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="ClaimButton"]')?.textContent === 'Temporary claim');
+    await page.getByText('界面已保存', { exact: true }).waitFor();
+    assert.equal(await readFile(file, 'utf8'), original);
+    const textSize = page.getByRole('spinbutton', { name: 'TextSize', exact: true });
+    await textSize.fill('-1');
+    await textSize.press('Enter');
+    await page.getByText('ClaimButton.TextSize 属性值无效。', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: '停止', exact: true }).isVisible(), true);
+    await textSize.fill('24');
+    await textSize.press('Enter');
     await page.getByRole('button', { name: '隐藏', exact: true }).click();
     await button.waitFor({ state: 'hidden' });
     assert.equal(await page.getByRole('button', { name: '停止', exact: true }).isEnabled(), true);
     await page.getByRole('button', { name: '打开', exact: true }).click();
     await button.waitFor({ state: 'visible' });
+    assert.equal(await textProperty.inputValue(), 'Temporary claim', '临时属性在后续运行命令后保留');
     assert.equal(await page.locator('.node-selection').count(), 0);
     assert.equal(await page.getByRole('button', { name: '适应窗口', exact: true }).isEnabled(), true);
     await page.getByRole('button', { name: '交互脚本', exact: true }).click();
@@ -141,6 +167,7 @@ try {
     await page.getByRole('button', { name: '输出', exact: true }).click();
     assert.equal(await page.getByRole('log').locator('.action').count(), 1);
     await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="ClaimButton"]')?.textContent === 'Claimed');
+    assert.equal(await textProperty.inputValue(), 'Claimed', '脚本修改同步到属性面板');
     assert.equal(await button.evaluate(node => getComputedStyle(node).cursor), 'not-allowed');
     await page.getByRole('button', { name: '隐藏', exact: true }).click();
     await button.waitFor({ state: 'hidden' });
@@ -152,11 +179,20 @@ try {
     await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="ClaimButton"]')?.getAttribute('aria-disabled') === 'false');
     await page.getByRole('button', { name: '界面', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="ClaimButton"]')?.getAttribute('aria-disabled') === 'false');
+    assert.equal(await textProperty.inputValue(), 'Ready', '重置丢弃临时属性');
+    await textProperty.fill('Discard on stop');
+    await textProperty.press('Enter');
+    await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="ClaimButton"]')?.textContent === 'Discard on stop');
     await page.getByRole('button', { name: '停止', exact: true }).click();
     await page.getByRole('button', { name: '运行', exact: true }).waitFor({ state: 'visible' });
     assert.equal(await page.locator('.runtime-toolbar button').count(), 1);
     assert.equal(await page.getByRole('button', { name: 'ClaimButton', exact: true }).count(), 0);
     assert.equal(await readFile(file, 'utf8'), original);
+    assert.equal(await textProperty.inputValue(), saved.root.children.find(node => node.name === 'ClaimButton').properties.Text, '停止恢复设计属性');
+    await page.getByRole('button', { name: '编辑', exact: true }).click();
+    assert.equal(await page.getByRole('button', { name: /^撤销/ }).isEnabled(), undoBeforeRun.enabled, '临时属性不改变撤销可用状态');
+    assert.equal(await page.getByRole('button', { name: /^撤销/ }).getAttribute('title'), undoBeforeRun.title, '临时属性不进入撤销历史');
+    await page.keyboard.press('Escape');
     assert.ok((await page.getByTestId('ui-artboard').locator('.preview-node').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).cursor))).every(cursor => cursor === 'move'), '停止后恢复编辑光标');
     await page.getByText('界面已保存', { exact: true }).waitFor();
   }
@@ -194,15 +230,21 @@ try {
   const clone = page.getByRole('button', { name: 'ClonedReward', exact: true });
   await clone.waitFor();
   await page.waitForFunction(() => !document.querySelector('.runtime-toolbar button:last-child')?.disabled);
+  await page.getByRole('button', { name: '选择节点 ClonedReward', exact: true }).click();
+  const cloneText = page.getByRole('textbox', { name: 'Text', exact: true });
+  await cloneText.fill('Temporary clone');
+  await cloneText.press('Enter');
+  await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="ClonedReward"]')?.textContent === 'Temporary clone');
   await clone.click();
   await page.getByRole('button', { name: '输出', exact: true }).click();
   await page.getByRole('log').getByText(/cloned-click/).waitFor();
   await clone.waitFor({ state: 'hidden' });
+  assert.equal(await page.getByRole('textbox', { name: '节点名称', exact: true }).inputValue(), 'OnlineRewardUI', '选中的运行节点销毁后回退到根节点');
   await page.getByRole('button', { name: '重置', exact: true }).click();
   await clone.waitFor();
   await page.getByRole('button', { name: '停止', exact: true }).click();
   assert.equal(await page.getByTestId('ui-artboard').locator('[aria-label="ClonedReward"]').count(), 0);
   assert.equal(await readFile(file, 'utf8'), original);
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${packaged ? 'packaged offline' : 'development'} Luau, class inheritance, button action, integration state, reset, errors, read-only design, clean stop.`);
+  console.log(`PASS: ${packaged ? 'packaged offline' : 'development'} Luau, class inheritance, button action, integration state, temporary runtime properties, cloned node inspection, reset, errors, clean stop.`);
 } finally { await app.close(); }

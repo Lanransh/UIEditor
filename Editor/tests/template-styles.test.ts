@@ -283,7 +283,7 @@ test('随应用提供的 多彩棋格风格：7 个鲜明配色模板和完整�
   const colors: Record<string, string> = {
     TitleImg: '#df1a23', CloseSurfaceImg: '#55ce35',
     ConfirmBtn: '#67ed14', CancelBtn: '#638079', BuyBtn: '#67ed14',
-    PaidPurchaseBtn: '#d03bf2', EquipBtn: '#67ed14', UnequipBtn: '#f2654d',
+    PaidPurchaseBtn: '#ffd633', EquipBtn: '#67ed14', UnequipBtn: '#f2654d',
     ProgressBarImg: '#571018', ProgressFillImg: '#ff2b35',
   };
   for (const file of files.filter(file => file.path.endsWith('.rbxui.json'))) {
@@ -294,6 +294,10 @@ test('随应用提供的 多彩棋格风格：7 个鲜明配色模板和完整�
         assert.doesNotMatch(node.properties.Text, /\p{Script=Han}/u, `${file.path} ${node.name} 使用英文文案`);
       }
       if (colors[node.name]) assert.equal(node.properties.BackgroundColor3, colors[node.name], `${file.path} ${node.name}`);
+      if (node.name === 'PaidPurchaseBtn') {
+        assert.equal(node.children.find(child => child.name === 'BottomEdgeImg')?.properties.BackgroundColor3, '#e58a25');
+        assert.ok(!node.children.some(child => child.className === 'UIGradient'), '付费按钮使用纯色，不添加渐变');
+      }
       if (['TitleTxt', 'CloseBtn', 'ButtonTxt', 'ProgressTxt'].includes(node.name)) {
         assert.equal(node.properties.TextColor3, '#ffffff', `${file.path} ${node.name} 使用白字描边`);
         assert.equal(node.children.find(child => child.name === 'TextStroke')?.properties.Enabled, true);
@@ -306,11 +310,15 @@ test('随应用提供的 多彩棋格风格：7 个鲜明配色模板和完整�
     checkStyle(document.root);
   }
   const design = await readFile(join(project.path, 'AgentWorkspace', 'Game-DESIGN.md'), 'utf8');
-  for (const rule of ['GothamBold', '30', 'CloseSurfaceImg', 'CloseBtn', 'PaidPurchaseBtn', '#D03BF2', '#DF1A23', '标题不固定红色', 'Current / Target']) assert.ok(design.includes(rule), rule);
+  for (const rule of ['GothamBold', '30', 'CloseSurfaceImg', 'CloseBtn', 'PaidPurchaseBtn', '#FFD633', '#E58A25', '#DF1A23', '标题不固定红色', 'Current / Target']) assert.ok(design.includes(rule), rule);
   const agents = await readFile(join(project.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8');
   for (const content of [agents, design]) {
     for (const rule of ['默认只参考布局', '只有用户明确要求参考配色', '不保留', '英文', '按钮语义色']) assert.ok(content.includes(rule), rule);
   }
   const check = await readFile(join(project.path, 'AgentWorkspace', '.agents', 'skills', 'ui-editor-style-check', 'SKILL.md'), 'utf8');
+  for (const content of [agents, design, check]) {
+    for (const color of ['#FFD633', '#E58A25']) assert.ok(content.includes(color), color);
+    assert.doesNotMatch(content, /付费紫色|紫色用于付费|#D03BF2|#691582/i);
+  }
   for (const rule of ['默认只对照布局', '不沿用截图颜色', '原语言已转成英文', '各状态文案均为英文']) assert.ok(check.includes(rule), rule);
 });

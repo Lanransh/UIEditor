@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Project } from '../shared/project';
 import type { DocumentAPI, DocumentLibrary } from '../shared/documents';
-import { findNode, updateNode, type UIDocument, type UINode } from '../shared/uiDocument';
+import { findNode, updateNode, type PropertyValue, type UIDocument, type UINode } from '../shared/uiDocument';
 import { useEditorHistory } from '../history/useEditorHistory';
 import { useHistoryShortcuts } from '../history/useHistoryShortcuts';
 import { projectStrategy } from './roblox';
@@ -47,7 +47,8 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   const runtime = useRuntime(document);
   useHistoryShortcuts({ ...history, canUndo: !busy && !runtime.active && history.canUndo, canRedo: !busy && !runtime.active && history.canRedo });
   const dirty = hasDocument && JSON.stringify(document) !== saved;
-  const selected = findNode(document.root, selectedId) ?? document.root;
+  const inspectionDocument = runtime.frame?.document ?? document;
+  const selected = findNode(inspectionDocument.root, selectedId) ?? inspectionDocument.root;
   useEffect(() => { window.documents.setDirty(dirty || assetConfigurationDirty); }, [dirty, assetConfigurationDirty]);
   useEffect(() => () => window.documents.setDirty(false), []);
 
@@ -58,6 +59,18 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   }
   function editNode(id: string, edit: (node: UINode) => UINode, label = '修改属性') {
     execute(label, value => ({ ...value, root: updateNode(value.root, id, edit) }));
+  }
+  function editProperty(id: string, property: string, value: PropertyValue) {
+    if (runtime.active) {
+      if (!runtime.ready || operating.current) return;
+      try {
+        strategy.validate({ ...inspectionDocument, root: updateNode(inspectionDocument.root, id, node => property === 'Name'
+          ? { ...node, name: value as string }
+          : { ...node, properties: { ...node.properties, [property]: value } }) });
+        setError('');
+        void runtime.setProperty(id, property, value);
+      } catch (cause) { setError(cause instanceof Error ? cause.message : '编辑失败'); }
+    } else editNode(id, node => property === 'Name' ? { ...node, name: value as string } : { ...node, properties: { ...node.properties, [property]: value } }, property === 'Name' ? '节点改名' : '修改属性');
   }
   async function save(saveAs = false, projectUI = false): Promise<boolean> {
     if (!hasDocument) return false;
@@ -192,7 +205,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
       execute('插入图片资产', value => insertNode(value, parent.id, node, strategy)); select(node.id);
     } else editNode(selected.id, node => applyImageAsset(node, asset), '应用图片资产');
   }
-  const editor = { projectId: project.manifest.id, projectName: project.name, projectPath: project.path, strategy, document, hasDocument, history, selected, select, editNode, execute, add, reparent, pickImage,
+  const editor = { projectId: project.manifest.id, projectName: project.name, projectPath: project.path, strategy, document, inspectionDocument, inspectionBusy: busy || assetsLoading || (runtime.active && !runtime.ready), hasDocument, history, selected, select, editNode, editProperty, execute, add, reparent, pickImage,
     inspectedAssetId, inspectAsset, clearAssetInspection, setAssetConfigurationDirty,
     imageAssets, assetsLoading, refreshImages, configureImage, importImage, useImage,
     newDocument, openDocument, openTemplate, saveTemplate, moveAsset, save: (saveAs = false) => run(async () => { await save(saveAs); }),

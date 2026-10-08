@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { randomUUID } from 'node:crypto';
 import { robloxStrategy } from '../src/editor/roblox';
-import { allNodes, findNode, type UIDocument, type UINode } from '../src/shared/uiDocument';
+import { allNodes, findNode, updateNode, type PropertyValue, type UIDocument, type UINode } from '../src/shared/uiDocument';
 import { validateJSON, type RuntimeFrame, type RuntimeLog } from '../src/shared/runtime';
 
 export class RuntimeError extends Error {
@@ -78,6 +78,13 @@ export class LuauSession {
           return node.children.some(child => visible(child, enabled));
         };
         if (!visible(this.document.root, true) || this.disabled.includes(target.id)) return { document: this.document, disabled: this.disabled, logs: [] };
+      } else if (input.type === 'set') {
+        const target = typeof input.node === 'string' && findNode(this.document.root, input.node);
+        if (!target || typeof input.property !== 'string' || (input.property !== 'Name' && !Object.hasOwn(target.properties, input.property))) throw new Error('无效的运行节点属性。');
+        const property = input.property, value = input.value as PropertyValue;
+        robloxStrategy.validate({ ...this.document, root: updateNode(this.document.root, target.id, node => property === 'Name'
+          ? { ...node, name: value as string }
+          : { ...node, properties: { ...node.properties, [property]: value } }) });
       } else if (!['start', 'stop', 'show', 'hide'].includes(input.type as string)) throw new Error('不支持的运行命令。');
       const line = JSON.stringify(command);
       if (Buffer.byteLength(line) > 8 * 1024 * 1024) throw new Error('运行消息超过 8 MiB。');
