@@ -35,8 +35,16 @@ export function ImageAssets({ editor, library, selectedId, select }: {
       if (!result.ok) setError(result.error);
     } catch (cause) { setError(String(cause)); }
   }
+  async function importLocalImage() {
+    setMenu(null); setError('');
+    try {
+      const imported = await editor.importImage(scope);
+      if (imported) select(imported.id);
+    } catch (cause) { setError(String(cause)); }
+  }
   return <div className="image-assets">
     <div className="image-asset-list">
+      <button disabled={editor.busy} onClick={() => void importLocalImage()} title={`导入到${library}，仅本地使用，不会上传 Roblox`}>导入本地图片</button>
       {error && <p role="alert" className="asset-error">{error}</p>}
       {editor.assetsLoading ? <p role="status">正在加载图片资产…</p> : <div className="asset-grid">
         {assets.map(a => <div key={a.id} className="image-asset-entry">

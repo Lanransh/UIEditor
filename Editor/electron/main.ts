@@ -194,6 +194,10 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
           const assets = await new ImageAssetStore(runtime, activeProject.path, permanentImages).list();
           return executeCode(getCodeAdapter(activeProject.manifest.mode), nativeDirectory, argument.document, argument.language, argument.source, assets).catch(error => ({ error: error.message, stage: error.stage ?? 'execution', logs: error.logs ?? [] }));
         }
+        case 'assets:import': {
+          if (!activeProject || !automationReady) throw new Error('请先打开工程。');
+          return new ImageAssetStore(runtime, activeProject.path, permanentImages).importFile(argument?.library, argument?.filePath);
+        }
         case 'file:open': {
           if (!activeProject || !automationReady) throw new Error('请先打开工程。');
           let library: 'project' | 'templates' = 'project', path = argument.relativePath;
@@ -461,13 +465,13 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     handle('images:import-file', async input => {
       const value = input as { library: ImageLibrary; path: string };
       if (!value || !['permanent', 'project'].includes(value.library) || typeof value.path !== 'string' || !value.path) throw new Error('请拖入本地图片文件。');
-      return imageStore().import(value.library, await readPreviewImage(value.path));
+      return imageStore().importFile(value.library, value.path);
     });
     handle('images:import', async library => {
       const store = imageStore();
       if (!['permanent', 'project'].includes(String(library))) throw new Error('图片资产库无效。');
       const result = await dialog.showOpenDialog(window, { title: '导入图片资产（不会上传）', properties: ['openFile'], filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }] });
-      return result.canceled || !result.filePaths[0] ? null : store.import(library as ImageLibrary, await readPreviewImage(result.filePaths[0]));
+      return result.canceled || !result.filePaths[0] ? null : store.importFile(library as ImageLibrary, result.filePaths[0]);
     });
     handle('document:open', async assetPath => {
       stopRuntime();

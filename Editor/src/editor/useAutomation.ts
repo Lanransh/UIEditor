@@ -22,13 +22,13 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
     const handle = async (request: AutomationRequest): Promise<any> => {
       const { editor: e, files: f } = current.current;
       const a = request.arguments, h = e.history.inspect();
-      const signature = JSON.stringify(e.imageAssets);
+      const signature = JSON.stringify(e.inspectImages());
       if (assetsSignature.current !== signature) { assetsSignature.current = signature; sessionId.current = crypto.randomUUID(); }
       if (documentId.current !== h.state.id) { documentId.current = h.state.id; sessionId.current = crypto.randomUUID(); }
       const stamp = () => ({ sessionId: sessionId.current, revision: e.history.inspect().revision });
-      const verify = () => { if (!alive || a.sessionId !== sessionId.current || a.revision !== e.history.inspect().revision || signature !== JSON.stringify(current.current.editor.imageAssets)) throw new Error('编辑会话、资产配置或 revision 已变化，请重新读取状态。'); };
+      const verify = () => { if (!alive || a.sessionId !== sessionId.current || a.revision !== e.history.inspect().revision || signature !== JSON.stringify(current.current.editor.inspectImages())) throw new Error('编辑会话、资产配置或 revision 已变化，请重新读取状态。'); };
       const writable = () => { verify(); if (e.runtime.inspect().sessionId || e.runtime.active || e.busy) throw new Error('当前正在运行或处理操作，请停止后编辑。'); };
-      const resolved = () => resolveImageAssets(e.history.inspect().state, e.imageAssets);
+      const resolved = () => resolveImageAssets(e.history.inspect().state, e.inspectImages());
       const dirty = () => e.hasDocument && JSON.stringify(resolved()) !== f.saved();
       const location = () => documentLocation(e.projectPath, f.path());
       const state = () => ({ ...stamp(), projectId: e.projectId, projectName: e.projectName, documentId: e.hasDocument ? e.history.inspect().state.id : null, projectType: e.strategy.mode, state: e.runtime.inspect().sessionId ? 'runtime' : 'edit', dirty: dirty(), relativePath: location()?.relativePath ?? null, library: location()?.library ?? null, mode: f.path() ? 'edit' : 'unsaved' });
@@ -39,7 +39,7 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
         return { document: resolved() };
       };
       try {
-        if (!e.hasDocument && !['uie.editor.get_state', 'uie.editor.get_capabilities', 'uie.document.list', 'uie.document.new', 'uie.document.open', 'uie.assets.search', 'uie.assets.get', 'uie.assets.configure', 'uie.debug.get_diagnostics'].includes(request.name)) throw new Error('请先新建或打开界面。');
+        if (!e.hasDocument && !['uie.editor.get_state', 'uie.editor.get_capabilities', 'uie.document.list', 'uie.document.new', 'uie.document.open', 'uie.assets.search', 'uie.assets.get', 'uie.assets.configure', 'uie.assets.import', 'uie.debug.get_diagnostics'].includes(request.name)) throw new Error('请先新建或打开界面。');
         switch (request.name) {
           case 'uie.runtime.batch': return { ...await executeRuntimeBatch(a, handle, () => current.current.editor.runtime.inspect().frame, verify, () => current.current.editor.runtime.inspect().interaction), ...state() };
           case 'uie.editor.get_state': return { ...state(), ...(a.detail === 'full' ? { document: e.hasDocument ? resolved() : null } : { nodeCount: e.hasDocument ? allNodes(h.state.root).length : 0 }) };
@@ -53,6 +53,16 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
             const matches = assets.filter(asset => (a.library === undefined || asset.library === a.library) && `${asset.name} ${asset.tags}`.toLowerCase().includes(query));
             const offset = integer(a.offset, 0, 0, 10000), limit = integer(a.limit, 50, 1, 200);
             return { ...stamp(), assets: matches.slice(offset, offset + limit).map(({ previewImage: _, ...asset }) => ({ ...asset })), total: matches.length, nextOffset: offset + limit < matches.length ? offset + limit : null };
+          }
+          case 'uie.assets.import': {
+            writable(); f.busy(true);
+            try {
+              const asset = await window.automation.invoke('assets:import', { library: a.library, filePath: a.filePath });
+              const assets = await e.refreshImages();
+              assetsSignature.current = JSON.stringify(assets); sessionId.current = crypto.randomUUID();
+              const { previewImage: _, ...summary } = asset;
+              return { ...stamp(), saved: true, asset: summary };
+            } finally { f.busy(false); }
           }
           case 'uie.assets.configure': {
             writable(); f.busy(true);

@@ -34,13 +34,15 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   const operating = useRef(false);
   const clipboard = useRef<UINode | null>(null);
   const [imageAssets, setImageAssets] = useState<ImageAsset[]>([]);
+  const liveImageAssets = useRef<ImageAsset[]>([]);
+  function replaceImages(assets: ImageAsset[]) { liveImageAssets.current = assets; setImageAssets(assets); }
   const [assetsLoading, setAssetsLoading] = useState(true);
   const document = useMemo(() => resolveImageAssets(history.state, imageAssets), [history.state, imageAssets]);
   useEffect(() => {
     let cancelled = false;
     void window.imageAssets.list().then(result => {
       if (cancelled) return;
-      if (result.ok) setImageAssets(result.value); else setError(result.error);
+      if (result.ok) replaceImages(result.value); else setError(result.error);
     }).catch(cause => { if (!cancelled) setError(String(cause)); }).finally(() => { if (!cancelled) setAssetsLoading(false); });
     return () => { cancelled = true; };
   }, []);
@@ -189,25 +191,29 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   async function refreshImages() {
     const result = await window.imageAssets.list();
     if (!result.ok) throw new Error(result.error);
-    setImageAssets(result.value); return result.value;
+    replaceImages(result.value); return result.value;
   }
   async function configureImage(value: ImageAssetUpdate) {
     if (operating.current || runtime.active) throw new Error('请停止运行后配置资产。');
     const result = await window.imageAssets.update(value);
     if (!result.ok) throw new Error(result.error);
-    setImageAssets(result.value); return result.value;
+    replaceImages(result.value); return result.value;
   }
   async function configureImageRobloxId(id: string, robloxId: string) {
     if (operating.current || runtime.active) throw new Error('请停止运行后配置资产。');
     const result = await window.imageAssets.updateRobloxId(id, robloxId);
     if (!result.ok) throw new Error(result.error);
-    setImageAssets(result.value); return result.value;
+    replaceImages(result.value); return result.value;
   }
   async function importImage(library: ImageLibrary, file?: File) {
-    const result = file ? await window.imageAssets.importFile(library, file) : await window.imageAssets.import(library);
-    if (!result.ok) throw new Error(result.error);
-    if (result.value) await refreshImages();
-    return result.value;
+    if (operating.current || runtime.active) throw new Error('请停止运行后导入图片。');
+    operating.current = true; setBusy(true);
+    try {
+      const result = file ? await window.imageAssets.importFile(library, file) : await window.imageAssets.import(library);
+      if (!result.ok) throw new Error(result.error);
+      if (result.value) await refreshImages();
+      return result.value;
+    } finally { operating.current = false; setBusy(false); }
   }
   function useImage(asset: ImageAsset, create = false) {
     if (!hasDocument) return;
@@ -219,7 +225,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   }
   const editor = { projectId: project.manifest.id, projectName: project.name, projectPath: project.path, strategy, document, inspectionDocument, inspectionBusy: busy || assetsLoading || (runtime.active && !runtime.ready), hasDocument, history, selected, select, editNode, editProperty, execute, add, reparent, pickImage,
     inspectedAssetId, inspectAsset, clearAssetInspection, setAssetConfigurationDirty,
-    imageAssets, assetsLoading, refreshImages, configureImage, configureImageRobloxId, importImage, useImage,
+    imageAssets, inspectImages: () => liveImageAssets.current, assetsLoading, refreshImages, configureImage, configureImageRobloxId, importImage, useImage,
     location: documentLocation(project.path, path), newDocument, openDocument, openTemplate, saveTemplate, moveAsset, save: (saveAs = false) => run(async () => { await save(saveAs); }),
     saveProjectUI: () => run(async () => { await save(false, true); }), back, dirty, path, error, busy: busy || runtime.active || assetsLoading, runtime };
   useAutomation(editor, { reset, saved: () => fileState.current.saved, path: () => fileState.current.path, busy: value => { operating.current = value; setBusy(value); }, markSaved: (value, file) => { fileState.current = { path: file, saved: JSON.stringify(value) }; setPath(file); setSaved(fileState.current.saved); } });

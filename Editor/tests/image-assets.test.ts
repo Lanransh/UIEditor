@@ -34,6 +34,35 @@ test('asset directories follow the library and reject unknown asset IDs', async 
   assert.equal(await store.assetDirectory(imported.id), join(project, 'image-assets'));
   await assert.rejects(store.assetDirectory('../outside'), /不存在/);
 });
+test('MCP local import requires a library, file path and current session', () => {
+  const args = { sessionId: 's', revision: 0, library: 'project', filePath: resolve('local.png') };
+  assert.doesNotThrow(() => validateTool('uie.assets.import', args));
+  for (const key of Object.keys(args)) {
+    const incomplete = { ...args } as Record<string, unknown>; delete incomplete[key];
+    assert.throws(() => validateTool('uie.assets.import', incomplete), /缺少参数/);
+  }
+  assert.throws(() => validateTool('uie.assets.import', { ...args, library: 'templates' }), /无效/);
+  assert.throws(() => validateTool('uie.assets.import', { ...args, projectId: crypto.randomUUID() }), /不支持/);
+});
+test('local file import persists previews without a Roblox ID and rejects invalid files without changing the catalog', async () => {
+  const { store, project, root } = await fixture();
+  const preview = (await store.list())[0].previewImage;
+  const path = join(root, 'local.png');
+  await writeFile(path, Buffer.from(preview.dataUrl.split(',')[1], 'base64'));
+  const asset = await store.importFile('project', path);
+  assert.equal(asset.name, 'local'); assert.equal(asset.robloxId, '');
+  assert.equal(asset.previewImage.dataUrl, preview.dataUrl);
+  assert.deepEqual((await store.list()).find(a => a.id === asset.id), asset);
+  const catalog = join(project, 'image-assets', 'catalog.json'), before = await readFile(catalog, 'utf8');
+  await assert.rejects(store.importFile('project', 'local.png'), /绝对路径/);
+  await assert.rejects(store.importFile('project', join(root, 'missing.png')));
+  await assert.rejects(store.importFile('project', root), /文件类型/);
+  await writeFile(join(root, 'invalid.png'), 'not an image');
+  await assert.rejects(store.importFile('project', join(root, 'invalid.png')), /仅支持/);
+  await writeFile(join(root, 'large.png'), Buffer.alloc(8 * 1024 * 1024 + 1));
+  await assert.rejects(store.importFile('project', join(root, 'large.png')), /8 MiB/);
+  assert.equal(await readFile(catalog, 'utf8'), before);
+});
 test('each image has one Roblox ID; permanent IDs are shared and project imports move with project', async () => {
   const { store, root, runtime, project } = await fixture();
   const initial = await store.list();

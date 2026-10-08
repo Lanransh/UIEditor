@@ -1,9 +1,10 @@
 import { mkdir, readFile, writeFile, rename, rm, lstat } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import builtins from '../src/assets/images/builtins.json';
 import { normalizeRobloxId, type ImageAsset, type ImageAssetUpdate, type ImageLibrary } from '../src/shared/imageAssets';
 import type { UINode } from '../src/shared/uiDocument';
+import { readPreviewImage } from './documents';
 
 interface Catalog { version: 2; assets: ImageAsset[] }
 const empty = (): Catalog => ({ version: 2, assets: [] });
@@ -106,6 +107,11 @@ export class ImageAssetStore {
       assets.set(a.id, a);
     }
     return [...assets.values()];
+  }
+  async importFile(library: ImageLibrary, path: string): Promise<ImageAsset> {
+    if (typeof path !== 'string' || !isAbsolute(path)) throw new Error('请提供本地图片的绝对路径。');
+    await regular(path);
+    return this.import(library, await readPreviewImage(path));
   }
   async import(library: ImageLibrary, previewImage: NonNullable<UINode['previewImage']>): Promise<ImageAsset> {
     if (!['permanent', 'project'].includes(library)) throw new Error('图片资产库无效。');

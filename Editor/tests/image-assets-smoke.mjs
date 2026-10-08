@@ -1,6 +1,6 @@
 import { _electron as electron } from 'playwright';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 
@@ -25,21 +25,56 @@ async function fileMenu(name) {
   await page.getByRole('button', { name: '文件', exact: true }).click();
   await page.getByRole('button', { name, exact: true }).click();
 }
-async function tool(name, args = {}) {
+async function rawTool(name, args = {}) {
   const discovery = JSON.parse(await readFile(join(runtime, 'ui-editor-automation.json'), 'utf8'));
   const response = await fetch(`http://127.0.0.1:${discovery.port}/call`, { method: 'POST', headers: { authorization: `Bearer ${discovery.token}`, 'content-type': 'application/json' }, body: JSON.stringify({ name, arguments: args }) });
-  const result = await response.json(); assert.equal(result.ok, true, result.error); return result.value;
+  return response.json();
+}
+async function tool(name, args = {}) {
+  const result = await rawTool(name, args); assert.equal(result.ok, true, result.error); return result.value;
+}
+async function waitForMainValue(read, expected) {
+  let value;
+  for (let i = 0; i < 100; i++) {
+    value = await application.evaluate(read);
+    if (value === expected) return;
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  assert.equal(value, expected);
 }
 try {
   await dialogs(parent);
   await page.getByRole('button', { name: '创建工程', exact: true }).click();
   await page.getByRole('dialog', { name: '创建工程', exact: true }).getByRole('button', { name: '下一步', exact: true }).click();
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
+  await page.getByRole('button', { name: '图片资产', exact: true }).click();
+  await page.getByRole('button', { name: '项目图片', exact: true }).click();
+  const importButton = page.getByRole('button', { name: '导入本地图片', exact: true });
+  const emptyState = await tool('uie.editor.get_state', { detail: 'full' });
+  const preview = (await tool('uie.assets.get', { id: 'builtin:roblox:placeholder' })).asset.previewImage;
+  const localPath = join(root, 'LocalIcon.png'), invalidPath = join(root, 'invalid.png');
+  await writeFile(localPath, Buffer.from(preview.dataUrl.split(',')[1], 'base64'));
+  await writeFile(invalidPath, 'not an image');
+  await dialogs(null); await importButton.click();
+  await page.waitForFunction(() => !document.querySelector('.image-asset-list > button').disabled);
+  assert.equal((await tool('uie.assets.search', { library: 'project' })).total, 0);
+  await dialogs(invalidPath); await importButton.click();
+  await page.getByRole('alert').filter({ hasText: '仅支持 PNG/JPEG/WebP/GIF' }).waitFor();
+  assert.equal((await tool('uie.assets.search', { library: 'project' })).total, 0);
+  await dialogs(localPath); await importButton.click();
+  await page.getByRole('button', { name: '图片资产 LocalIcon', exact: true }).waitFor();
+  const local = (await tool('uie.assets.search', { library: 'project' })).assets[0];
+  assert.equal(local.robloxId, '');
+  const afterImport = await tool('uie.editor.get_state', { detail: 'full' });
+  assert.equal(afterImport.document, null); assert.equal(afterImport.revision, emptyState.revision);
+  assert.notEqual(afterImport.sessionId, emptyState.sessionId);
+  await dialogs(parent);
   await page.getByRole('button', { name: '文件', exact: true }).click();
   await page.getByRole('button', { name: '新建界面', exact: true }).click();
   await page.getByRole('textbox', { name: '新界面名称', exact: true }).fill('ImageAssets');
   await page.getByRole('button', { name: '创建', exact: true }).click();
   await page.getByRole('tree', { name: 'Roblox 节点' }).waitFor();
+  await page.getByRole('button', { name: 'UI 资产', exact: true }).click();
   const libraries = page.getByRole('navigation', { name: '资产库', exact: true });
   assert.equal(await libraries.getByRole('button', { name: '永久图片', exact: true }).count(), 0);
   assert.equal(await libraries.getByRole('button', { name: '项目图片', exact: true }).count(), 0);
@@ -48,7 +83,7 @@ try {
   assert.equal(await libraries.getByRole('button', { name: '项目UI', exact: true }).count(), 0);
   await page.getByRole('button', { name: '永久图片', exact: true }).click();
   const stud = page.getByRole('button', { name: '图片资产 Stud 透明平铺', exact: true }); await stud.waitFor();
-  assert.equal(await page.getByRole('button', { name: '导入图片', exact: true }).count(), 0);
+  assert.equal(await importButton.count(), 1);
   assert.equal(await page.getByRole('textbox', { name: '搜索图片资产', exact: true }).count(), 0);
   const previews = await page.locator('.image-asset-entry .ui-asset-preview').evaluateAll(elements => elements.map(element => {
     const frame = element.getBoundingClientRect(), image = element.querySelector('img').getBoundingClientRect();
@@ -76,14 +111,14 @@ try {
   await page.screenshot({ path: resolve('test-results/image-assets-context-menu.png') });
   await page.getByRole('menuitem', { name: '复制 ID', exact: true }).click();
   await menu.waitFor({ state: 'hidden' });
-  assert.equal(await application.evaluate(({ clipboard }) => clipboard.readText()), 'rbxassetid://123456');
+  await waitForMainValue(({ clipboard }) => clipboard.readText(), 'rbxassetid://123456');
   await application.evaluate(({ shell }) => {
     globalThis.openedImageDirectory = null;
     shell.openPath = async path => { globalThis.openedImageDirectory = path; return ''; };
   });
   await stud.click({ button: 'right' });
   await page.getByRole('menuitem', { name: '打开目录', exact: true }).click();
-  assert.equal(await application.evaluate(() => globalThis.openedImageDirectory), permanentImages);
+  await waitForMainValue(() => globalThis.openedImageDirectory, permanentImages);
   const invalidDirectory = await page.evaluate(() => window.imageAssets.openDirectory('missing'));
   assert.equal(invalidDirectory.ok, false);
   await stud.click({ button: 'right' }); await page.keyboard.press('Escape');
@@ -135,7 +170,7 @@ try {
   const files = await page.evaluateHandle(() => { const data = new DataTransfer(); data.items.add(document.querySelector('#test-image-drop').files[0]); return data; });
   await page.locator('.image-assets').dispatchEvent('drop', { dataTransfer: files });
   await page.locator('#test-image-drop').evaluate(input => input.remove());
-  assert.equal((await tool('uie.assets.search', { library: 'project' })).assets.length, 0);
+  assert.equal((await tool('uie.assets.search', { library: 'project' })).assets.length, 1);
   assert.equal(await page.getByRole('button', { name: '图片资产 Placeholder', exact: true }).count(), 0);
   await page.getByRole('button', { name: '永久图片', exact: true }).click();
   const asset = (await tool('uie.assets.search', { query: 'stud', library: 'permanent' })).assets[0];
@@ -221,6 +256,46 @@ try {
   await page.getByRole('button', { name: '上传到 Roblox（替换 ID）', exact: true }).click();
   await upload.getByRole('alert').filter({ hasText: '更新并重启 StudioGameToolkit' }).waitFor();
   await upload.getByRole('button', { name: '关闭', exact: true }).click();
+  const beforeMcpImport = await tool('uie.editor.get_state', { detail: 'full' });
+  const imported = await tool('uie.assets.import', { sessionId: beforeMcpImport.sessionId, revision: beforeMcpImport.revision, library: 'project', filePath: localPath });
+  assert.equal(imported.saved, true); assert.equal(imported.asset.robloxId, '');
+  assert.equal(imported.asset.previewImage, undefined);
+  assert.equal(imported.revision, beforeMcpImport.revision);
+  const current = await tool('uie.editor.get_state', { detail: 'full' });
+  assert.deepEqual(current.document, beforeMcpImport.document);
+  assert.equal(current.sessionId, imported.sessionId);
+  const catalog = join(parent, 'UIEditorWorkspace', 'image-assets', 'catalog.json');
+  const beforeFailedImport = await readFile(catalog, 'utf8');
+  assert.equal((await rawTool('uie.assets.import', { sessionId: beforeMcpImport.sessionId, revision: beforeMcpImport.revision, library: 'project', filePath: localPath })).ok, false);
+  assert.equal((await rawTool('uie.assets.import', { sessionId: current.sessionId, revision: current.revision, library: 'project', filePath: invalidPath })).ok, false);
+  assert.equal(await readFile(catalog, 'utf8'), beforeFailedImport);
+  const source = `local n=ui.nodes.create("ImageLabel",{name="LocalAssetIcon",properties={Position=UDim2.fromOffset(120,140),Size=UDim2.fromOffset(80,90)}});ui.assets.apply(n.id,"${imported.asset.id}")`;
+  assert.equal((await tool('uie.code.execute', { sessionId: current.sessionId, revision: current.revision, language: 'luau', source })).success, true);
+  const applied = (await tool('uie.editor.get_state', { detail: 'full' })).document.root.children.find(n => n.name === 'LocalAssetIcon');
+  assert.equal(applied.imageAssetId, imported.asset.id); assert.equal(applied.properties.Image, '');
+  assert.equal(applied.previewImage.dataUrl, preview.dataUrl);
+  assert.deepEqual(applied.properties.Position, { x: { scale: 0, offset: 120 }, y: { scale: 0, offset: 140 } });
+  assert.deepEqual(applied.properties.Size, { x: { scale: 0, offset: 80 }, y: { scale: 0, offset: 90 } });
+  const beforeSave = await tool('uie.editor.get_state');
+  await tool('uie.document.save', { sessionId: beforeSave.sessionId, revision: beforeSave.revision });
+  const beforeOpen = await tool('uie.editor.get_state');
+  await tool('uie.document.open', { sessionId: beforeOpen.sessionId, revision: beforeOpen.revision, relativePath: 'Assets.rbxui.json' });
+  assert.deepEqual((await tool('uie.editor.get_state', { detail: 'full' })).document.root.children.find(n => n.name === applied.name), applied);
+  await page.getByRole('button', { name: '项目图片', exact: true }).click();
+  assert.equal(await page.getByRole('button', { name: '图片资产 LocalIcon', exact: true }).count(), 2);
+  const beforeRun = await tool('uie.editor.get_state');
+  await tool('uie.runtime.control', { sessionId: beforeRun.sessionId, revision: beforeRun.revision, action: 'run' });
+  assert.equal(await importButton.isDisabled(), true);
+  const duringRun = await tool('uie.editor.get_state');
+  assert.equal((await rawTool('uie.assets.import', { sessionId: duringRun.sessionId, revision: duringRun.revision, library: 'project', filePath: localPath })).ok, false);
+  assert.equal(await readFile(catalog, 'utf8'), beforeFailedImport);
+  await tool('uie.runtime.control', { sessionId: duringRun.sessionId, revision: duringRun.revision, action: 'stop' });
+  const stopped = await tool('uie.editor.get_state');
+  const permanentImport = await tool('uie.assets.import', { sessionId: stopped.sessionId, revision: stopped.revision, library: 'permanent', filePath: localPath });
+  assert.equal(permanentImport.asset.library, 'permanent'); assert.equal(permanentImport.asset.robloxId, '');
+  await page.getByRole('button', { name: '永久图片', exact: true }).click();
+  await page.getByRole('button', { name: '图片资产 LocalIcon', exact: true }).waitFor();
+  await page.screenshot({ path: resolve('test-results/image-assets-local-import.png') });
   assert.deepEqual(errors, []);
-  console.log('Image asset UI, uniform previews, no search/import, single Roblox ID, persistence, canvas drop and MCP checks passed.');
+  console.log('Image asset UI, local import/cancel/errors, MCP import/session/runtime guards, persistence, node layout and existing asset/upload checks passed.');
 } finally { await application.close(); }

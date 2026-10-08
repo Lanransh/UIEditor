@@ -30,6 +30,10 @@ description: 在 UIEditor 的 Roblox 工程中制作、修改和验证可编辑 
    修改已有界面先读浅层树定位目标，再按 id/parentId 查询相关节点；JSON 查询优先 compact=true，
    按截断提示与 nextOffset 补查。scripts.get 按需指定 kind，已取得且未变更的结果不重复打印。
    保留稳定节点 ID 和任务外内容。布局单位明确为 Scale/Offset。
+   本地图片先用 uie.assets.search 查询复用；缺少时通过 uie.assets.import 将绝对路径文件导入
+   项目图片库（library="project"，不上传，Roblox ID 保持空白），再重读会话并在 code.execute
+   中用 ui.assets.apply(nodeId,assetId) 绑定。只写 previewImage 不会登记到底部图片库。
+   同一素材复用同一资产 ID；应用已有节点时保留位置、尺寸、层级及原有样式。
    游戏数据决定的动态图可先使用占位图；静态图缺少资源时也使用占位图（如重生图标）。
    保留可替换的图片节点，具体遵循业务接入参考的贴图与占位图约定。
 4. code.execute、scripts.set 等写操作携带最新 sessionId/revision；冲突后重读。

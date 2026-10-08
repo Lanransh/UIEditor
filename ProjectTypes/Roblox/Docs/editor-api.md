@@ -47,6 +47,14 @@ library 支持 project（默认）、templates、permanent。永久UI全局读�
 
 `uie.assets.search/get` 可传 projectId 读取来源工程图片；省略使用当前工程，library="permanent" 读取全局图片。`uie.editor.get_state` 返回当前 projectId、projectName、documentId。所有修改与运行仍针对当前编辑会话，不接受 target。
 
+本地素材先登记资产，再应用到节点：先用 `uie.assets.search` 查找可复用资产；缺少时调用
+`uie.assets.import({sessionId,revision,library:"project",filePath:"本地图片绝对路径"})`。
+library 也可明确选择 permanent；导入只读取 PNG/JPEG/WebP/GIF 普通文件，单张不超过 8 MiB，
+不接受远程链接，不上传 Roblox，robloxId 初始为空。成功立即保存资产库，返回资产摘要
+（含 id，不含 previewImage）和新会话；导入不进入文档撤销历史，也不修改节点。
+重读状态后在 `code.execute` 中调用 `ui.assets.apply(nodeId,assetId)`，节点引用和预览快照
+一起进入文档历史。运行时禁止导入。仅设置 `previewImage` 不会在底部图片库登记素材。
+
 ## 历史、文件与运行边界
 
 一次 execute 只提交一条文档命令，用户可以在 App 内撤销重做；redo 恢复快照，不重新执行代码。MCP 不提供 undo/redo。失败、dry-run 和无变化不影响历史。
