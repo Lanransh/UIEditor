@@ -1,19 +1,12 @@
 import { spawnSync } from 'node:child_process';
 import { mkdir, copyFile, access } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
+import { findCMake } from './find-cmake.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const output = join(root, '.cache', 'native-build');
-let cmake = process.env.UI_EDITOR_CMAKE || 'cmake';
-if (!process.env.UI_EDITOR_CMAKE && process.platform === 'win32') {
-  const probe = spawnSync(cmake, ['--version'], { windowsHide: true });
-  if (probe.error?.code === 'ENOENT') {
-    const installed = join(process.env.ProgramFiles || 'C:\\Program Files', 'CMake', 'bin', 'cmake.exe');
-    try { await access(installed); cmake = installed; } catch {
-      throw new Error('CMake was not found. Install CMake 3.20+ or set UI_EDITOR_CMAKE to the full path of cmake.exe.');
-    }
-  }
-}
+const cmake = findCMake();
+console.log('Using CMake: ' + cmake);
 const args = ['-S', join(root, 'native'), '-B', output, '-DCMAKE_BUILD_TYPE=Release'];
 for (const [name, variable] of [['luau', 'UI_EDITOR_LUAU_SOURCE'], ['json', 'UI_EDITOR_JSON_SOURCE']]) {
   if (process.env[variable]) args.push(`-DFETCHCONTENT_SOURCE_DIR_${name.toUpperCase()}=${resolve(process.env[variable])}`);

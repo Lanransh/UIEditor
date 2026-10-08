@@ -8,7 +8,7 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 - 首次运行：双击根目录 `BuildAndRun.bat`，安装锁定依赖、构建并启动。
 - 后续运行：双击 `Run.bat`，直接启动现有构建。源码修改后需重新构建。
 - 构建需要 Node.js 24 LTS（至少 24.13）、npm，以及构建 Luau 辅助程序所需的 CMake 3.20+、Git 和 C++17 编译器（MSVC 或 MinGW）；首次获取依赖需要联网。打包应用运行时不需要这些工具或网络。
-- CMake 不在 PATH 时，构建脚本会尝试 Windows 的 `Program Files/CMake/bin/cmake.exe`；其他安装位置可通过 `UI_EDITOR_CMAKE` 指定完整路径。
+- 构建脚本先检查 PATH 中的 CMake；缺失或低于 3.20 时，尝试 Windows 的 `Program Files/CMake/bin/cmake.exe` 和 Visual Studio 自带的 CMake。其他安装位置可通过 `UI_EDITOR_CMAKE` 指定完整路径；显式指定的版本不符合要求时直接报错。
 - 批处理和打包默认使用与参考工程相同的 npm Electron 镜像；可通过 `ELECTRON_MIRROR` 环境变量覆盖。
 - 可将 Windows 便携 Node.js 放到 `ToolRuntime/Runtime/nodejs/`，批处理优先使用其中的 `node.exe` 和 `npm.cmd`。
 - 打包入口：`ToolRuntime/UIEditor-win32-x64/UIEditor.exe`。运行打包应用无需额外安装 Node.js；分发时需保留整个应用目录，不能只复制 exe。
