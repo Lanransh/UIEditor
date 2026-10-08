@@ -25,6 +25,7 @@ async function childMenu(parent) {
   const row = page.getByRole('button', { name: `选择节点 ${parent}`, exact: true }).locator('..');
   await row.hover();
   await row.getByRole('button', { name: `为 ${parent} 添加子节点`, exact: true }).click();
+  assert.equal(await page.getByRole('menu', { name: '添加子节点', exact: true }).getByRole('separator').count(), 0);
 }
 async function add(type, parent) {
   await childMenu(parent ?? await page.getByLabel('节点名称', { exact: true }).inputValue());
@@ -104,9 +105,29 @@ try {
   await dialogs(imageFile); await page.getByRole('button', { name: '选择预览图片', exact: true }).click();
   await page.getByText('图标.png', { exact: true }).waitFor();
   await select('主面板'); await add('TextButton'); await input('节点名称', '领取'); await input('Text', '领取奖励'); await input('Position.y.offset', 260);
+  // Selected nodes can be renamed inline from F2 or the row context menu.
+  await select('领取');
+  await page.keyboard.press('F2');
+  await page.getByRole('textbox', { name: '重命名节点 领取', exact: true }).fill('临时名称');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: '选择节点 领取', exact: true }).waitFor();
+  await page.keyboard.press('F2');
+  await page.getByRole('textbox', { name: '重命名节点 领取', exact: true }).fill('领取按钮');
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: '选择节点 领取按钮', exact: true }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '重命名', exact: true }).click();
+  await page.getByRole('textbox', { name: '重命名节点 领取按钮', exact: true }).fill('领取');
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: '选择节点 领取', exact: true }).waitFor();
   // Tree context save selects the project library without a native file dialog.
   await dialogs(null, null);
   await page.getByRole('button', { name: '选择节点 领取', exact: true }).click({ button: 'right' });
+  const nodeMenu = page.getByRole('menu', { name: '节点操作', exact: true });
+  assert.equal(await nodeMenu.getByRole('separator').count(), 1);
+  assert.deepEqual(await nodeMenu.evaluate(menu => {
+    const children = [...menu.children], divider = children.findIndex(child => child.getAttribute('role') === 'separator');
+    return { operations: children.slice(0, divider).map(child => child.textContent), firstAddition: children[divider + 1].textContent };
+  }), { operations: ['重命名', '保存…'], firstAddition: 'Frame' });
   await page.getByRole('menuitem', { name: '保存…', exact: true }).click();
   await page.getByRole('dialog', { name: '保存UI', exact: true }).getByRole('button', { name: '保存', exact: true }).click();
   await dirty(false);

@@ -12,11 +12,41 @@ const nodeIcons = import.meta.glob<string>('../assets/roblox-node-icons/*.png', 
 export function NodeTree({ editor }: { editor: DocumentEditor }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [renaming, setRenaming] = useState<{ id: string; original: string; value: string } | null>(null);
   const [menu, setMenu] = useState<{ parent: UINode; x: number; y: number; context?: boolean } | null>(null);
   const menuElement = useRef<HTMLDivElement>(null);
+  const renameInput = useRef<HTMLInputElement>(null);
+  const renameCancelled = useRef(false);
   const draggedId = useRef<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; position: NodeDropPosition } | null>(null);
   useEffect(() => { setMenu(null); }, [editor.inspectionDocument.root, editor.busy]);
+  useEffect(() => {
+    if (!renaming) return;
+    renameInput.current?.focus();
+    renameInput.current?.select();
+  }, [renaming?.id]);
+  function beginRename(node: UINode) {
+    if (editor.busy) return;
+    renameCancelled.current = false;
+    setMenu(null);
+    setRenaming({ id: node.id, original: node.name, value: node.name });
+  }
+  function commitRename() {
+    const current = renaming;
+    setRenaming(null);
+    if (current && current.value !== current.original) editor.editProperty(current.id, 'Name', current.value);
+  }
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.repeat || event.key !== 'F2' || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || editor.busy) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.closest('input, textarea, select') || target.isContentEditable)) return;
+      event.preventDefault();
+      beginRename(editor.selected);
+    };
+    window.addEventListener('keydown', listener);
+    return () => window.removeEventListener('keydown', listener);
+  }, [editor.busy, editor.selected.id, editor.selected.name]);
   useEffect(() => {
     if (!menu) return;
     function dismiss(event: PointerEvent) {
@@ -52,7 +82,7 @@ export function NodeTree({ editor }: { editor: DocumentEditor }) {
     const position = dropTarget?.id === node.id ? dropTarget.position : null;
     return <div key={node.id} role="treeitem" aria-selected={editor.selected.id === node.id} aria-expanded={node.children.length ? !closed : undefined}>
       <div className={`node-row${editor.selected.id === node.id ? ' selected' : ''}${position ? ` drop-${position}` : ''}`} style={{ paddingLeft: 6 + depth * 18 }} title={`${node.name} · ${node.className}`}
-        draggable={!editor.busy && node.id !== editor.document.root.id}
+        draggable={!editor.busy && node.id !== editor.document.root.id && renaming?.id !== node.id}
         onContextMenu={event => {
           event.preventDefault(); event.stopPropagation();
           if (editor.busy || !editor.select(node.id)) return;
@@ -76,7 +106,15 @@ export function NodeTree({ editor }: { editor: DocumentEditor }) {
           if (!editor.busy && id) editor.execute('拖拽节点', value => moveNode(value, id, node.id, next, editor.strategy));
         }}>
         <button className="node-expand" disabled={!node.children.length} aria-label={`${closed ? '展开' : '折叠'} ${node.name}`} onClick={() => setCollapsed(previous => { const next = new Set(previous); if (closed) next.delete(node.id); else next.add(node.id); return next; })}>{node.children.length ? closed ? '▸' : '▾' : ''}</button>
-        <button className="node-select" aria-label={`选择节点 ${node.name}`} onClick={() => editor.select(node.id)}><img className="node-icon" src={nodeIcons[`../assets/roblox-node-icons/${node.className}.png`]} width={16} height={16} alt="" draggable={false} /><span>{node.name}</span></button>
+        {renaming?.id === node.id
+          ? <div className="node-select node-renaming"><img className="node-icon" src={nodeIcons[`../assets/roblox-node-icons/${node.className}.png`]} width={16} height={16} alt="" draggable={false} /><input ref={renameInput} aria-label={`重命名节点 ${node.name}`} value={renaming.value} onChange={event => setRenaming({ ...renaming, value: event.target.value })} onBlur={() => {
+            if (renameCancelled.current) { renameCancelled.current = false; return; }
+            commitRename();
+          }} onKeyDown={event => {
+            if (event.key === 'Enter') event.currentTarget.blur();
+            else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); renameCancelled.current = true; setRenaming(null); }
+          }} /></div>
+          : <button className="node-select" aria-label={`选择节点 ${node.name}`} onClick={() => editor.select(node.id)}><img className="node-icon" src={nodeIcons[`../assets/roblox-node-icons/${node.className}.png`]} width={16} height={16} alt="" draggable={false} /><span>{node.name}</span></button>}
         {editor.strategy.nodes[node.className].category !== 'component' && <button disabled={editor.busy} className="node-add-child" aria-label={`为 ${node.name} 添加子节点`} title="添加子节点" aria-haspopup="menu" aria-expanded={menu?.parent.id === node.id} onClick={event => {
           const bounds = event.currentTarget.getBoundingClientRect();
           setMenu({ parent: node, x: Math.max(8, Math.min(bounds.right, window.innerWidth - 208)), y: Math.max(8, Math.min(bounds.bottom, window.innerHeight - 288)) });
@@ -85,6 +123,7 @@ export function NodeTree({ editor }: { editor: DocumentEditor }) {
       {!closed && node.children.length > 0 && <div role="group">{node.children.map(child => branch(child, depth + 1))}</div>}
     </div>;
   }
+  const addableNodes = menu ? Object.keys(editor.strategy.nodes).filter(name => editor.strategy.canParent(menu.parent, editor.strategy.createNode(name))) : [];
   return <>
     <h2><Layers3 size={16} />节点树<span className="node-tree-actions">
       <button type="button" aria-label="展开所有节点树" title="展开所有节点树" onClick={() => setCollapsed(new Set())}><ChevronsUpDown size={16} /></button>
@@ -95,8 +134,10 @@ export function NodeTree({ editor }: { editor: DocumentEditor }) {
       {menu && <div ref={menuElement} className="node-add-menu" role="menu" aria-label={menu.context ? '节点操作' : '添加子节点'} style={{ left: menu.x, top: menu.y }}
         onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setMenu(null); } }}
         onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setMenu(null); }}>
-        {menu.context && <button role="menuitem" autoFocus onClick={() => { setMenu(null); setSaving(true); }}>保存…</button>}
-        {Object.keys(editor.strategy.nodes).filter(name => editor.strategy.canParent(menu.parent, editor.strategy.createNode(name))).map((name, index) => <button key={name} role="menuitem" autoFocus={!menu.context && index === 0} onClick={() => {
+        {menu.context && <button role="menuitem" autoFocus onClick={() => beginRename(menu.parent)}>重命名</button>}
+        {menu.context && <button role="menuitem" onClick={() => { setMenu(null); setSaving(true); }}>保存…</button>}
+        {menu.context && addableNodes.length > 0 && <div className="node-menu-separator" role="separator" />}
+        {addableNodes.map((name, index) => <button key={name} role="menuitem" autoFocus={!menu.context && index === 0} onClick={() => {
           editor.add(name, menu.parent.id); setMenu(null);
         }}><img className="node-icon" src={nodeIcons[`../assets/roblox-node-icons/${name}.png`]} width={16} height={16} alt="" />{name}</button>)}
       </div>}
