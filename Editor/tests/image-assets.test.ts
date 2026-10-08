@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, writeFile, rename } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { ImageAssetStore } from '../electron/image-assets';
+import { ImageAssetStore, permanentImageRoot } from '../electron/image-assets';
 import { normalizeRobloxId, applyImageAsset, resolveImageAssets } from '../src/shared/imageAssets';
 import { robloxStrategy } from '../src/editor/roblox';
 import { executeCode, robloxCodeAdapter } from '../electron/code-executor';
@@ -27,9 +27,9 @@ test('Roblox IDs normalize and reject invalid input without losing precision', (
 });
 
 test('asset directories follow the library and reject unknown asset IDs', async () => {
-  const { store, runtime, project } = await fixture();
+  const { store, root, project } = await fixture();
   const builtin = (await store.list())[0];
-  assert.equal(await store.assetDirectory(builtin.id), join(runtime, 'image-assets'));
+  assert.equal(await store.assetDirectory(builtin.id), join(root, 'SharedAssets', 'image-assets'));
   const imported = await store.import('project', builtin.previewImage);
   assert.equal(await store.assetDirectory(imported.id), join(project, 'image-assets'));
   await assert.rejects(store.assetDirectory('../outside'), /不存在/);
@@ -61,7 +61,7 @@ test('invalid updates and corrupt catalogs preserve data and report errors', asy
   await writeFile(file, '{}'); await assert.rejects(store.list(), /格式/);
 });
 test('legacy catalogs keep each image ID and stop applying old overrides; new writes remove override fields', async () => {
-  const { store, project, runtime } = await fixture();
+  const { store, root, project, runtime } = await fixture();
   const stud = (await store.list())[0];
   await mkdir(join(project, 'image-assets'));
   await mkdir(join(runtime, 'image-assets'));
@@ -69,10 +69,96 @@ test('legacy catalogs keep each image ID and stop applying old overrides; new wr
   await writeFile(join(runtime, 'image-assets/catalog.json'), JSON.stringify({ version: 1, assets: [{ ...stud, projectRobloxId: '' }], overrides: {} }));
   assert.equal((await store.list())[0].robloxId, stud.robloxId);
   await store.update({ ...stud, robloxId: '123' });
-  const saved = JSON.parse(await readFile(join(runtime, 'image-assets/catalog.json'), 'utf8'));
+  const saved = JSON.parse(await readFile(join(root, 'SharedAssets/image-assets/catalog.json'), 'utf8'));
   assert.equal(saved.version, 2); assert.equal('overrides' in saved, false);
   assert.equal('projectRobloxId' in saved.assets[0], false);
   assert.throws(() => validateTool('uie.assets.configure', { id: stud.id, sessionId: 's', revision: 1, projectRobloxId: '456' }), /不支持/);
+});
+test('permanent library roots are shared by development and packaged App and isolated in tests', () => {
+  const root = resolve('editor-repository');
+  assert.equal(permanentImageRoot(false, join(root, 'Editor'), 'unused'), join(root, 'SharedAssets'));
+  assert.equal(permanentImageRoot(true, 'unused', join(root, 'ToolRuntime', 'UIEditor-win32-x64', 'UIEditor.exe')), join(root, 'SharedAssets'));
+  assert.equal(permanentImageRoot(true, 'unused', 'unused', join(root, 'test', 'runtime')), join(root, 'test', 'SharedAssets'));
+});
+test('another computer reads identical permanent images and Roblox IDs without the original Runtime', async () => {
+  const a = await fixture(), b = await fixture();
+  const preview = (await a.store.list())[0].previewImage;
+  const imported = await a.store.import('permanent', preview);
+  await a.store.update({ ...imported, name: 'Shared uploaded image', tags: 'shared', robloxId: '987654321012345' });
+  const builtin = (await a.store.list()).find(asset => asset.usage === 'tile')!;
+  await a.store.update({ ...builtin, robloxId: '123456789012345' });
+  await cp(join(a.root, 'SharedAssets'), join(b.root, 'SharedAssets'), { recursive: true });
+  const onB = new ImageAssetStore(join(b.root, 'new-runtime'));
+  assert.deepEqual(await onB.list(), (await a.store.list()).filter(asset => asset.library === 'permanent'));
+  assert.equal((await onB.list()).find(asset => asset.id === imported.id)!.robloxId, 'rbxassetid://987654321012345');
+  const doc = robloxStrategy.createDocument('Shared');
+  doc.root.children.push(applyImageAsset(robloxStrategy.createNode('ImageLabel'), imported));
+  assert.equal(resolveImageAssets(doc, await onB.list()).root.children[0].properties.Image, 'rbxassetid://987654321012345');
+});
+test('legacy migration keeps shared IDs authoritative, retains originals and runs only once', async () => {
+  const { store, root, runtime } = await fixture();
+  const stud = (await store.list()).find(asset => asset.usage === 'tile')!;
+  await store.update({ ...stud, robloxId: '111' });
+  const legacyDirectory = join(runtime, 'image-assets'); await mkdir(legacyDirectory);
+  const legacyFile = join(legacyDirectory, 'catalog.json');
+  const oldImage = { ...stud, id: 'legacy-upload', name: 'Old upload', robloxId: 'rbxassetid://222' };
+  const content = JSON.stringify({ version: 2, assets: [{ ...stud, robloxId: 'rbxassetid://999' }, oldImage] });
+  await writeFile(legacyFile, content);
+  assert.equal((await store.list()).find(asset => asset.id === stud.id)!.robloxId, 'rbxassetid://111');
+  assert.equal((await store.list()).find(asset => asset.id === oldImage.id)!.robloxId, 'rbxassetid://222');
+  assert.equal(await readFile(legacyFile, 'utf8'), content);
+  const sharedFile = join(root, 'SharedAssets/image-assets/catalog.json'), before = await readFile(sharedFile, 'utf8');
+  await writeFile(legacyFile, 'corrupt after completed migration');
+  await store.list();
+  assert.equal(await readFile(sharedFile, 'utf8'), before);
+});
+test('corrupt shared catalogs prevent migration without overwriting either library', async () => {
+  const { store, root, runtime } = await fixture();
+  const stud = (await store.list())[0];
+  const shared = join(root, 'SharedAssets/image-assets'), legacy = join(runtime, 'image-assets');
+  await mkdir(shared, { recursive: true }); await mkdir(legacy);
+  await writeFile(join(shared, 'catalog.json'), '{}');
+  const old = JSON.stringify({ version: 2, assets: [stud] });
+  await writeFile(join(legacy, 'catalog.json'), old);
+  await assert.rejects(store.list(), /格式/);
+  assert.equal(await readFile(join(shared, 'catalog.json'), 'utf8'), '{}');
+  assert.equal(await readFile(join(legacy, 'catalog.json'), 'utf8'), old);
+});
+test('a delayed concurrent migration cannot overwrite a newly saved Roblox ID', async () => {
+  const { store, runtime } = await fixture();
+  const stud = (await store.list())[0];
+  await mkdir(join(runtime, 'image-assets'));
+  await writeFile(join(runtime, 'image-assets/catalog.json'), JSON.stringify({ version: 2, assets: [{ ...stud, robloxId: 'rbxassetid://111' }] }));
+  const slow = new ImageAssetStore(runtime);
+  const writer = slow as unknown as { write(library: string, catalog: unknown): Promise<void> };
+  const original = writer.write.bind(slow);
+  let release!: () => void, entered!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const ready = new Promise<void>(resolve => { entered = resolve; });
+  writer.write = async (...args) => { entered(); await gate; return original(...args); };
+  const migrating = slow.list();
+  await ready;
+  const fast = new ImageAssetStore(runtime);
+  const updating = fast.update({ ...stud, robloxId: '777' });
+  const finishedBeforeRelease = await Promise.race([updating.then(() => true), new Promise<boolean>(resolve => setTimeout(() => resolve(false), 100))]);
+  release();
+  await Promise.all([migrating, updating]);
+  assert.equal((await fast.list()).find(asset => asset.id === stud.id)!.robloxId, 'rbxassetid://777');
+  assert.equal(finishedBeforeRelease, false);
+});
+test('uploaded ID updates retain current metadata across store instances and release locks on failure', async () => {
+  const { store, runtime } = await fixture();
+  const beforeUpload = (await store.list())[0];
+  const other = new ImageAssetStore(runtime);
+  await other.update({ ...beforeUpload, name: 'Updated during upload', tags: 'new tags' });
+  const assets = await store.updateRobloxId(beforeUpload.id, '777');
+  const saved = assets.find(asset => asset.id === beforeUpload.id)!;
+  assert.equal(saved.name, 'Updated during upload'); assert.equal(saved.tags, 'new tags');
+  assert.equal(saved.robloxId, 'rbxassetid://777');
+  await assert.rejects(store.update({ ...saved, name: '' }), /无效/);
+  await other.updateRobloxId(saved.id, '888');
+  assert.equal((await store.list()).find(asset => asset.id === saved.id)!.robloxId, 'rbxassetid://888');
+  await assert.rejects(store.updateRobloxId(saved.id, ''), /无效/);
 });
 test('asset references resolve the single Roblox ID while standalone documents retain snapshots; authoring remains undoable', async () => {
   const { store, root } = await fixture();

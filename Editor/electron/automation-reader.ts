@@ -11,7 +11,7 @@ import { ImageAssetStore } from './image-assets';
 
 // UUID lookup stays on the main-process side; queries never activate a project.
 export class AutomationReader {
-  constructor(private runtime: string, private recent: RecentProjects, private current: () => Project | null) {}
+  constructor(private runtime: string, private recent: RecentProjects, private current: () => Project | null, private permanentImages?: string) {}
   private async projects() {
     const paths = new Set((await this.recent.list()).map(item => item.path));
     const current = this.current();
@@ -87,13 +87,13 @@ export class AutomationReader {
     // Recheck the UUID after reading, in case a saved file was replaced during lookup.
     const document = await readDocument(entries[0].path);
     if (document.id.toLowerCase() !== value.documentId.toLowerCase()) throw new Error('界面身份已变化，请重新列出界面。');
-    const assets = await new ImageAssetStore(this.runtime, storage.project?.path).list();
+    const assets = await new ImageAssetStore(this.runtime, storage.project?.path, this.permanentImages).list();
     return { document: resolveImageAssets(document, assets.filter(asset => storage.project || asset.library === 'permanent')),
       target: { ...(storage.project ? { projectId: storage.project.manifest.id } : {}), library: storage.library, documentId: document.id } };
   }
   async images(args: Record<string, unknown>) {
     const project = args.library === 'permanent' ? null : await this.project(args.projectId);
-    const assets = (await new ImageAssetStore(this.runtime, project?.path).list())
+    const assets = (await new ImageAssetStore(this.runtime, project?.path, this.permanentImages).list())
       .filter(asset => (args.library === undefined || args.library === asset.library) && (project || asset.library === 'permanent'));
     return { assets, projectId: project?.manifest.id ?? null };
   }

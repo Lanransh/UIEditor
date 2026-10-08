@@ -12,7 +12,15 @@
 
 ## 数据和解析
 
-资产使用稳定内部字符串 ID，平台当前固定 Roblox；列表、属性和 MCP 只处理当前支持平台。永久图片保存于 `Runtime/image-assets/catalog.json`，项目图片保存于 `<工程>/image-assets/catalog.json`。新清单使用 version=2，仅含 assets，不改变 project.json。兼容读取 version=1 图片及其自身 robloxId，旧覆盖字段不参与解析，新写入不包含覆盖字段。每个清单最多 100 张、64 MiB，图片沿用 PNG/JPEG/WebP/GIF 与单张 10 MiB 读取限制。清单嵌入图片 Data URL，移动项目不依赖导入源路径；拒绝目录与清单链接、损坏格式，不覆盖损坏清单。
+资产使用稳定内部字符串 ID，平台当前固定 Roblox；列表、属性和 MCP 只处理当前支持平台。永久图片保存于 UIEditor 仓库根目录 `SharedAssets/image-assets/catalog.json`，随编辑器仓库提交；项目图片保存于 `<工程>/image-assets/catalog.json`，随游戏工程提交。新清单使用 version=2，仅含 assets，不改变 project.json。兼容读取 version=1 图片及其自身 robloxId，旧覆盖字段不参与解析，新写入不包含覆盖字段。每个清单最多 100 张、64 MiB，图片沿用 PNG/JPEG/WebP/GIF 与单张 8 MiB 读取限制。清单嵌入图片 Data URL，移动项目不依赖导入源路径；拒绝目录与清单链接、损坏格式，不覆盖损坏清单。
+
+永久图片的内容、稳定 ID、名称、标签和 Roblox ID 保存在同一清单，不能只提交 UI 文件或程序代码而漏掉图片清单。电脑 A 上传成功并提交清单后，电脑 B 拉取并重新打开编辑器即可读取相同图片和资源 ID，不需要再次上传。共享清单不包含 API Key、本机路径、Toolkit 令牌或任务状态；未取得成功 ID 的上传任务不会跨电脑恢复。
+
+开发版与默认 `ToolRuntime/UIEditor-win32-x64/` 打包版均使用仓库根目录的同一 `SharedAssets`，不复制进 app.asar 或打包资源，不被重新打包覆盖；分发或移动打包版时需保留这一相对目录结构。设置 `UI_EDITOR_USER_DATA` 的隔离测试使用该 Runtime 的同级 `SharedAssets`，不会改写真实共享库。
+
+首次访问共享库时兼容迁移旧 Runtime 的永久图片，仅添加共享清单尚不存在的资产 ID，共享清单已有内容和 Roblox ID 优先；不能用电脑 B 的旧本机 ID 覆盖 Git 拉取的 ID。迁移后保留旧清单，并在旧 `Runtime/image-assets/shared-library-migrated.json` 写本机标记，后续不重复导入旧记录。损坏清单明确报错，不覆盖损坏内容；内置默认数据继续作为未配置资产的回退。
+
+同一主进程内，所有资产存储实例按规范化清单目录共享串行队列，迁移、导入和修改在队列内重新读取并写入，异常也释放队列；不能让并发 MCP 读取触发的旧迁移快照覆盖刚保存的资源 ID。此队列不协调外部 Git 操作或其他进程。
 
 图片节点可附加 `imageAssetId`，仍保存已解析 Image 和嵌入 previewImage 快照，保持单独保存界面的可移植性。编辑器、保存、运行及 MCP 均取图片自身的 robloxId；永久图片的 ID 在项目间共享，项目图片只属于自己的工程。当前库没有该资产时保留文档快照，节点属性明确提示缺失，不删除预览。库存在但未配置 ID 时 Image 为空，只能本地预览。
 
@@ -29,8 +37,16 @@
 
 `uie.assets.search` 查询名称、标签、库并分页，返回 robloxId；`uie.assets.get` 返回详情与图片预览；`uie.assets.configure` 保存名称、标签和唯一 robloxId，省略字段保留原值，不支持 projectRobloxId 参数。AI 制作通过 `ui.assets.apply(nodeId, assetId)` 应用同一资产，随 code.execute 整笔支持撤销、dry-run 与失败回滚。制作 VM 不开放文件与网络。资产属性变化使旧 MCP 编辑会话失效，需重新读取状态。
 
-无自动上传或权限查询。通过 Toolkit 导入 UI 时使用解析后的资源 ID，见 [导入设计](roblox-import.md)。本地预览、ID 语法正确与配置保存均不能证明审核通过或目标游戏有权加载；配置页明确显示权限未验证。
+图片属性提供「上传到 Roblox」；已有 ID 时按钮明确标注「替换 ID」，未保存配置须先保存。点击后由主进程读取资产内容，使用 Toolkit 已配置的资源所有者与 API Key 上传，不在 UIEditor 管理云端凭据。通过 `/discover.uiEditorImageUpload === 1` 检查能力，旧版提示更新并重启，不影响原有 UI 导入。
+
+主进程取当前 `UIEditorWorkspace` 同级 `GameKitWorkspace` 的真实路径，按 Toolkit 的路径规范化 SHA-256 前 16 位工程 ID 匹配已运行且有 PlaceId 的工程；Windows 忽略路径大小写。明确匹配时直接上传，不要求选择工程；找不到匹配时才显示工程选择，不因只有一个其他工程或名称相同而自动上传。
+
+单张源图片与转换后的 PNG 上限均为 8 MiB；Toolkit 校验宽高小于 8000、总像素不超过 16777216，非静态 PNG 转换为 PNG，动画只取第一帧。上传使用 `/ui-editor/image-upload`，查询使用 `/ui-editor/image-upload-task`；按返回的 `pollAfterMs`（至少 3 秒）串行查询，区分处理中、等待审核、成功与失败。成功的合法 Image 引用自动回填并保存，配置保存失败可单独重试保存 ID；失败不改原 ID，连接错误可继续查询。关闭对话框停止 App 查询，不取消已提交的 Toolkit 操作，再次提交同一图片复用缓存；没有资产选择触发的后台自动上传。
+
+无游戏权限查询。通过 Toolkit 导入 UI 时使用解析后的资源 ID，见 [导入设计](roblox-import.md)。本地预览、ID 语法正确、配置保存与上传审核通过均不能证明目标游戏有权加载；配置页明确显示权限未验证。
+
+上传成功和重试保存仅提交资产 ID 与 Roblox ID；主进程在清单队列内读取最新记录，仅更新 Roblox ID，保留等待审核期间通过 MCP 保存的名称、标签和图片内容，不回写上传开始时的配置快照。
 
 ## 检查
 
-`tests/image-assets.test.ts` 检查单一 ID、永久库共享、项目隔离、旧清单兼容、导入、项目移动、非法 ID、损坏清单、快照与制作应用；`npm run test:assets` 构建并运行图片资产 Electron 冒烟，验证页签分类、无搜索与导入入口、统一矩形预览、共用属性面板、配置、保存重开、画布拖入和 MCP。截图保存在忽略的 test-results 目录，不能代替 Studio 验证。
+`tests/image-assets.test.ts` 检查单一 ID、跨电脑共享、开发与打包路径一致、旧 Runtime 迁移与共享 ID 优先、项目隔离、旧清单兼容、导入、项目移动、非法 ID、损坏清单、快照与制作应用；`tests/image-upload.test.ts` 检查同级工程匹配、能力检查、通信校验与 8 MiB 边界；`npm run test:assets` 构建并运行图片资产 Electron 冒烟，验证页签分类、无搜索与导入入口、统一矩形预览、共用属性面板、配置、保存重开、画布拖入、MCP，以及 mock 上传的自动匹配、选择回退、审核等待、ID 落盘和失败保留。截图保存在忽略的 test-results 目录，不实际上传 Roblox，不能代替 Studio 验证。

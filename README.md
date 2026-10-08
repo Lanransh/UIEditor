@@ -104,6 +104,7 @@ npm run dev
 - `Editor/electron/`：文件管理、原生目录选择、受限 IPC 和应用生命周期。
 - `Editor/scripts/`、`Editor/tests/`：开发、打包脚本及自动化验证。
 - `TemplateStyles/`：风格制作包的唯一维护源；打包版直接读取分发资源，新建项目原样复制。
+- `SharedAssets/image-assets/catalog.json`：可提交的永久图片及 Roblox ID；上传后提交清单，其他电脑拉取即可复用，不需要重新上传。
 - `ToolRuntime/`：打包应用和运行数据，详见[运行目录说明](ToolRuntime/README.md)。
 - `Docs/`：[设计文档](Docs/design/README.md)，记录当前行为、数据格式与职责边界。
 

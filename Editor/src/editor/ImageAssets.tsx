@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DocumentEditor } from './useDocumentEditor';
 import { normalizeRobloxId, type ImageAsset } from '../shared/imageAssets';
+import { ImageUploadDialog } from './ImageUploadDialog';
 
 export function ImageAssets({ editor, library, selectedId, select }: {
   editor: DocumentEditor; library: string; selectedId: string | null; select(id: string): void;
@@ -72,6 +73,7 @@ export function ImageAssetProperties({ editor, asset }: { editor: DocumentEditor
   const [name, setName] = useState(asset.name), [tags, setTags] = useState(asset.tags);
   const [robloxId, setRobloxId] = useState(asset.robloxId);
   const [message, setMessage] = useState(''), [pending, setPending] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const previous = useRef(asset);
   useEffect(() => {
     const old = previous.current;
@@ -94,17 +96,23 @@ export function ImageAssetProperties({ editor, asset }: { editor: DocumentEditor
     } catch (cause) { setMessage(String(cause)); } finally { setPending(false); }
   }
   return <form className="image-asset-properties editor-fields" aria-label="图片资产属性" onSubmit={event => { event.preventDefault(); void save(); }}>
-    <fieldset disabled={editor.busy || pending}>
+    <fieldset disabled={editor.busy || pending || uploadOpen}>
       <div className="image-asset-config-preview image-checker"><img src={asset.previewImage.dataUrl} alt={`${asset.name}预览`} /></div>
       <div className="image-asset-config-fields">
         <label>名称<input aria-label="图片资产名称" maxLength={100} value={name} onChange={e => setName(e.target.value)} /></label>
         <label>标签<input aria-label="图片资产标签" maxLength={500} value={tags} onChange={e => setTags(e.target.value)} /></label>
         <label>Roblox 资源 ID<input aria-label="Roblox 资源 ID" value={robloxId} onChange={e => setRobloxId(e.target.value)} placeholder="数字或 rbxassetid://…" /></label>
-        <p className="property-note">{invalid || effective || '未配置，仅本地预览'}<br />{effective ? '已配置，Roblox 审核与游戏权限尚未验证。' : '不会自动上传；请上传后填写图片资源 ID。'}</p>
+        <p className="property-note">{invalid || effective || '未配置，仅本地预览'}<br />{effective ? '已配置，Roblox 审核与游戏权限尚未验证。' : '可通过 Toolkit 上传，或手动填写图片资源 ID。'}</p>
         <div className="image-asset-actions"><button type="submit" disabled={!changed || !!invalid || !name.trim()}>保存配置</button>
+          <button type="button" disabled={changed} onClick={() => setUploadOpen(true)}>{asset.robloxId ? '上传到 Roblox（替换 ID）' : '上传到 Roblox'}</button>
         </div>
+        {changed && <p className="property-note">请先保存配置，再上传图片。</p>}
         {message && <p role="status">{message}</p>}
       </div>
     </fieldset>
+    {uploadOpen && <ImageUploadDialog asset={asset} onClose={() => setUploadOpen(false)} saveId={async id => {
+      await editor.configureImageRobloxId(asset.id, id);
+      setRobloxId(id); setMessage('上传成功，ID 已自动保存。');
+    }} />}
   </form>;
 }

@@ -126,7 +126,7 @@ UDim/UDim2 的 Scale 支持小数，Offset 必须是整数；属性编辑、MCP 
 ## 图片与预览边界
 
 Image 保存 Roblox 资源标识；节点的 previewImage 分别保存本地文件名和图片 Data URL。
-预览图嵌入文档，移动工程不依赖原图片路径；支持 PNG/JPEG/WebP/GIF，单张最多 10 MiB。
+预览图嵌入文档，移动工程不依赖原图片路径；支持 PNG/JPEG/WebP/GIF，本地图片读取单张最多 8 MiB。
 图片可通过主进程选择并读取，或通过制作 API 附加已经取得的图片 Data URL，不自动上传或访问远程资源。缺失预览图显示占位提示。
 图片还可从永久与项目库引用，节点附加 imageAssetId 并保留预览和 Image 快照；单一 Roblox ID、属性入口与 MCP 见 [图片资产](image-assets.md)。引用节点的 Image 由资产解析，解除引用后恢复手动编辑。
 

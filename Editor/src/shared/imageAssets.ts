@@ -14,6 +14,7 @@ export interface ImageAssetAPI {
   import(library: ImageLibrary): Promise<Result<ImageAsset | null>>;
   importFile(library: ImageLibrary, file: File): Promise<Result<ImageAsset>>;
   update(value: ImageAssetUpdate): Promise<Result<ImageAsset[]>>;
+  updateRobloxId(id: string, robloxId: string): Promise<Result<ImageAsset[]>>;
   openDirectory(id: string): Promise<Result<null>>;
 }
 declare global { interface Window { imageAssets: ImageAssetAPI } }

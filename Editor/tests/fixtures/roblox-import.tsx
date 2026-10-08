@@ -10,6 +10,9 @@ let current: RobloxImportTask = { id: 'a'.repeat(32), deliveryId: 'delivery', na
 const state = { submitted: 0, failDiscovery: false, failTask: false, succeed: () => { current = { ...current, status: 'succeeded', message: 'UI 已导入 Studio' }; } };
 (window as unknown as { importQA: typeof state }).importQA = state;
 window.toolkit = {
+  imageTargets: async () => ({ ok: false, error: '此测试不上传图片' }),
+  uploadImage: async () => ({ ok: false, error: '此测试不上传图片' }),
+  imageTask: async () => ({ ok: false, error: '此测试不上传图片' }),
   discover: async () => state.failDiscovery ? { ok: false, error: '后台未启动' } : { ok: true, value: [{ id: 'game', name: 'Roblox_Y1', placeId: '123' }] },
   submit: async (target, document) => {
     if (target !== 'game' || document.root.name !== 'RewardsUI') throw new Error('Wrong snapshot');

@@ -17,7 +17,7 @@ import { startBridge } from './automation-bridge';
 import { executeCode, getCodeAdapter } from './code-executor';
 import { openInterface, saveInterface } from './automation-files';
 import { createCodexMcpSettingsStore } from './codex-mcp-settings.cjs';
-import { ImageAssetStore } from './image-assets';
+import { ImageAssetStore, permanentImageRoot } from './image-assets';
 import { ensureWorkspaceLauncher } from './workspace-launcher';
 import { listTemplateStyles, previewTemplateStyle, styleDirectory, templateStylesDirectory } from './template-styles';
 import { resolveImageAssets, type ImageAssetUpdate, type ImageLibrary } from '../src/shared/imageAssets';
@@ -25,6 +25,7 @@ import { resolveImageAssets, type ImageAssetUpdate, type ImageLibrary } from '..
 const runtime = process.env.UI_EDITOR_USER_DATA
   ? process.env.UI_EDITOR_USER_DATA
   : join(app.isPackaged ? dirname(dirname(process.execPath)) : join(__dirname, '..', '..', 'ToolRuntime'), 'Runtime');
+const permanentImages = permanentImageRoot(app.isPackaged, app.getAppPath(), process.execPath, process.env.UI_EDITOR_USER_DATA);
 for (const name of ['userData', 'sessionData', 'logs', 'crashDumps'] as const) {
   const directory = join(runtime, name);
   mkdirSync(directory, { recursive: true });
@@ -68,7 +69,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       return listTemplateStyles(stylesRoot);
     }
     let activeProject: Project | null = null;
-    const reader = new AutomationReader(runtime, recent, () => automationReady ? activeProject : null);
+    const reader = new AutomationReader(runtime, recent, () => automationReady ? activeProject : null, permanentImages);
     const previews = new Map<Electron.WebContents, { document: UIDocument; ready(): void }>();
     async function savedScreenshot(document: UIDocument, target: object) {
       const preview = new BrowserWindow({ width: 1280, height: 720, useContentSize: true, show: false, skipTaskbar: true, focusable: false,
@@ -165,7 +166,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
         case 'settings:set': return mcpSettings.setEnabled(argument);
         case 'code': {
           if (!activeProject || !automationReady) throw new Error('请先打开工程。');
-          const assets = await new ImageAssetStore(runtime, activeProject.path).list();
+          const assets = await new ImageAssetStore(runtime, activeProject.path, permanentImages).list();
           return executeCode(getCodeAdapter(activeProject.manifest.mode), nativeDirectory, argument.document, argument.language, argument.source, assets).catch(error => ({ error: error.message, stage: error.stage ?? 'execution', logs: error.logs ?? [] }));
         }
         case 'file:open': { if (!activeProject || !automationReady) throw new Error('请先打开工程。'); const result = await openInterface(activeProject.path, argument.relativePath); documentPath = result.path; return result; }
@@ -197,7 +198,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       stopRuntime();
       const revision = runtimeRevision;
       try {
-        const assets = await new ImageAssetStore(runtime, activeProject.path).list();
+        const assets = await new ImageAssetStore(runtime, activeProject.path, permanentImages).list();
         const started = await LuauSession.start(join(__dirname, app.isPackaged ? '../../native-bin' : '../native-bin'), resolveImageAssets(robloxStrategy.validate(document), assets));
         if (revision !== runtimeRevision || window.isDestroyed()) { started.session.abort(); return { ok: false, error: '运行启动已取消。' }; }
         runtimeSession = started.session;
@@ -303,6 +304,18 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     const requireProject = () => { if (!activeProject) throw new Error('请先打开工程。'); return activeProject; };
     const toolkit = new ToolkitClient();
     handle('toolkit:discover', async () => toolkit.discover());
+    handle('toolkit:image-targets', async () => toolkit.imageTargets(requireProject().path));
+    handle('toolkit:image-upload', async argument => {
+      const value = argument as { targetId: string; assetId: string };
+      const asset = (await imageStore().list()).find(asset => asset.id === value.assetId);
+      if (!asset) throw new Error('图片资产不存在。');
+      return toolkit.uploadImage(value.targetId, asset.name, asset.previewImage.dataUrl);
+    });
+    handle('toolkit:image-task', async argument => {
+      requireProject();
+      const value = argument as { targetId: string; taskId: string };
+      return toolkit.imageTask(value.targetId, value.taskId);
+    });
     handle('toolkit:submit', async argument => {
       requireProject();
       const value = argument as { targetId: string; document: unknown };
@@ -375,9 +388,14 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       }
       return { path, document: await writeDocument(path, document) };
     });
-    const imageStore = () => new ImageAssetStore(runtime, requireProject().path);
+    const imageStore = () => new ImageAssetStore(runtime, requireProject().path, permanentImages);
     handle('images:list', async () => imageStore().list());
     handle('images:update', async input => imageStore().update(input as ImageAssetUpdate));
+    handle('images:update-roblox-id', async input => {
+      const value = input as Pick<ImageAssetUpdate, 'id' | 'robloxId'>;
+      if (!value) throw new Error('图片资产配置无效。');
+      return imageStore().updateRobloxId(value.id, value.robloxId);
+    });
     handle('images:open-directory', async id => {
       if (typeof id !== 'string') throw new Error('图片资产 ID 无效。');
       const error = await shell.openPath(await imageStore().assetDirectory(id));

@@ -83,7 +83,7 @@ export async function writeDocument(path: string, source: unknown): Promise<UIDo
   return document;
 }
 export async function readPreviewImage(path: string) {
-  if ((await stat(path)).size > 10 * 1024 * 1024) throw new Error('图片不能超过 10 MiB。');
+  if ((await stat(path)).size > 8 * 1024 * 1024) throw new Error('图片不能超过 8 MiB。');
   const bytes = await readFile(path);
   let type: string;
   if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) type = 'png';

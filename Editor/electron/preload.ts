@@ -43,6 +43,7 @@ const imageAssets: ImageAssetAPI = {
   import: library => ipcRenderer.invoke('images:import', library),
   importFile: (library, file) => ipcRenderer.invoke('images:import-file', { library, path: webUtils.getPathForFile(file) }),
   update: value => ipcRenderer.invoke('images:update', value),
+  updateRobloxId: (id, robloxId) => ipcRenderer.invoke('images:update-roblox-id', { id, robloxId }),
   openDirectory: id => ipcRenderer.invoke('images:open-directory', id),
 };
 contextBridge.exposeInMainWorld('imageAssets', imageAssets);
@@ -71,6 +72,9 @@ contextBridge.exposeInMainWorld('automation', {
 });
 
 contextBridge.exposeInMainWorld('toolkit', {
+  imageTargets: () => ipcRenderer.invoke('toolkit:image-targets'),
+  uploadImage: (targetId: string, assetId: string) => ipcRenderer.invoke('toolkit:image-upload', { targetId, assetId }),
+  imageTask: (targetId: string, taskId: string) => ipcRenderer.invoke('toolkit:image-task', { targetId, taskId }),
   discover: () => ipcRenderer.invoke('toolkit:discover'),
   submit: (targetId: string, document: unknown) => ipcRenderer.invoke('toolkit:submit', { targetId, document }),
   task: (targetId: string, taskId: string, action: string) => ipcRenderer.invoke('toolkit:task', { targetId, taskId, action }),

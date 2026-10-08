@@ -19,3 +19,4 @@ Editor/.cache/
 Editor/native-bin/
 Editor/test-results/
 *.log
+/SharedAssets/image-assets/*.tmp

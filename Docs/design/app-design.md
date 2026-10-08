@@ -44,7 +44,7 @@ React 通过 `useEditorHistory(initialState)` 获取 `state`、`execute`、`undo
 选择风格的项目另有 `interfaces/`、`template-references/` 与 `AgentWorkspace/`；提示词及规范原样复制，不增加全局来源路径到 project.json，重开不重新复制。
 工程不依赖最近列表，可独立移动后重新打开。
 每次创建或成功打开工程时生成本地 `Run.bat`，指向当前编辑器并通过 `UI_EDITOR_OPEN_WORKSPACE` 打开批处理所在工程；普通启动仍进入 Hub。已有编辑器实例时将工程交给该实例，当前界面未保存或工程操作未完成时提示用户先完成操作。仅更新带 UIEditor 生成标记的启动文件，不覆盖用户自建 Run.bat。
-工作区 `.gitignore` 仅追加 `/Run.bat` 并保留已有规则。工程元数据、`interfaces` 中的 UI 文件、模板参考 `template-references` 及项目图片 `image-assets` 均应提交到 Git；启动文件含本机路径，不提交。永久图片属于编辑器 Runtime，存储边界见 [图片资产](image-assets.md)。
+工作区 `.gitignore` 仅追加 `/Run.bat` 并保留已有规则。工程元数据、`interfaces` 中的 UI 文件、模板参考 `template-references` 及项目图片 `image-assets` 均应提交到 Git；启动文件含本机路径，不提交。永久图片及其 Roblox ID 保存于编辑器仓库的 `SharedAssets/image-assets/catalog.json`，随 UIEditor 提交并跨电脑复用；Runtime 不作为永久图片的权威来源，存储与旧数据迁移边界见 [图片资产](image-assets.md)。
 
 仓库根目录保留启动批处理与说明；`Editor/` 集中源码、依赖、开发脚本、测试和构建产物；`Docs/design/` 保存设计文档。
 `ToolRuntime/UIEditor-win32-x64/` 保存打包应用；开发模式与打包应用均使用根目录的 `ToolRuntime/Runtime/` 保存历史、Electron 用户数据、会话、日志和缓存。

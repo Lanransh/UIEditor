@@ -2,11 +2,13 @@ import { _electron as electron } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
 
 await mkdir('test-results', { recursive: true });
 const root = await mkdtemp(resolve('test-results/image-assets-ui-'));
 const parent = join(root, 'project'); await mkdir(parent);
 const runtime = join(root, 'runtime');
+const permanentImages = join(root, 'SharedAssets', 'image-assets');
 const env = { ...process.env, UI_EDITOR_BACKGROUND: '1', UI_EDITOR_USER_DATA: runtime }; delete env.ELECTRON_RUN_AS_NODE;
 const application = await electron.launch(process.argv.includes('--packaged') ? { executablePath: resolve(process.env.UI_EDITOR_PACKAGED_EXECUTABLE || '../ToolRuntime/UIEditor-win32-x64/UIEditor.exe'), args: [], env } : { args: ['.'], env });
 const page = await application.firstWindow(), errors = [];
@@ -81,7 +83,7 @@ try {
   });
   await stud.click({ button: 'right' });
   await page.getByRole('menuitem', { name: '打开目录', exact: true }).click();
-  assert.equal(await application.evaluate(() => globalThis.openedImageDirectory), join(runtime, 'image-assets'));
+  assert.equal(await application.evaluate(() => globalThis.openedImageDirectory), permanentImages);
   const invalidDirectory = await page.evaluate(() => window.imageAssets.openDirectory('missing'));
   assert.equal(invalidDirectory.ok, false);
   await stud.click({ button: 'right' }); await page.keyboard.press('Escape');
@@ -160,6 +162,65 @@ try {
   assert.equal((await tool('uie.editor.get_state', { detail: 'full' })).document.root.children.at(-1).properties.Position.x.offset, droppedNode.properties.Position.x.offset);
   await page.locator('.canvas-heading').click(); await page.keyboard.press('Control+z');
   assert.equal((await tool('uie.editor.get_state', { detail: 'full' })).document.root.children.length, count);
+  // Mock upload IPC in the isolated main process; the real bridge client is unit tested.
+  await mkdir(join(parent, 'GameKitWorkspace'));
+  const toolkitPath = join(parent, 'GameKitWorkspace');
+  const toolkitId = createHash('sha256').update(process.platform === 'win32' ? toolkitPath.toLowerCase() : toolkitPath).digest('hex').slice(0, 16);
+  await application.evaluate(({ ipcMain }, id) => {
+    globalThis.uploadQA = { mode: 'automatic', submissions: 0, queries: 0, id };
+    for (const name of ['toolkit:image-targets', 'toolkit:image-upload', 'toolkit:image-task']) ipcMain.removeHandler(name);
+    ipcMain.handle('toolkit:image-targets', () => {
+      const qa = globalThis.uploadQA;
+      return qa.mode === 'old' ? { ok: false, error: '请更新并重启 StudioGameToolkit' } :
+        { ok: true, value: { automaticTargetId: qa.mode === 'fallback' ? '' : id,
+          targets: [{ id: qa.mode === 'fallback' ? 'other' : id, name: 'MockGame', placeId: '123' }] } };
+    });
+    const snapshot = { taskId: 'a'.repeat(32), status: 'processing', message: '处理中', pollAfterMs: 3000 };
+    ipcMain.handle('toolkit:image-upload', (_, value) => {
+      if (value.assetId !== 'builtin:roblox:stud' || ![id, 'other'].includes(value.targetId)) throw new Error('Wrong upload request');
+      globalThis.uploadQA.submissions++; globalThis.uploadQA.queries = 0;
+      return { ok: true, value: snapshot };
+    });
+    ipcMain.handle('toolkit:image-task', (_, value) => {
+      if (value.taskId !== snapshot.taskId) throw new Error('Wrong task ID');
+      const qa = globalThis.uploadQA; qa.queries++;
+      return { ok: true, value: qa.mode === 'fail' ? { ...snapshot, status: 'failed', message: '测试审核拒绝' } :
+        qa.queries === 1 ? { ...snapshot, status: 'waiting_review', message: '测试等待审核' } :
+          { ...snapshot, status: 'succeeded', message: '测试上传完成', robloxId: 'rbxassetid://987654321' } };
+    });
+  }, toolkitId);
+  await stud.click();
+  await page.getByRole('button', { name: '上传到 Roblox（替换 ID）', exact: true }).click();
+  const upload = page.getByRole('dialog', { name: '上传图片到 Roblox', exact: true });
+  await upload.getByText('处理中', { exact: true }).waitFor();
+  assert.equal(await upload.getByLabel('图片上传目标工程').count(), 0);
+  await upload.getByText('测试等待审核', { exact: true }).waitFor();
+  await page.screenshot({ path: resolve('test-results/image-upload-waiting.png') });
+  const duringUpload = await tool('uie.editor.get_state');
+  await tool('uie.assets.configure', { sessionId: duringUpload.sessionId, revision: duringUpload.revision,
+    id: asset.id, name: '审核期间更新的名称', tags: '审核期间更新的标签' });
+  await upload.getByText('上传成功，ID 已自动保存；目标游戏加载权限尚未验证。', { exact: true }).waitFor();
+  const uploadedAsset = JSON.parse(await readFile(join(permanentImages, 'catalog.json'), 'utf8')).assets.find(a => a.id === asset.id);
+  assert.equal(uploadedAsset.robloxId, 'rbxassetid://987654321');
+  assert.equal(uploadedAsset.name, '审核期间更新的名称');
+  assert.equal(uploadedAsset.tags, '审核期间更新的标签');
+  await upload.getByRole('button', { name: '关闭', exact: true }).click();
+  assert.equal(await page.getByLabel('Roblox 资源 ID', { exact: true }).inputValue(), 'rbxassetid://987654321');
+  assert.equal(await page.getByLabel('图片资产名称', { exact: true }).inputValue(), '审核期间更新的名称');
+  assert.equal(await page.getByLabel('图片资产标签', { exact: true }).inputValue(), '审核期间更新的标签');
+  await application.evaluate(() => { globalThis.uploadQA.mode = 'fallback'; });
+  await page.getByRole('button', { name: '上传到 Roblox（替换 ID）', exact: true }).click();
+  await upload.getByLabel('图片上传目标工程').selectOption('other');
+  assert.equal(await application.evaluate(() => globalThis.uploadQA.submissions), 1);
+  await application.evaluate(() => { globalThis.uploadQA.mode = 'fail'; });
+  await upload.getByRole('button', { name: '上传图片', exact: true }).click();
+  await upload.getByText('测试审核拒绝', { exact: true }).waitFor();
+  await upload.getByRole('button', { name: '关闭', exact: true }).click();
+  assert.equal(await page.getByLabel('Roblox 资源 ID', { exact: true }).inputValue(), 'rbxassetid://987654321');
+  await application.evaluate(() => { globalThis.uploadQA.mode = 'old'; });
+  await page.getByRole('button', { name: '上传到 Roblox（替换 ID）', exact: true }).click();
+  await upload.getByRole('alert').filter({ hasText: '更新并重启 StudioGameToolkit' }).waitFor();
+  await upload.getByRole('button', { name: '关闭', exact: true }).click();
   assert.deepEqual(errors, []);
   console.log('Image asset UI, uniform previews, no search/import, single Roblox ID, persistence, canvas drop and MCP checks passed.');
 } finally { await application.close(); }
