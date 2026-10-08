@@ -1,11 +1,14 @@
+import { pointSchema, validateMouseAction, type Point } from './runtime-mouse';
 import { findNode } from './uiDocument';
 import { validateJSON, type RuntimeFrame } from './runtime';
 import type { AutomationRequest } from './automation';
 
-const actions = ['run', 'reset', 'stop', 'click', 'assert'] as const;
+const actions = ['run', 'reset', 'stop', 'click', 'hover', 'scroll', 'drag', 'assert'] as const;
 export interface RuntimeBatchStep {
   action: typeof actions[number];
-  id?: string;
+  id?: string | null;
+  to?: Partial<Point>; delta?: Partial<Point>; from?: Point; steps?: number;
+  hovered?: boolean; pressed?: boolean;
   properties?: Record<string, unknown>;
   disabled?: boolean;
   dispatched?: boolean;
@@ -16,7 +19,7 @@ export const runtimeBatchStepsSchema = {
   items: {
     type: 'object', additionalProperties: false, required: ['action'],
     properties: {
-      action: { enum: actions }, id: { type: 'string' },
+      action: { enum: actions }, id: { type: ['string', 'null'] }, to: pointSchema, delta: pointSchema, from: pointSchema, steps: { type: 'integer', minimum: 1, maximum: 32 }, hovered: { type: 'boolean' }, pressed: { type: 'boolean' },
       properties: { type: 'object' }, disabled: { type: 'boolean' },
       dispatched: { type: 'boolean' }, reason: { enum: ['hidden', 'disabled', null] },
     },
@@ -27,16 +30,18 @@ export function validateRuntimeBatchSteps(value: unknown): asserts value is Runt
   if (!Array.isArray(value) || value.length < 1 || value.length > 32) throw new Error('steps 必须包含 1–32 个步骤。');
   for (const step of value) {
     if (!step || typeof step !== 'object' || Array.isArray(step) || !actions.includes(step.action)) throw new Error('无效的验证步骤。');
-    const allowed = step.action === 'click' ? ['action', 'id', 'dispatched', 'reason'] : step.action === 'assert' ? ['action', 'id', 'properties', 'disabled'] : ['action'];
+    const mouse = ['hover', 'scroll', 'drag'].includes(step.action);
+    if (mouse) validateMouseAction(step);
+    const allowed = mouse ? ['action', 'id', 'dispatched', 'reason', ...(step.action === 'scroll' ? ['to', 'delta'] : step.action === 'drag' ? ['from', 'to', 'steps'] : [])] : step.action === 'click' ? ['action', 'id', 'dispatched', 'reason'] : step.action === 'assert' ? ['action', 'id', 'properties', 'disabled', 'hovered', 'pressed'] : ['action'];
     if (Object.keys(step).some(key => !allowed.includes(key))) throw new Error('验证步骤包含不支持的字段。');
     if (['click', 'assert'].includes(step.action) && (typeof step.id !== 'string' || !step.id)) throw new Error('点击和断言需要稳定节点 id。');
-    for (const key of ['disabled', 'dispatched']) if (step[key] !== undefined && typeof step[key] !== 'boolean') throw new Error(`${key} 必须是布尔值。`);
+    for (const key of ['disabled', 'dispatched', 'hovered', 'pressed']) if (step[key] !== undefined && typeof step[key] !== 'boolean') throw new Error(`${key} 必须是布尔值。`);
     if (step.reason !== undefined && ![null, 'hidden', 'disabled'].includes(step.reason)) throw new Error('reason 无效。');
     if (step.properties !== undefined) {
       validateJSON(step.properties);
       if (!step.properties || typeof step.properties !== 'object' || Array.isArray(step.properties)) throw new Error('properties 必须是对象。');
     }
-    if (step.action === 'assert' && step.disabled === undefined && !Object.keys(step.properties ?? {}).length) throw new Error('断言需要 properties 或 disabled。');
+    if (step.action === 'assert' && step.disabled === undefined && step.hovered === undefined && step.pressed === undefined && !Object.keys(step.properties ?? {}).length) throw new Error('断言需要 properties、disabled、hovered 或 pressed。');
   }
 }
 
@@ -53,6 +58,7 @@ export async function executeRuntimeBatch(
   dispatch: (request: AutomationRequest) => Promise<any>,
   inspect: () => RuntimeFrame | null,
   verify: () => void,
+  interaction: () => { hoveredId: string | null; pressedId: string | null } = () => ({ hoveredId: null, pressedId: null }),
 ) {
   validateRuntimeBatchSteps(args.steps);
   verify();
@@ -72,15 +78,21 @@ export async function executeRuntimeBatch(
         for (const [key, expected] of Object.entries(step.properties ?? {})) {
           if (!equal(node.properties[key], expected)) throw new Error(`属性 ${key} 不匹配：期望 ${JSON.stringify(expected)}，实际 ${JSON.stringify(node.properties[key])}。`);
         }
+        for (const key of ['hovered', 'pressed'] as const) {
+          result[key] = interaction()[key === 'hovered' ? 'hoveredId' : 'pressedId'] === node.id;
+          if (step[key] !== undefined && result[key] !== step[key]) throw new Error(`${key} 状态不匹配。`);
+        }
         if (step.disabled !== undefined && result.disabled !== step.disabled) throw new Error('disabled 状态不匹配。');
       } else {
+        const mouse = ['hover', 'scroll', 'drag'].includes(step.action);
+        const { action, dispatched, reason, ...input } = step;
         result = await dispatch({
-          name: step.action === 'click' ? 'uie.runtime.click' : 'uie.runtime.control',
-          arguments: { sessionId: args.sessionId, revision: args.revision, ...(step.action === 'click' ? { id: step.id } : { action: step.action }) },
+          name: mouse || step.action === 'click' ? `uie.runtime.${step.action}` : 'uie.runtime.control',
+          arguments: { sessionId: args.sessionId, revision: args.revision, ...(mouse || step.action === 'click' ? input : { action: step.action }) },
         });
         verify();
         if (!result.result?.ok) throw new Error(result.result?.error ?? '运行操作失败。');
-        if (step.action === 'click') {
+        if (mouse || step.action === 'click') {
           if (step.dispatched !== undefined && result.dispatched !== step.dispatched) throw new Error('dispatched 状态不匹配。');
           if (step.reason !== undefined && result.reason !== step.reason) throw new Error('reason 不匹配。');
         }

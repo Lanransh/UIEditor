@@ -1,3 +1,4 @@
+import type { MouseAction } from '../shared/runtime-mouse';
 import { useEffect, useRef } from 'react';
 import type { DocumentEditor } from './useDocumentEditor';
 import { getNode, nodeTree, findNodes, integer, type AutomationRequest } from '../shared/automation';
@@ -39,7 +40,7 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
       try {
         if (!e.hasDocument && !['uie.editor.get_state', 'uie.editor.get_capabilities', 'uie.document.list', 'uie.document.new', 'uie.document.open', 'uie.assets.search', 'uie.assets.get', 'uie.assets.configure', 'uie.debug.get_diagnostics'].includes(request.name)) throw new Error('请先新建或打开界面。');
         switch (request.name) {
-          case 'uie.runtime.batch': return { ...await executeRuntimeBatch(a, handle, () => current.current.editor.runtime.inspect().frame, verify), ...state() };
+          case 'uie.runtime.batch': return { ...await executeRuntimeBatch(a, handle, () => current.current.editor.runtime.inspect().frame, verify, () => current.current.editor.runtime.inspect().interaction), ...state() };
           case 'uie.editor.get_state': return { ...state(), ...(a.detail === 'full' ? { document: e.hasDocument ? resolved() : null } : { nodeCount: e.hasDocument ? allNodes(h.state.root).length : 0 }) };
           case 'uie.assets.search': case 'uie.assets.get': {
             const assets = await e.refreshImages();
@@ -65,8 +66,8 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
             } finally { f.busy(false); }
           }
           case 'uie.editor.get_capabilities': return { ...stamp(), ...getCapabilities(e.strategy) };
-          case 'uie.nodes.get': { const view = readDocument(); return { ...stamp(), ...('runtimeSessionId' in view ? { runtimeSessionId: view.runtimeSessionId, frameSequence: view.frameSequence } : {}), ...(a.format === 'tree' ? nodeTree(view.document, a) : { node: getNode(view.document, a) }) }; }
-          case 'uie.nodes.find': { const view = readDocument(); return { ...stamp(), ...('runtimeSessionId' in view ? { runtimeSessionId: view.runtimeSessionId, frameSequence: view.frameSequence } : {}), ...findNodes(view.document, a) }; }
+          case 'uie.nodes.get': { const view = readDocument(); return { ...stamp(), ...('runtimeSessionId' in view ? { runtimeSessionId: view.runtimeSessionId, frameSequence: view.frameSequence, interaction: e.runtime.inspect().interaction } : {}), ...(a.format === 'tree' ? nodeTree(view.document, a) : { node: getNode(view.document, a) }) }; }
+          case 'uie.nodes.find': { const view = readDocument(); return { ...stamp(), ...('runtimeSessionId' in view ? { runtimeSessionId: view.runtimeSessionId, frameSequence: view.frameSequence, interaction: e.runtime.inspect().interaction } : {}), ...findNodes(view.document, a) }; }
           case 'uie.code.execute': {
             writable(); if (a.dryRun !== undefined && typeof a.dryRun !== 'boolean') throw new Error('dryRun 必须是布尔值。');
             if (a.label !== undefined && (typeof a.label !== 'string' || a.label.length > 80)) throw new Error('label 最多 80 个字符。');
@@ -111,6 +112,13 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
             else throw new Error('不支持的运行操作。');
             return { ...state(), result, runtimeSessionId: e.runtime.inspect().sessionId, frameSequence: e.runtime.inspect().sequence };
           }
+          case 'uie.runtime.hover': case 'uie.runtime.scroll': case 'uie.runtime.drag': {
+            verify();
+            const result = await e.runtime.mouse({ ...a, action: request.name.split('.').at(-1) } as MouseAction);
+            verify();
+            const runtime = e.runtime.inspect();
+            return { ...stamp(), ...result, result, runtimeSessionId: runtime.sessionId, frameSequence: runtime.sequence, interaction: runtime.interaction };
+          }
           case 'uie.runtime.click': {
             verify(); const runtime = e.runtime.inspect(); if (!runtime.sessionId || !runtime.frame) throw new Error('没有运行会话。');
             const id = String(a.id), node = findNode(runtime.frame.document.root, id);
@@ -122,7 +130,7 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
           }
           case 'uie.debug.get_diagnostics': {
             const runtime = e.runtime.inspect(), cursor = integer(a.cursor, 0, 0, Number.MAX_SAFE_INTEGER);
-            return { ...state(), connected: true, lastError: lastError.current, logs: runtime.logs.filter(log => log.cursor > cursor), cursor: runtime.cursor, truncated: cursor < (runtime.logs[0]?.cursor ?? runtime.cursor + 1) - 1 };
+            return { ...state(), connected: true, interaction: runtime.interaction, lastError: lastError.current, logs: runtime.logs.filter(log => log.cursor > cursor), cursor: runtime.cursor, truncated: cursor < (runtime.logs[0]?.cursor ?? runtime.cursor + 1) - 1 };
           }
           case 'uie.debug.screenshot': {
             window.dispatchEvent(new Event('uie:screenshot-start'));

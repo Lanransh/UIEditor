@@ -84,6 +84,7 @@ npm run dev
 | `npm run test:display` | 使用源码启动隔离显示样例，检查节点渲染与字号约束并保存截图；Studio 对比另行执行，见[显示测试记录](Editor/tests/roblox-display-report.md) |
 | `npm run test:packaged` | 启动已打包 exe，检查 Hub、IPC、运行目录和沙箱配置 |
 | `node tests/workspace-launcher-smoke.mjs` | build 后验证工作区启动文件生成、直接打开工程及已有实例接收启动请求 |
+| `npm run test:mouse` | 构建并验证鼠标事件、固定适应画布、滚动条及稳定 MCP 鼠标接口；需要已有原生宿主 |
 | `npm run test:runtime` | 构建并验证脚本、按钮动作、数据刷新、重置及错误恢复 |
 | `npm run build:mcp` | 构建独立 stdio MCP 服务，普通 build 已包含 |
 | `npm run test:mcp` | 构建并通过真实 stdio MCP 验证制作、查询、历史、运行与保存 |

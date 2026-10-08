@@ -98,6 +98,18 @@ local function nodeFor(ref)
     assert(id and nodes[id] and not nodes[id].destroyed, "Unknown or destroyed node reference: " .. tostring(ref))
     return nodes[id], id
 end
+local mouseEvents = { MouseEnter = true, MouseLeave = true, MouseMoved = true, MouseWheelForward = true, MouseWheelBackward = true, InputBegan = true, InputChanged = true, InputEnded = true }
+local function fire(id, event, ...)
+    for _, handler in ipairs(table.clone(handlers[id] or {})) do
+        if handler.event == event and handler.connection.Connected then handler.callback(...) end
+    end
+end
+local function equal(a, b)
+    if type(a) ~= "table" or type(b) ~= "table" then return a == b end
+    for k, v in pairs(a) do if not equal(v, b[k]) then return false end end
+    for k in pairs(b) do if a[k] == nil then return false end end
+    return true
+end
 local API = {}
 function API:Get(ref, property)
     local node = nodeFor(ref)
@@ -113,16 +125,18 @@ function API:Set(ref, property, value)
         if expected == "EnumItem" then assert(value.EnumType == property, "Wrong enum type for " .. property) end
         value = encode(value)
     end
+    local changed = not equal(node.properties[property], value)
     node.properties[property] = clone(value)
+    if changed then fire(id, "property:" .. property) end
 end
 function API:On(ref, event, callback)
     local node, id = nodeFor(ref)
-    assert(event == "Activated" and (node.className == "TextButton" or node.className == "ImageButton"), "Only button Activated is supported")
+    assert(mouseEvents[event] and node.properties.Visible ~= nil or event == "Activated" and (node.className == "TextButton" or node.className == "ImageButton") or string.sub(event, 1, 9) == "property:" and node.properties[string.sub(event, 10)] ~= nil, "Unsupported node event: " .. event)
     assert(type(callback) == "function", "Expected callback")
     local connection = { Connected = true }
     function connection:Disconnect() self.Connected = false end
     handlers[id] = handlers[id] or {}
-    table.insert(handlers[id], { callback = callback, connection = connection })
+    table.insert(handlers[id], { event = event, callback = callback, connection = connection })
     return connection
 end
 function API:SetEnabled(ref, enabled)
@@ -210,8 +224,12 @@ makeProxy = function(id)
             if key == "FindFirstChild" then return function(_, name) return child(id, name) end end
             if key == "WaitForChild" then return function(_, name) return assert(child(id, name), "Missing child: " .. name) end end
             if key == "IsA" then return function(_, name) return node.className == name end end
-            if key == "Activated" then
-                return table.freeze({ Connect = function(_, callback) return API:On(id, "Activated", callback) end })
+            if key == "GetPropertyChangedSignal" then return function(_, property)
+                assert(node.properties[property] ~= nil, "Unsupported property")
+                return table.freeze({ Connect = function(_, callback) return API:On(id, "property:" .. property, callback) end })
+            end end
+            if key == "Activated" or mouseEvents[key] then
+                return table.freeze({ Connect = function(_, callback) return API:On(id, key, callback) end })
             end
             if node.properties[key] ~= nil then return API:Get(id, key) end
             return child(id, key)
@@ -335,6 +353,11 @@ function host.initialize(input)
         for _, name in ipairs(choices) do items[name] = value("EnumItem", { Name = name, EnumType = property }) end
         Enum[property] = table.freeze(items)
     end
+    for kind, names in pairs({ UserInputType = { "MouseButton1", "MouseButton2", "MouseButton3", "MouseMovement", "MouseWheel" }, UserInputState = { "Begin", "Change", "End", "Cancel" } }) do
+        local items = {}
+        for _, name in ipairs(names) do items[name] = value("EnumItem", { Name = name, EnumType = kind }) end
+        Enum[kind] = table.freeze(items)
+    end
     table.freeze(Enum)
 end
 function host.prepare(input)
@@ -374,9 +397,19 @@ function host.command(input)
             API:Set(input.node, input.property, input.value)
         end
     elseif input.type == "event" and not disabled[input.node] then
-        for _, handler in ipairs(handlers[input.node] or {}) do
-            if handler.connection.Connected then handler.callback() end
-        end
+        fire(input.node, "Activated")
+    elseif input.type == "mouse" then
+        local event = input.event
+        table.insert(logs, { kind = "input", message = input.node .. " " .. event })
+        if string.sub(event, 1, 5) == "Input" then
+            local button = ({ [0] = "MouseButton1", [1] = "MouseButton3", [2] = "MouseButton2" })[input.button]
+            local state = input.cancelled and "Cancel" or event == "InputBegan" and "Begin" or event == "InputEnded" and "End" or "Change"
+            fire(input.node, event, table.freeze({
+                UserInputType = Enum.UserInputType[input.wheel and "MouseWheel" or button or "MouseMovement"], UserInputState = Enum.UserInputState[state],
+                Position = table.freeze({ X = input.x, Y = input.y, Z = input.wheel and -math.sign(input.dy) or 0 }),
+                Delta = table.freeze({ X = input.wheel and 0 or input.dx, Y = input.wheel and 0 or input.dy, Z = input.wheel and -math.sign(input.dy) or 0 }),
+            }))
+        else fire(input.node, event, input.x, input.y) end
     end
 end
 function host.dispose()

@@ -55,5 +55,5 @@ export function RuntimeOutput({ editor }: { editor: DocumentEditor }) {
   const logs = editor.runtime.logs;
   const output = useRef<HTMLDivElement>(null);
   useEffect(() => { if (output.current) output.current.scrollTop = output.current.scrollHeight; }, [logs]);
-  return <section className="runtime-output" aria-label="运行输出"><div ref={output} className="script-logs" role="log" aria-label="运行日志">{logs.length ? logs.map((log, index) => <pre key={index} className={log.kind}>[{({ error: '错误', action: '动作', output: '输出', warning: '警告' })[log.kind]}] {log.message}</pre>) : <p>运行后显示打印、警告、动作和错误。</p>}</div></section>;
+  return <section className="runtime-output" aria-label="运行输出"><div ref={output} className="script-logs" role="log" aria-label="运行日志">{logs.length ? logs.map((log, index) => <pre key={index} className={log.kind}>[{({ input: '输入', error: '错误', action: '动作', output: '输出', warning: '警告' })[log.kind]}] {log.message}</pre>) : <p>运行后显示打印、警告、动作和错误。</p>}</div></section>;
 }

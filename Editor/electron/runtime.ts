@@ -5,7 +5,7 @@ import { createInterface } from 'node:readline';
 import { randomUUID } from 'node:crypto';
 import { robloxStrategy } from '../src/editor/roblox';
 import { allNodes, findNode, updateNode, type PropertyValue, type UIDocument, type UINode } from '../src/shared/uiDocument';
-import { validateJSON, type RuntimeFrame, type RuntimeLog } from '../src/shared/runtime';
+import { mouseEvents, validateJSON, type RuntimeFrame, type RuntimeLog } from '../src/shared/runtime';
 
 export class RuntimeError extends Error {
   constructor(message: string, readonly logs: RuntimeLog[]) { super(message); }
@@ -14,7 +14,7 @@ function readLogs(source: unknown): RuntimeLog[] {
   validateJSON(source);
   if (!Array.isArray(source)) throw new Error('无效的运行日志。');
   return source.map(log => {
-    if (!['output', 'warning', 'action'].includes(log.kind) || typeof log.message !== 'string') throw new Error('无效的运行日志。');
+    if (!['output', 'warning', 'action', 'input'].includes(log.kind) || typeof log.message !== 'string') throw new Error('无效的运行日志。');
     return { kind: log.kind, message: log.payload === undefined ? log.message : `${log.message} ${JSON.stringify(log.payload)}` };
   });
 }
@@ -78,6 +78,16 @@ export class LuauSession {
           return node.children.some(child => visible(child, enabled));
         };
         if (!visible(this.document.root, true) || this.disabled.includes(target.id)) return { document: this.document, disabled: this.disabled, logs: [] };
+      } else if (input.type === 'mouse') {
+        const target = typeof input.node === 'string' && findNode(this.document.root, input.node);
+        if (!target || robloxStrategy.nodes[target.className].category !== 'object' || !mouseEvents.includes(input.event as any)
+          || ['x', 'y', 'dx', 'dy'].some(key => typeof input[key] !== 'number' || !Number.isFinite(input[key]))
+          || ![-1, 0, 1, 2].includes(input.button as number) || (input.cancelled !== undefined && typeof input.cancelled !== 'boolean') || (input.wheel !== undefined && typeof input.wheel !== 'boolean')) throw new Error('无效的鼠标输入。');
+        const shown = (node: UINode, visible: boolean): boolean => {
+          visible = visible && (node.className === 'ScreenGui' ? node.properties.Enabled === true : node.properties.Visible !== false);
+          return node.id === target.id ? visible : node.children.some(child => shown(child, visible));
+        };
+        if (!['MouseLeave', 'InputEnded'].includes(String(input.event)) && (!shown(this.document.root, true) || this.disabled.includes(target.id))) return { document: this.document, disabled: this.disabled, logs: [] };
       } else if (input.type === 'set') {
         const target = typeof input.node === 'string' && findNode(this.document.root, input.node);
         if (!target || typeof input.property !== 'string' || (input.property !== 'Name' && !Object.hasOwn(target.properties, input.property))) throw new Error('无效的运行节点属性。');

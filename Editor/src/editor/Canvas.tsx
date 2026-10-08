@@ -1,3 +1,4 @@
+import { runtimeGeometry, localMousePoint } from './runtimeMouse';
 import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import { findParent, updateNode, type UIDocument, type UDim, type UDim2, type UINode, type Vector2 } from '../shared/uiDocument';
 import type { DocumentEditor } from './useDocumentEditor';
@@ -24,6 +25,10 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
   const gesture = useRef<Gesture | null>(null);
   const [space, setSpace] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const runtimeRef = useRef(editor.runtime); runtimeRef.current = editor.runtime;
+  const editView = useRef<{ zoom: number; pan: { x: number; y: number } } | null>(null);
+  const mouseGesture = useRef<{ pointerId: number; buttonId: string | null; button: number; startX: number; startY: number; moved: boolean; scroll?: { id: string; axis: 'x' | 'y'; position: number; ratio: number; start: number; matrix: NonNullable<ReturnType<typeof runtimeGeometry>>['matrix'] } } | null>(null);
+  const suppressClick = useRef(false);
   useEffect(() => {
     const start = () => setCapturing(true), end = () => setCapturing(false);
     window.addEventListener('uie:screenshot-start', start); window.addEventListener('uie:screenshot-end', end);
@@ -31,21 +36,76 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
   }, []);
   const shown = editor.runtime.frame?.document ?? draft ?? editor.document;
   useEffect(() => {
-    const down = (event: KeyboardEvent) => { if (event.code === 'Space' && event.target instanceof HTMLElement && !event.target.closest('input,textarea,select,button')) { event.preventDefault(); setSpace(true); } };
+    const down = (event: KeyboardEvent) => { if (!runtimeRef.current.active && event.code === 'Space' && event.target instanceof HTMLElement && !event.target.closest('input,textarea,select,button')) { event.preventDefault(); setSpace(true); } };
     const up = (event: KeyboardEvent) => { if (event.code === 'Space') setSpace(false); };
-    const blur = () => { setSpace(false); gesture.current = null; draftRef.current = null; setDraft(null); };
+    const blur = () => { if (runtimeRef.current.active) void runtimeRef.current.cancelMouse(); mouseGesture.current = null; setSpace(false); gesture.current = null; draftRef.current = null; setDraft(null); };
     window.addEventListener('keydown', down); window.addEventListener('keyup', up); window.addEventListener('blur', blur);
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('blur', blur); };
   }, []);
   function fit() {
     const area = viewport.current!;
-    const scale = Math.max(.1, Math.min(2, (area.clientWidth - 48) / 1280, (area.clientHeight - 48) / 720));
+    const scale = Math.max(editor.runtime.active ? .001 : .1, Math.min(editor.runtime.active ? Infinity : 2, (area.clientWidth - 48) / 1280, (area.clientHeight - 48) / 720));
     setZoom(scale); setPan({ x: (area.clientWidth - 1280 * scale) / 2, y: (area.clientHeight - 720 * scale) / 2 });
   }
   useEffect(() => { if (visible) fit(); }, [editor.document.id, visible]);
-  useEffect(() => { if (visible && editor.runtime.ready) fit(); }, [editor.runtime.ready, visible]);
+  useEffect(() => {
+    if (!editor.runtime.active) {
+      if (editView.current) { setZoom(editView.current.zoom); setPan(editView.current.pan); editView.current = null; }
+      mouseGesture.current = null; return;
+    }
+    editView.current = { zoom, pan };
+    setSpace(false); gesture.current = null; draftRef.current = null; setDraft(null);
+    const area = viewport.current!;
+    const preventWheelDefault = (event: WheelEvent) => event.preventDefault();
+    area.addEventListener('wheel', preventWheelDefault, { passive: false });
+    const observer = new ResizeObserver(fit);
+    observer.observe(viewport.current!); fit();
+    return () => { observer.disconnect(); area.removeEventListener('wheel', preventWheelDefault); };
+  }, [editor.runtime.active]);
+  function nodeId(target: EventTarget) { return (target as HTMLElement).closest<HTMLElement>('[data-node-id]')?.dataset.nodeId ?? null; }
+  function point(event: PointerEvent) {
+    const rect = viewport.current!.getBoundingClientRect();
+    return { x: (event.clientX - rect.left - pan.x) / zoom, y: (event.clientY - rect.top - pan.y) / zoom };
+  }
+  function runtimeDown(event: PointerEvent) {
+    if (!editor.runtime.ready || mouseGesture.current || ![0, 1, 2].includes(event.button)) return;
+    event.preventDefault();
+    const id = nodeId(event.target), bar = (event.target as HTMLElement).closest<HTMLElement>('[data-scroll-axis]');
+    suppressClick.current = false;
+    const active: NonNullable<(typeof mouseGesture)['current']> = { pointerId: event.pointerId, buttonId: (event.target as HTMLElement).closest<HTMLElement>('[data-class-name="TextButton"], [data-class-name="ImageButton"]')?.dataset.nodeId ?? null, button: event.button, startX: event.clientX, startY: event.clientY, moved: false };
+    if (bar && id && event.button === 0) {
+      const axis = bar.dataset.scrollAxis as 'x' | 'y';
+      const { matrix } = runtimeGeometry(editor.runtime.frame!, editor.strategy, id)!;
+      active.scroll = { id, axis, matrix, start: localMousePoint(matrix, point(event))[axis], position: Number(bar.dataset.position), ratio: Number(bar.dataset.max) / Math.max(.001, Number(bar.dataset.travel)) };
+    }
+    mouseGesture.current = active;
+    viewport.current!.setPointerCapture(event.pointerId);
+    void editor.runtime.pointer('down', id, point(event), event.button);
+  }
+  function runtimeMove(event: PointerEvent) {
+    const active = mouseGesture.current;
+    if (active && active.pointerId !== event.pointerId) return;
+    if (active) {
+      active.moved ||= Math.hypot(event.clientX-active.startX, event.clientY-active.startY) > 3;
+      suppressClick.current = active.moved;
+      if (active.scroll) {
+        const { id, axis, position, ratio, matrix, start } = active.scroll;
+        void editor.runtime.mouse({ action: 'scroll', id, to: { [axis]: position + ((localMousePoint(matrix, point(event))[axis] - start) * ratio) } });
+      }
+    }
+    void editor.runtime.pointer('move', nodeId(event.target), point(event), event.button);
+  }
+  function runtimeUp(event: PointerEvent, cancel = false) {
+    const active = mouseGesture.current;
+    if (!active || active.pointerId !== event.pointerId) return;
+    mouseGesture.current = null;
+    void editor.runtime.pointer(cancel ? 'cancel' : 'up', nodeId(event.target), point(event), event.button);
+    if (viewport.current?.hasPointerCapture(event.pointerId)) viewport.current.releasePointerCapture(event.pointerId);
+    const releasedButton = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-class-name="TextButton"], [data-class-name="ImageButton"]')?.dataset.nodeId;
+    if (!cancel && !active.moved && !active.scroll && active.button === 0 && active.buttonId && active.buttonId === releasedButton) void editor.runtime.activate(active.buttonId);
+  }
   function start(event: PointerEvent, kind: Gesture['kind'], node?: UINode) {
-    if ((editor.busy && !editor.runtime.active) || (editor.runtime.active && kind !== 'pan') || gesture.current || ![0, 1].includes(event.button)) return;
+    if ((editor.busy && !editor.runtime.active) || editor.runtime.active || gesture.current || ![0, 1].includes(event.button)) return;
     event.preventDefault(); event.stopPropagation();
     if (node && editor.select(node.id) === false) return;
     const layout = node && layoutComponent(findParent(shown.root, node.id)!);
@@ -104,7 +164,7 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
     if (viewport.current?.hasPointerCapture(event.pointerId)) viewport.current.releasePointerCapture(event.pointerId);
   }
   return <section className="canvas" aria-label="Roblox 画布">
-    <div className="canvas-heading"><span>1280 × 720 · {editor.document.name}</span><div className="canvas-tools"><button disabled={editor.busy && !editor.runtime.active} onClick={fit}>适应窗口</button><select aria-label="画布缩放" disabled={editor.busy && !editor.runtime.active} value={zoom} onChange={event => setZoom(Number(event.target.value))}><option value={zoom}>{Math.round(zoom * 100)}%</option>{[.25, .5, .75, 1, 1.5, 2].filter(value => value !== zoom).map(value => <option key={value} value={value}>{value * 100}%</option>)}</select></div></div>
+    <div className="canvas-heading"><span>1280 × 720 · {editor.document.name}</span><div className="canvas-tools"><button disabled={editor.busy || editor.runtime.active} onClick={fit}>适应窗口</button><select aria-label="画布缩放" disabled={editor.busy || editor.runtime.active} value={zoom} onChange={event => setZoom(Number(event.target.value))}><option value={zoom}>{Math.round(zoom * 100)}%</option>{[.25, .5, .75, 1, 1.5, 2].filter(value => value !== zoom).map(value => <option key={value} value={value}>{value * 100}%</option>)}</select></div></div>
     <div ref={viewport} data-zoom={zoom} className={`canvas-viewport${space ? ' panning' : ''}`} onDragOver={event => { if (!editor.busy && event.dataTransfer.types.includes('application/x-uie-image-asset')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }} onDrop={event => {
       if (editor.busy) return;
       const asset = editor.imageAssets.find(asset => asset.id === event.dataTransfer.getData('application/x-uie-image-asset'));
@@ -113,7 +173,13 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
       const bounds = event.currentTarget.getBoundingClientRect(), node = applyImageAsset(editor.strategy.createNode('ImageLabel'), asset);
       node.properties.Position = { x: { scale: 0, offset: Math.round((event.clientX - bounds.x - pan.x) / zoom) }, y: { scale: 0, offset: Math.round((event.clientY - bounds.y - pan.y) / zoom) } };
       editor.execute('拖入图片资产', document => insertNode(document, document.root.id, node, editor.strategy)); editor.select(node.id);
-    }} onPointerDown={event => { if (event.button === 0 && !space) editor.select(shown.root.id); start(event, 'pan'); }} onPointerMove={move} onPointerUp={event => finish(event)} onPointerCancel={event => finish(event, true)} onLostPointerCapture={event => finish(event, true)} onWheel={event => {
+    }} onContextMenu={event => { if (editor.runtime.active) event.preventDefault(); }} onClickCapture={event => { if (editor.runtime.active && suppressClick.current) { event.preventDefault(); event.stopPropagation(); } }} onPointerLeave={() => { if (editor.runtime.active && !mouseGesture.current) void editor.runtime.mouse({ action: 'hover', id: null }); }} onPointerDown={event => { if (editor.runtime.active) { runtimeDown(event); return; } if (event.button === 0 && !space) editor.select(shown.root.id); start(event, 'pan'); }} onPointerMove={event => editor.runtime.active ? runtimeMove(event) : move(event)} onPointerUp={event => editor.runtime.active ? runtimeUp(event) : finish(event)} onPointerCancel={event => editor.runtime.active ? runtimeUp(event, true) : finish(event, true)} onLostPointerCapture={event => editor.runtime.active ? runtimeUp(event, true) : finish(event, true)} onWheel={event => {
+      if (editor.runtime.active) {
+        event.stopPropagation();
+        const id = nodeId(event.target), unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 720 : 1;
+        if (id) void editor.runtime.wheel(id, { x: event.deltaX * unit, y: event.deltaY * unit });
+        return;
+      }
       if (gesture.current) return;
       if (event.ctrlKey || event.metaKey) {
         const next = Math.max(.1, Math.min(3, zoom * (event.deltaY > 0 ? .9 : 1.1)));
@@ -123,10 +189,10 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
     }}>
       <div className="ui-artboard" data-testid="ui-artboard" style={{ width: 1280, height: 720, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
         <DocumentPreview document={shown} strategy={editor.strategy} selected={!capturing && !editor.runtime.active ? editor.selected : undefined} runtime={editor.runtime}
-          onNodePointerDown={(event, node) => { if (editor.runtime.active) { event.stopPropagation(); return; } start(event, space || event.button === 1 ? 'pan' : 'move', space || event.button === 1 ? undefined : node); }}
+          onNodePointerDown={(event, node) => { if (editor.runtime.active) return; start(event, space || event.button === 1 ? 'pan' : 'move', space || event.button === 1 ? undefined : node); }}
           onResize={(event, node) => start(event, 'resize', node)} />
       </div>
-      {!capturing && <div className="canvas-hint">{editor.runtime.active ? '运行模式 · 点击按钮执行脚本' : '空白处拖动 / 空格或中键平移 · Ctrl+滚轮缩放 · 静态设计'}</div>}
+      {!capturing && <div className="canvas-hint">{editor.runtime.active ? '运行模式 · 鼠标交互 · 自动适应窗口' : '空白处拖动 / 空格或中键平移 · Ctrl+滚轮缩放 · 静态设计'}</div>}
     </div>
   </section>;
 }
@@ -167,7 +233,7 @@ export function DocumentPreview({ document: shown, strategy, selected: selection
     const childRects = strategy.layout(node, contentWidth, contentHeight);
     const textSize = p.TextScaled ? auxiliary(node, 'UITextSizeConstraint')?.properties : undefined;
     const fontSize = Math.min(textSize ? textSize.MaxTextSize as number : 100, Math.max(textSize ? textSize.MinTextSize as number : 1, p.TextScaled ? Math.min(rect.height * .7, rect.width / Math.max(1, String(p.Text).length) * 1.5) : p.TextSize as number));
-    const contentStyle: CSSProperties = { position: 'absolute', inset: 0, overflow: p.ClipsDescendants || node.className === 'CanvasGroup' ? 'hidden' : 'visible' };
+    const contentStyle: CSSProperties = { position: 'absolute', inset: 0, overflow: scroll || p.ClipsDescendants || node.className === 'CanvasGroup' ? 'hidden' : 'visible' };
     const textStyle: CSSProperties = { fontSize, fontFamily: p.Font === 'Arial' ? 'Arial, sans-serif' : String(p.Font).startsWith('Gotham') ? 'Segoe UI, sans-serif' : 'Segoe UI, Microsoft YaHei, sans-serif', fontWeight: p.Font === 'GothamBold' ? 700 : undefined, whiteSpace: p.TextWrapped ? 'pre-wrap' : 'pre', textAlign: String(p.TextXAlignment).toLowerCase() as CSSProperties['textAlign'], justifyContent: p.TextYAlignment === 'Top' ? 'flex-start' : p.TextYAlignment === 'Bottom' ? 'flex-end' : 'center' };
     const tileSize = p.TileSize as UDim2 | undefined;
     const text = (p.Text as string) || (node.className === 'TextBox' ? p.PlaceholderText as string : '');
@@ -178,9 +244,7 @@ export function DocumentPreview({ document: shown, strategy, selected: selection
     const button = ['TextButton', 'ImageButton'].includes(node.className);
     const disabled = runtime?.frame?.disabled.includes(node.id);
     return <div key={node.id} data-node-id={runtime ? node.id : undefined} data-class-name={runtime ? node.className : undefined} className="preview-node" style={{ ...style, cursor: runtime?.active ? button ? disabled ? 'not-allowed' : 'pointer' : 'default' : undefined }}
-      role={runtime?.active && button ? 'button' : undefined} aria-label={runtime?.active && button ? node.name : undefined} aria-disabled={runtime?.active && button ? disabled : undefined} tabIndex={runtime?.active && button && !disabled ? 0 : undefined}
-      onClick={event => { if (runtime?.active && button) { event.stopPropagation(); if (!disabled) void runtime.activate(node.id); } }}
-      onKeyDown={event => { if (runtime?.active && button && ['Enter', ' '].includes(event.key)) { event.preventDefault(); event.stopPropagation(); if (!disabled && !event.repeat) void runtime.activate(node.id); } }}
+      role={runtime?.active && button ? 'button' : undefined} aria-label={runtime?.active && button ? node.name : undefined} aria-disabled={runtime?.active && button ? disabled : undefined}
       onPointerDown={event => onNodePointerDown?.(event, node)}>
       <div style={contentStyle}>
         {gradient?.Enabled && <div className="preview-background" style={{ position: 'absolute', inset: 0, borderRadius: radius, pointerEvents: 'none', ...gradientStyle(gradient, p.BackgroundColor3 as string, p.BackgroundTransparency as number, rect.width, rect.height) }} />}
@@ -193,8 +257,8 @@ export function DocumentPreview({ document: shown, strategy, selected: selection
           </filter></defs></svg>
           <div className="preview-image" style={{ borderRadius: radius, opacity: 1 - (p.ImageTransparency as number), filter: `url("#${imageFilterId}")`, backgroundImage: `url("${node.previewImage.dataUrl}")`, backgroundSize: p.ScaleType === 'Tile' ? `${Math.max(.01, pixels(tileSize!.x, rect.width))}px ${Math.max(.01, pixels(tileSize!.y, rect.height))}px` : p.ScaleType === 'Stretch' ? '100% 100%' : p.ScaleType === 'Crop' ? 'cover' : 'contain', backgroundPosition: p.ScaleType === 'Tile' ? 'left top' : undefined, backgroundRepeat: p.ScaleType === 'Tile' ? 'repeat' : 'no-repeat' }} />
         </> : <div className="preview-image-missing" style={{ borderRadius: radius }}>▧<small>缺少预览图片</small></div>)}
-        {scroll && scrollbar.vertical && <div className="preview-scrollbar vertical" style={{ width: thickness, height: scrollbar.thumbHeight, top: scrollbar.top }}>{scrollTexture(scrollbar.thumbHeight)}</div>}
-        {scroll && scrollbar.horizontal && <div className="preview-scrollbar horizontal" style={{ height: thickness, width: scrollbar.thumbWidth, left: scrollbar.left }}>{scrollTexture(scrollbar.thumbWidth, true)}</div>}
+        {scroll && scrollbar.vertical && <div data-scroll-axis="y" data-position={scrollbar.y} data-max={scrollbar.maxY} data-travel={scrollbar.windowHeight-scrollbar.thumbHeight} className="preview-scrollbar vertical" style={{ pointerEvents: runtime?.active ? 'auto' : undefined, zIndex: 10000, width: thickness, height: scrollbar.thumbHeight, top: scrollbar.top }}>{scrollTexture(scrollbar.thumbHeight)}</div>}
+        {scroll && scrollbar.horizontal && <div data-scroll-axis="x" data-position={scrollbar.x} data-max={scrollbar.maxX} data-travel={scrollbar.windowWidth-scrollbar.thumbWidth} className="preview-scrollbar horizontal" style={{ pointerEvents: runtime?.active ? 'auto' : undefined, zIndex: 10000, height: thickness, width: scrollbar.thumbWidth, left: scrollbar.left }}>{scrollTexture(scrollbar.thumbWidth, true)}</div>}
         <div style={{ position: 'absolute', width: contentWidth, height: contentHeight, left: scroll ? -scrollbar.x : 0, top: scroll ? -scrollbar.y : 0 }}>
           {node.children.filter(isObject).map(child => renderNode(child, childRects.get(child.id)!))}
         </div>

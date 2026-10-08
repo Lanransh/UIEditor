@@ -120,7 +120,7 @@ test('Codex settings preserve unrelated entries and invalid TOML is never modifi
   await assert.rejects(settings.setEnabled(true), /TOML/); assert.equal(await readFile(filePath, 'utf8'), 'bad = [');
 });
 test('MCP directory is static and bridge authenticates forwarding and screenshots', async () => {
-  assert.equal(definitions.length, 20); assert.ok(!definitions.some(tool => tool.name.includes('selection')));
+  assert.equal(definitions.length, 23); assert.ok(!definitions.some(tool => tool.name.includes('selection')));
   for (const name of ['uie.assets.search', 'uie.assets.get', 'uie.assets.configure']) assert.ok(definitions.some(tool => tool.name === name));
   assert.ok(definitions.some(tool => tool.name === 'uie.scripts.get'));
   assert.ok(definitions.some(tool => tool.name === 'uie.scripts.set'));

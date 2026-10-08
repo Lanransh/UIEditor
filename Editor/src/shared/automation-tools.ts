@@ -1,8 +1,10 @@
+import { pointSchema, validateMouseAction } from './runtime-mouse';
 import { toolNames } from './automation';
 import { runtimeBatchStepsSchema, validateRuntimeBatchSteps } from './runtime-batch';
 const uuid = { type: 'string', pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$' };
 const target = { type: 'object', properties: { projectId: uuid, library: { enum: ['project', 'templates', 'permanent'] }, documentId: uuid }, required: ['documentId'], additionalProperties: false };
 const properties = {
+  to: pointSchema, from: pointSchema, delta: pointSchema,
   steps: runtimeBatchStepsSchema,
   projectId: uuid, target, format: { enum: ['json', 'tree'] }, maxNodes: { type: 'integer', minimum: 1, maximum: 2000 },
   sessionId: { type: 'string' }, revision: { type: 'integer' }, id: { type: 'string' }, parentId: { type: 'string' },
@@ -16,6 +18,9 @@ const properties = {
   tags: { type: 'string' }, robloxId: { type: 'string' },
 };
 const fields: Record<string, string[]> = {
+  'uie.runtime.hover': ['sessionId', 'revision', 'id'],
+  'uie.runtime.scroll': ['sessionId', 'revision', 'id', 'to', 'delta'],
+  'uie.runtime.drag': ['sessionId', 'revision', 'id', 'from', 'to', 'steps'],
   'uie.runtime.batch': ['sessionId', 'revision', 'steps'],
   'uie.editor.get_state': ['detail'], 'uie.editor.get_capabilities': [],
   'uie.nodes.get': ['id', 'depth', 'view', 'target', 'format', 'maxNodes'], 'uie.nodes.find': ['name', 'className', 'match', 'parentId', 'recursive', 'offset', 'limit', 'view', 'target'],
@@ -46,9 +51,12 @@ const descriptions = [
   'Get an image asset with preview and Roblox ID; optional projectId selects source project, permanent library is global.',
   'Save image asset metadata and its single Roblox ID. Omitted fields stay unchanged. Asset catalog changes are saved immediately and are not document undo operations.',
   'List current and recent projects by UUID without opening or switching projects; reports unavailable paths and duplicate UUIDs.',
-  'Validate preview in one sequential call: 1–32 run/reset/stop/click/assert steps, stable node IDs, optional click dispatched/reason expectations and property/disabled assertions. Stops on first failure and returns per-step results plus runtime diagnostics; no rollback or automatic stop. Save/reopen and visual screenshots remain separate.',
+  'Validate preview in one sequential call: 1–32 run/reset/stop/click/hover/scroll/drag/assert steps, stable node IDs, optional click dispatched/reason expectations and property/disabled/hovered/pressed assertions. Stops on first failure and returns per-step results plus runtime diagnostics; no rollback or automatic stop. Save/reopen and visual screenshots remain separate.',
+  'Hover a runtime node by ID, or leave with id=null. No screen coordinates.',
+  'Scroll a ScrollingFrame by ID. Supply exactly one of to or delta in canvas pixels; to preserves unspecified axes. Returns clamped position and range.',
+  'Drag a runtime node using normalized local from/to points (0–1), with 1–32 moves (default 8). Sends mouse begin/change/end without activating a button.',
 ];
-export const definitions = toolNames.map((name, index) => ({ name, description: descriptions[index], inputSchema: { type: 'object', properties: Object.fromEntries(fields[name].map(key => [key, name === 'uie.document.list' && key === 'library' ? { enum: ['project', 'templates', 'permanent'] } : properties[key as keyof typeof properties]])), additionalProperties: false, required: fields[name].filter(key => ['sessionId', 'revision'].includes(key) || (name === 'uie.runtime.batch' && key === 'steps') || (name === 'uie.code.execute' && ['language', 'source'].includes(key)) || (['uie.runtime.click', 'uie.assets.get', 'uie.assets.configure'].includes(name) && key === 'id') || (name === 'uie.runtime.control' && key === 'action') || (name === 'uie.document.open' && key === 'relativePath') || (name === 'uie.document.new' && key === 'name')) } }));
+export const definitions = toolNames.map((name, index) => ({ name, description: descriptions[index], inputSchema: { type: 'object', properties: Object.fromEntries(fields[name].map(key => [key, name === 'uie.runtime.hover' && key === 'id' ? { type: ['string', 'null'] } : name === 'uie.runtime.drag' && key === 'steps' ? { type: 'integer', minimum: 1, maximum: 32 } : name === 'uie.document.list' && key === 'library' ? { enum: ['project', 'templates', 'permanent'] } : properties[key as keyof typeof properties]])), additionalProperties: false, required: fields[name].filter(key => ['sessionId', 'revision'].includes(key) || (name === 'uie.runtime.batch' && key === 'steps') || (name === 'uie.runtime.drag' && ['from', 'to'].includes(key)) || (name === 'uie.code.execute' && ['language', 'source'].includes(key)) || (['uie.runtime.click', 'uie.runtime.hover', 'uie.runtime.scroll', 'uie.runtime.drag', 'uie.assets.get', 'uie.assets.configure'].includes(name) && key === 'id') || (name === 'uie.runtime.control' && key === 'action') || (name === 'uie.document.open' && key === 'relativePath') || (name === 'uie.document.new' && key === 'name')) } }));
 
 export function validateTool(name: string, args: unknown) {
   const tool = definitions.find(tool => tool.name === name);
@@ -56,6 +64,7 @@ export function validateTool(name: string, args: unknown) {
   if (!args || typeof args !== 'object' || Array.isArray(args)) throw new Error('工具参数必须是对象。');
   const values = args as Record<string, unknown>;
   if (name === 'uie.runtime.batch') validateRuntimeBatchSteps(values.steps);
+  if (['uie.runtime.hover', 'uie.runtime.scroll', 'uie.runtime.drag'].includes(name)) validateMouseAction({ ...values, action: name.split('.').at(-1) });
   if (['uie.assets.get', 'uie.assets.configure'].includes(name) && typeof values.id !== 'string') throw new Error('缺少参数 id');
   if (name === 'uie.scripts.set' && values.source === undefined && values.integration === undefined) throw new Error('必须提供 source（交互代码）或 integration（接入代码）。');
   if (values.target !== undefined && values.view === 'runtime') throw new Error('保存文件不支持运行副本。');
@@ -66,7 +75,7 @@ export function validateTool(name: string, args: unknown) {
     if (!definition) throw new Error(`不支持的参数 ${key}`);
     if (value === undefined) continue;
     if (key === 'target') { validateTarget(value); continue; }
-    if (key === 'steps') continue;
+    if (key === 'steps' || ['to', 'from', 'delta'].includes(key) || (name === 'uie.runtime.hover' && key === 'id')) continue;
     if (key === 'projectId') validateUUID(value);
     if (definition.enum && !definition.enum.includes(value)) throw new Error(`参数 ${key} 无效。`);
     if (definition.type === 'integer') {

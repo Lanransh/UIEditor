@@ -18,6 +18,7 @@
     "test:roblox-import": "npm run build && node tests/roblox-import-smoke.mjs",
     "test:packaged": "node tests/packaged-smoke.mjs",
     "test:welfare": "node scripts/build-runtime-hosts.mjs && npm run build && tsx --test tests/welfare.test.ts && tsx tests/welfare-smoke.ts",
+    "test:mouse": "node scripts/build-runtime-hosts.mjs && npm run build && tsx --test tests/runtime-mouse.test.ts tests/runtime-batch.test.ts && tsx tests/runtime-mouse-smoke.ts",
     "test:runtime": "npm run build && node tests/runtime-smoke.mjs",
     "build:mcp": "node scripts/build-mcp.mjs",
     "test:mcp": "npm run build && tsx tests/automation-smoke.ts",

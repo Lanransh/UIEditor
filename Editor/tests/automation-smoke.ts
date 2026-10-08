@@ -36,7 +36,7 @@ let app: Awaited<ReturnType<typeof electron.launch>> | undefined;
 try {
   assert.equal((await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'test', version: '1' } })).serverInfo.name, 'ui-editor');
   const listed = (await rpc('tools/list')).tools;
-  assert.equal(listed.length, 20); assert.ok(listed.some((tool: any) => tool.name === 'uie.runtime.batch')); assert.ok(listed.some((tool: any) => tool.name === 'uie.scripts.set')); assert.ok(!listed.some((tool: any) => tool.name.startsWith('uie.history.')));
+  assert.equal(listed.length, 23); assert.ok(listed.some((tool: any) => tool.name === 'uie.runtime.batch')); assert.ok(listed.some((tool: any) => tool.name === 'uie.scripts.set')); assert.ok(!listed.some((tool: any) => tool.name.startsWith('uie.history.')));
   assert.equal((await raw('uie.history.undo')).isError, true);
   assert.equal((await raw('uie.editor.get_state')).isError, true);
   const parent = join(root, 'project'); await mkdir(parent);

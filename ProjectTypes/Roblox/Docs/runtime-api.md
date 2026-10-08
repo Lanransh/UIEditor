@@ -20,3 +20,15 @@
 `Parent = nil` 暂时移出预览，保留属性和连接，可重新挂载。Destroy 递归移除并断开连接，重复调用无效果，销毁后不可重新挂载。文档根节点不能销毁或重新挂载。运行节点只存在于本次会话，停止和重置后不保留，也不写入设计文档、保存文件或撤销历史。使用 `uie.nodes.get/find` 的运行视图取得副本 ID，再通过 `uie.runtime.click` 测试副本按钮。
 
 App 使用真实 Luau 和模拟节点，覆盖公开支持的属性与接口；常用交互源码在导入后使用 Roblox 原生节点方法。没有完整引擎服务；WaitForChild 缺失时立即报错，不等待。App 预览通过后，仍须分别验证 Studio 与设备显示。
+
+## 鼠标测试
+
+运行画布自动适应窗口，滚轮不会缩放或平移编辑画布。鼠标接口需要当前 sessionId/revision：
+
+- `uie.runtime.hover({sessionId,revision,id})`：悬停；id=null 移出。
+- `uie.runtime.scroll({sessionId,revision,id,to:{y:300}})`：定位 ScrollingFrame；也可使用 delta:{y:120} 测试滚轮路径，不能同时传 to/delta。单位为逻辑内容像素，自动限制范围。
+- `uie.runtime.drag({sessionId,revision,id,from:{x:0.1,y:0.5},to:{x:0.9,y:0.5},steps:8})`：节点局部归一化坐标；steps 为 1–32；不自动移动节点或激活按钮，由脚本响应输入。
+
+节点支持 MouseEnter/MouseLeave/MouseMoved、MouseWheelForward/Backward、InputBegan/InputChanged/InputEnded 和 GetPropertyChangedSignal(property)。Input 回调提供鼠标 UserInputType、UserInputState、Position/Delta（X/Y/Z），位置为 1280×720 逻辑画布像素；仅实现有限鼠标数据，不是完整引擎 InputObject。滚动容器的默认滚动无须脚本；监听 CanvasPosition 可响应滚动变化。不支持键盘、文本输入和焦点事件。
+
+AI 优先使用 runtime.batch 的 hover/scroll/drag/click，并通过 assert 检查属性、hovered/pressed/disabled；nodes.get/find 的 view=runtime 和 get_diagnostics 返回 interaction.hoveredId/pressedId，诊断日志包含输入与脚本结果。按 ID 操作检查显隐和禁用，不检查遮挡；关键状态另外截图。运行中克隆的 ID 不跨 reset 复用。

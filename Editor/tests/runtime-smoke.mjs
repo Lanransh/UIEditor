@@ -146,7 +146,7 @@ try {
     await button.waitFor({ state: 'visible' });
     assert.equal(await textProperty.inputValue(), 'Temporary claim', '临时属性在后续运行命令后保留');
     assert.equal(await page.locator('.node-selection').count(), 0);
-    assert.equal(await page.getByRole('button', { name: '适应窗口', exact: true }).isEnabled(), true);
+    assert.equal(await page.getByRole('button', { name: '适应窗口', exact: true }).isEnabled(), false);
     await page.getByRole('button', { name: '交互脚本', exact: true }).click();
     assert.equal(await page.getByRole('textbox', { name: '交互脚本', exact: true }).getAttribute('readonly'), 'true');
     await page.getByRole('button', { name: '接入脚本', exact: true }).click();

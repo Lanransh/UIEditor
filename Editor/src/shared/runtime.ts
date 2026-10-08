@@ -1,10 +1,12 @@
 import type { Result } from './project';
 import type { UIDocument, UIScripts, JSONValue, PropertyValue } from './uiDocument';
 
-export interface RuntimeLog { kind: 'output' | 'warning' | 'action' | 'error'; message: string }
+export interface RuntimeLog { kind: 'output' | 'warning' | 'action' | 'error' | 'input'; message: string }
 export interface RuntimeFrame { document: UIDocument; disabled: string[]; logs: RuntimeLog[] }
 type RuntimeResult<T> = Result<T> & { logs?: RuntimeLog[] };
-export type RuntimeCommand = { type: 'event'; node: string } | { type: 'show' | 'hide' } | { type: 'set'; node: string; property: string; value: PropertyValue };
+export const mouseEvents = ['MouseEnter', 'MouseLeave', 'MouseMoved', 'MouseWheelForward', 'MouseWheelBackward', 'InputBegan', 'InputChanged', 'InputEnded'] as const;
+export type MouseEventName = typeof mouseEvents[number];
+export type RuntimeCommand = { type: 'mouse'; node: string; event: MouseEventName; x: number; y: number; dx: number; dy: number; button: number; wheel?: boolean; cancelled?: boolean } | { type: 'event'; node: string } | { type: 'show' | 'hide' } | { type: 'set'; node: string; property: string; value: PropertyValue };
 export interface RuntimeAPI {
   start(document: UIDocument): Promise<RuntimeResult<{ session: string; frame: RuntimeFrame }>>;
   command(session: string, command: RuntimeCommand): Promise<RuntimeResult<RuntimeFrame>>;

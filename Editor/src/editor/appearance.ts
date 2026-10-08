@@ -38,7 +38,7 @@ export function scrollGeometry(width: number, height: number, canvasWidth: numbe
   const positionX = Math.min(maxX, Math.max(0, Math.trunc(x))), positionY = Math.min(maxY, Math.max(0, Math.trunc(y)));
   const thumbWidth = canvasWidth ? Math.min(windowWidth, Math.max(2 * thickness, windowWidth * windowWidth / canvasWidth)) : 0;
   const thumbHeight = canvasHeight ? Math.min(windowHeight, Math.max(2 * thickness, windowHeight * windowHeight / canvasHeight)) : 0;
-  return { horizontal, vertical, x: positionX, y: positionY, thumbWidth, thumbHeight,
+  return { horizontal, vertical, maxX, maxY, windowWidth, windowHeight, x: positionX, y: positionY, thumbWidth, thumbHeight,
     left: maxX ? positionX / maxX * (windowWidth - thumbWidth) : 0,
     top: maxY ? positionY / maxY * (windowHeight - thumbHeight) : 0 };
 }

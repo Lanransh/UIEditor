@@ -8,7 +8,7 @@
 
 ## 工具与查询
 
-固定工具包含 editor.get_state/get_capabilities、nodes.get/find、code.execute、scripts.get/set、document.list/new/open/save、runtime.control/click/batch、debug.get_diagnostics/screenshot、assets.search/get/configure 和 project.list，均带 uie 前缀。不提供选中节点、MCP undo/redo 或制作代码内部的历史 API。尚未新建或打开界面时，get_state 返回 nodeCount=0，full 详情的 document 为 null；状态同时返回 projectId、projectName 和当前 documentId（无文档时为 null）；文档编辑、保存、运行及当前画布截图要求先新建或打开界面。图片查询、配置和 ui.assets.apply 见 [图片资产](image-assets.md)。
+固定工具包含 editor.get_state/get_capabilities、nodes.get/find、code.execute、scripts.get/set、document.list/new/open/save、runtime.control/click/hover/scroll/drag/batch、debug.get_diagnostics/screenshot、assets.search/get/configure 和 project.list，均带 uie 前缀。不提供选中节点、MCP undo/redo 或制作代码内部的历史 API。尚未新建或打开界面时，get_state 返回 nodeCount=0，full 详情的 document 为 null；状态同时返回 projectId、projectName 和当前 documentId（无文档时为 null）；文档编辑、保存、运行及当前画布截图要求先新建或打开界面。图片查询、配置和 ui.assets.apply 见 [图片资产](image-assets.md)。
 
 scripts.get 读取交互代码 source、接入代码 integration，可用 kind 指定其中一份，省略时读取两份。scripts.set 要求 sessionId/revision，可传 source、integration 或同时传两者，未传字段保持原值。源码长度及结构校验沿用文档边界；语法错误允许保存并在运行时反馈。运行中禁止修改源码。code.execute 内的 ui.scripts.get/set 仍可将源码与节点修改组合提交。
 
@@ -26,6 +26,20 @@ nodes.get/find、scripts.get 和 debug.screenshot 共用可选 target：`{projec
 
 保存文件截图使用独立隐藏、不可聚焦窗口，复用 DocumentPreview 渲染器，等待图片、字体和绘制完成。输出固定 1280×720 PNG（规范化 Windows DPI）、来源 target 和 view=saved-design；不执行文档脚本、不影响前台画布。未传 target 的截图保持现有视口与缩放行为。写入工具及 runtime.control/click、debug.get_diagnostics、get_capabilities 继续绑定当前会话，不接受跨工程目标。
 
+## 稳定鼠标接口
+
+运行输入继续要求当前 sessionId/revision。uie.runtime.click 保持按按钮 ID 激活的语义；新增：
+
+| 工具 | 参数（省略会话字段） | 行为 |
+| --- | --- | --- |
+| uie.runtime.hover | `{id}`，id 可为 null | 悬停节点或移出；重复悬停同一节点不重复进入 |
+| uie.runtime.scroll | `{id,to:{x?,y?}}` 或 `{id,delta:{x?,y?}}` | 目标必须是 ScrollingFrame；二选一，逻辑内容像素；缺省轴保留；返回实际 position 和 range |
+| uie.runtime.drag | `{id,from:{x,y},to:{x,y},steps?}` | 局部归一化坐标 0–1，steps 默认 8、范围 1–32；按下、固定次数移动、释放；不激活按钮 |
+
+scroll 的 delta 分发滚轮事件并执行默认滚动，to 定位滚动且只产生属性变化通知，不伪造滚轮。MouseMoved 与 InputChanged 描述拖动路径；普通节点的位移由脚本决定。隐藏或禁用目标返回 dispatched=false 和 reason，不绕过状态；非法类型/参数报错。所有步骤串行等待运行帧更新，返回运行身份、帧序号和 interaction（hoveredId/pressedId）。不提供键盘、焦点或文本输入工具。
+
+runtime.batch 接收同名鼠标步骤，支持 dispatched/reason 预期；assert 除属性和 disabled 外支持 hovered/pressed。运行视图的 nodes.get/find 及 get_diagnostics 返回 interaction，后者沿用日志游标返回 input 日志及脚本输出。AI 应先查询本次运行副本的节点 ID，批量输入并断言 CanvasPosition、样式和按钮状态，再截取关键状态；重置后重新查询动态节点 ID。按 ID 操作不做屏幕坐标命中或遮挡检查，截图和真实鼠标验证保持独立。
+
 ## 代码事务与历史
 
 制作执行在独立 Luau VM 中操作草稿，通过当前节点注册表提供创建和属性转换。值类型构造与现有运行宿主共享；不开放文件、网络、require 或 Electron。每次代码最多 256 KiB、5000 次编辑操作、200 条制作日志，沿用 64 MiB VM、250 ms 执行预算、2 秒主进程看门狗及 8 MiB 消息限制。
@@ -37,7 +51,7 @@ nodes.get/find、scripts.get 和 debug.screenshot 共用可选 target：`{projec
 ## 运行与文件
 
 `uie.runtime.batch` 将已知验证步骤合并为一次 MCP 往返，要求当前 sessionId/revision。
-steps 为 1–32 个顺序执行的 `run / reset / stop / click / assert`，不接受任意
+steps 为 1–32 个顺序执行的 `run / reset / stop / click / hover / scroll / drag / assert`，不接受任意
 代码、设计修改、文件操作或嵌套批次。click 使用稳定节点 id，可断言 dispatched
 和 reason（null、disabled、hidden）；assert 使用稳定节点 id，精确比较指定
 properties 的 JSON 值及可选 disabled 状态，只读取运行副本。所有步骤在执行前

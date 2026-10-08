@@ -1,8 +1,9 @@
+import { mouseEvents } from '../shared/runtime';
 import type { ProjectStrategy } from './strategy';
 
 export interface AutomationCapabilities {
   authoring: { language: string; version: string; sourceLimitBytes: number; memoryMiB: number; executionMs: number; api: string[]; values: string[] };
-  runtime: { language: string; version: string; actions: string[]; event: string; clickableNodeTypes: string[]; scripts: string[]; api: string[] };
+  runtime: { language: string; version: string; actions: string[]; event: string; mouseEvents: readonly string[]; mouseTools: string[]; mouseCoordinates: string; clickableNodeTypes: string[]; scripts: string[]; api: string[] };
 }
 export const robloxAutomation: AutomationCapabilities = {
   authoring: {
@@ -11,8 +12,8 @@ export const robloxAutomation: AutomationCapabilities = {
     values: ['UDim', 'UDim2', 'Vector2', 'Color3', 'Enum'],
   },
   runtime: {
-    language: 'luau', version: '0.694', actions: ['run', 'stop', 'reset'], event: 'Activated', clickableNodeTypes: ['TextButton', 'ImageButton'], scripts: ['source', 'integration'],
-    api: ['_G.FX.Class', 'FX.Loader:PlayerGui("ScreenGui.Child")', 'FX.Loader:Here(root,"Child.Descendant")', 'node:Clone()', 'node:Destroy()', 'node:GetChildren()', 'node.Name', 'node.Parent', 'CUIEditorUICompClass', 'OnReady', 'Render', 'GetUIConfig', 'GetUIState', 'RefreshUI', 'OnUIAction', 'EmitUIAction', 'TrackConnection', 'SetButtonEnabled'],
+    language: 'luau', version: '0.694', actions: ['run', 'stop', 'reset'], event: 'Activated', mouseEvents, mouseTools: ['uie.runtime.hover', 'uie.runtime.scroll', 'uie.runtime.drag'], mouseCoordinates: 'drag from/to: normalized node-local 0–1; event Position: 1280×720 canvas pixels; scroll: content pixels; mouse only, no keyboard/text input', clickableNodeTypes: ['TextButton', 'ImageButton'], scripts: ['source', 'integration'],
+    api: ['_G.FX.Class', 'FX.Loader:PlayerGui("ScreenGui.Child")', 'FX.Loader:Here(root,"Child.Descendant")', 'node:Clone()', 'node:Destroy()', 'node:GetChildren()', 'node:GetPropertyChangedSignal(property):Connect(callback)', 'node.Name', 'node.Parent', 'CUIEditorUICompClass', 'OnReady', 'Render', 'GetUIConfig', 'GetUIState', 'RefreshUI', 'OnUIAction', 'EmitUIAction', 'TrackConnection', 'SetButtonEnabled'],
   },
 };
 export function getCapabilities(strategy: ProjectStrategy) {
