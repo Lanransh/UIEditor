@@ -13,7 +13,7 @@ test('import preserves node paths, scripts, scale/offset and gradient sequences 
   assert.equal(JSON.stringify(document), before); assert.equal(result.scripts.shared, uiEditorCompSource);
   assert.ok(result.scripts.source.includes(document.scripts.source));
   assert.match(result.scripts.source, /UI.ScreenGuiName = "RewardsUI"/);
-  assert.match(result.scripts.source, /require\(script.Parent.CUIEditorUICompClass\)/);
+  assert.match(result.scripts.source, /require\(script.Parent.CUIView\)/);
   assert.equal(document.scripts.integration, JSON.parse(before).scripts.integration);
   assert.deepEqual(result.model.children[0].properties.Position, { UDim2: [[.5, -50], [0, 20]] });
   assert.equal(result.model.children[0].name, 'ClaimBtn');
@@ -55,9 +55,9 @@ test('import enables automatic localization on root and visual descendants only'
 
 test('legacy inheritance migrates only in generated source, without changing saved scripts', () => {
   const document = strategy.createDocument('Legacy');
-  document.scripts.source = document.scripts.source.replace('"CUIEditorUICompClass"', '"FCUICompClass"');
+  document.scripts.source = document.scripts.source.replace('"CUIView"', '"FCUICompClass"');
   const saved = document.scripts.source;
   const result = createRobloxImportPackage(document);
-  assert.match(result.scripts.source, /FX.Class\("CLegacyUIBaseCompClass", "CUIEditorUICompClass"\)/);
+  assert.match(result.scripts.source, /FX.Class\("CLegacyView", "CUIView"\)/);
   assert.equal(document.scripts.source, saved);
 });

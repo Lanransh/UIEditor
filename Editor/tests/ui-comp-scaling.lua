@@ -46,14 +46,18 @@ function Base:Ctor(owner) self._connections = {} end
 function Base:TrackConnection(connection) table.insert(self._connections, connection) end
 function Base:Dtor() for _, connection in ipairs(self._connections) do connection:Disconnect() end end
 _G.FX = { Class = function(name, parent)
-    assert(name == 'CUIEditorUICompClass' and parent == 'FCUICompClass')
+    if name == 'CUIEditorUICompClass' then
+        assert(parent == 'CUIView')
+        return {}
+    end
+    assert(name == 'CUIView' and parent == 'FCUICompClass')
     return setmetatable({ Super = Base }, { __index = Base })
 end, Loader = { PlayerGui = function(_, name) assert(name == 'TestUI'); return screen end } }
 local file = assert(io.open('src/shared/uiCompClass.ts', 'r'))
 local source = file:read('*a'); file:close()
 local UI = assert(load(assert(source:match('String.raw`(.*)`;')), 'CUIEditorUICompClass'))()
-local function new()
-    local instance = setmetatable({ ScreenGuiName = 'TestUI' }, { __index = UI })
+local function new(adapt)
+    local instance = setmetatable({ ScreenGuiName = 'TestUI', ScreenAdaptation = adapt }, { __index = UI })
     instance:Ctor({})
     return instance
 end
@@ -95,3 +99,10 @@ assert(panel.Position == originalPosition and existing.Scale == .8)
 local again = new(); close(existing.Scale, 1.6)
 again:Dtor(); assert(existing.Scale == .8 and panel.Position == originalPosition)
 print('Shared UI class: resolution fitting, centering, nested scale, late children and lifecycle passed')
+-- MainUI opts out before construction; no scale or resize subscriptions are installed.
+local hud = new(false)
+assert(hud._responsiveGroups == nil and #hud._connections == 0)
+assert(panel.Position == originalPosition and existing.Scale == .8)
+hud:Dtor()
+assert(panel.Position == originalPosition and existing.Scale == .8)
+print('Custom MainUI adaptation opt-out passed')

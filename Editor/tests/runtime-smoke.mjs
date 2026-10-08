@@ -46,7 +46,7 @@ try {
   await page.getByRole('button', { name: '文件', exact: true }).click();
   await page.getByRole('button', { name: '新建界面', exact: true }).click();
   await newName.fill('OnlineReward');
-  await page.getByText('交互类：COnlineRewardUIBaseCompClass', { exact: true }).waitFor();
+  await page.getByText('展示类：COnlineRewardView', { exact: true }).waitFor();
   await page.getByRole('button', { name: '创建', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('[aria-label="界面名称"]')?.value === 'OnlineReward');
   await page.getByRole('button', { name: '交互脚本', exact: true }).click();
@@ -54,8 +54,8 @@ try {
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await page.getByText('界面已保存', { exact: true }).waitFor();
   const template = JSON.parse(await readFile(file, 'utf8'));
-  assert.match(template.scripts.source, /COnlineRewardUIBaseCompClass/);
-  assert.match(template.scripts.integration, /COnlineRewardUIPreviewCompClass/);
+  assert.match(template.scripts.source, /COnlineRewardView/);
+  assert.match(template.scripts.integration, /COnlineRewardPreview/);
   assert.doesNotMatch(template.scripts.integration, /print\(/);
   const tokenColors = await page.locator('[aria-label="交互脚本面板"] .view-lines span').evaluateAll(spans => [...new Set(spans.map(span => getComputedStyle(span).color))]);
   assert.ok(tokenColors.length >= 3, JSON.stringify(tokenColors));

@@ -327,6 +327,7 @@ function Shared:EmitUIAction(action, payload)
     emitUIAction(self, action, payload)
 end
 table.freeze(Shared)
+table.freeze(FX.GetClass("CUIEditorUICompClass"))
 local host = {}
 function host.initialize(input)
     for property, choices in pairs(input.enums) do
@@ -345,7 +346,7 @@ function host.prepare(input)
     end
 end
 function host.interaction(cls)
-    assert(type(cls) == "table" and classes[cls.__name] == cls and (cls.__base == Base or cls.__base == Shared), "Interaction script must return a class inheriting CUIEditorUICompClass")
+    assert(type(cls) == "table" and classes[cls.__name] == cls and (cls.__base == Base or cls.__base == Shared or cls.__base == FX.GetClass("CUIEditorUICompClass")), "Interaction script must return a class inheriting CUIView")
     Class = cls
     Class.ScreenGuiName = nodes[root].name
     table.freeze(Class)

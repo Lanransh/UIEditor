@@ -2,7 +2,7 @@ import { _electron as electron, type ElectronApplication, type Page } from 'play
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { readTemplateStyle, projectStylePath } from '../electron/template-styles';
+import { readTemplateStyle, projectStylePath, readAgentPackage } from '../electron/template-styles';
 
 const packaged = process.argv.includes('--packaged');
 const executable = process.env.UI_EDITOR_PACKAGED_EXECUTABLE ?? resolve(process.env.UI_EDITOR_PACKAGE_OUTPUT || '../ToolRuntime', 'UIEditor-win32-x64', 'UIEditor.exe');
@@ -60,7 +60,7 @@ try {
   assert.ok(style && !style.problem);
   assert.equal(style.templateCount, 7);
   assert.equal(style.preview?.root.name, 'SmallWindowUI');
-  const library = packaged ? join(dirname(executable), 'resources', 'TemplateStyles') : resolve('../TemplateStyles');
+  const library = packaged ? join(dirname(executable), 'resources', 'TemplateStyles', 'Roblox') : resolve('../TemplateStyles/Roblox');
   const snapshot = await readTemplateStyle(join(library, '多彩棋格风格'));
   const source = join(root, '风格项目');
   await mkdir(source);
@@ -68,7 +68,7 @@ try {
   await pick(source);
   let dialog = await createDialog();
   assert.ok(await dialog.getByRole('radio', { name: '空白工程（不使用风格）', exact: true }).isChecked());
-  assert.ok((await dialog.innerText()).includes('设计规范、AI 提示词'));
+  assert.ok((await dialog.innerText()).includes('Roblox 制作与代码接入技能'));
   assert.equal(await dialog.getByRole('radio').count(), 2, 'first creation offers blank + complete style, no recent source');
   const thumbnail = dialog.getByRole('img', { name: '多彩棋格风格 缩略图', exact: true });
   await thumbnail.locator('.ui-thumbnail-artboard').waitFor();
@@ -84,6 +84,10 @@ try {
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
   for (const file of snapshot.files) assert.deepEqual(await readFile(join(workspace, projectStylePath(file.path))), file.content, file.path);
   assert.ok((await readdir(workspace)).includes('interfaces'));
+  const typeRoot = packaged ? join(dirname(executable), 'resources', 'ProjectTypes', 'Roblox') : resolve('../ProjectTypes/Roblox');
+  for (const file of await readAgentPackage(typeRoot, ['AGENTS.md'])) {
+    assert.deepEqual(await readFile(join(workspace, projectStylePath(file.path))), file.content, file.path);
+  }
   await page.getByRole('button', { name: '模板参考', exact: true }).click();
   await page.getByRole('button', { name: 'UI 资产 SmallWindow', exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: 'UI 资产 TemplatePage', exact: true }).count(), 0);

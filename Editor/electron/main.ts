@@ -281,7 +281,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       }
       const parent = await pick('选择父文件夹 — 将自动创建 UIEditorWorkspace');
       if (!parent) return null;
-      const result = await createProject(parent, source, style);
+      const result = await createProject(parent, source, style, join(app.isPackaged ? process.resourcesPath : dirname(app.getAppPath()), 'ProjectTypes', 'Roblox'));
       if (result.kind === 'existing') {
         const answer = await dialog.showMessageBox(window, { type: 'question', title: '工程已存在', message: '此位置已有有效工程，是否打开？', detail: result.project.path, buttons: ['打开工程', '取消'], defaultId: 0, cancelId: 1 });
         if (answer.response !== 0) return null;

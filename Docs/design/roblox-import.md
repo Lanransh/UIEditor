@@ -14,19 +14,21 @@ UIEditor 主进程连接固定本机桥接 `127.0.0.1:34871`。工程令牌只�
 
 ```text
 Generated/
-  CUIEditorUICompClass.lua                 # 继承 FCUICompClass
-  COnlineRewardUIBaseCompClass.lua         # 继承公共基类
+  CUIView.lua                 # 继承 FCUICompClass
+  COnlineRewardView.lua         # 继承公共基类
 ```
 
 公共基类源码唯一维护在 `Editor/src/shared/uiCompClass.ts`；构建时嵌入编辑器运行宿主，导入时随 `scripts.shared` 提交给 Toolkit。UIEditor 生成完整交互源码（公共类 require、ScreenGuiName 元数据及旧父类兼容转换）；Toolkit 原样同步 `scripts.source/shared`，只负责目标工程、Rojo 路径、构建与投递。UIEditor 不读取目标工程结构。旧 UIEditor 未携带公共类时，Toolkit 提示更新客户端。
 
 类文件按源码中的实际类名命名，不从可改的文档显示名猜测。界面交互类附加 ScreenGuiName 元数据供公共基类查找 PlayerGui；公共基类提供组件名、根节点、配置、状态、刷新、动作转发与原生按钮禁用。连接清理、Show/Hide 仍继承游戏 FCUICompClass。App 加载这份公共类，宿主仅适配固定画布、原生按钮禁用与动作日志，不载入完整游戏框架。
 
-新文档使用公共基类；旧直接继承 FCUICompClass 的交互类保留 App 兼容，导入时仅转换类声明的父类。迁移不修改已保存源码。
+新文档使用公共基类；旧直接继承 FCUICompClass 或 CUIEditorUICompClass 的交互类保留 App 兼容，导入时仅转换类声明的父类。迁移不修改已保存源码。
+
+公共模块现命名为 `CUIView.lua`；本仓库已验证导出包，新名称在外部 Toolkit 与 Studio 的实际导入仍需联调验证。
 
 ## 分辨率适配与自动翻译
 
-公共类在 Ctor 中启动适配，以 1280×720 为设计基准，取当前 ScreenGui 可用宽高比例的较小值，整体等比缩放并居中；大屏可放大，比例不同时留白。仅处理直属 GuiObject，不增加父级容器，保留节点查找路径；直属位置与尺寸中的 Scale/Offset 先按设计画布解析，子孙节点沿用内部布局。已有 UIScale 与设备比例相乘，避免重复缩放；尺寸变化和新增直属节点自动更新，移出节点与组件销毁时恢复设计值并清理监听。编辑器运行在固定 1280×720 画布，设备适配比例为 1。
+普通页面默认 `ScreenAdaptation = true`；MainUI 可在类上设置 `ScreenAdaptation = false`，自行管理屏幕布局。公共类在 Ctor 中按开关启动适配，以 1280×720 为设计基准，取当前 ScreenGui 可用宽高比例的较小值，整体等比缩放并居中；大屏可放大，比例不同时留白。仅处理直属 GuiObject，不增加父级容器，保留节点查找路径；直属位置与尺寸中的 Scale/Offset 先按设计画布解析，子孙节点沿用内部布局。已有 UIScale 与设备比例相乘，避免重复缩放；尺寸变化和新增直属节点自动更新，移出节点与组件销毁时恢复设计值并清理监听。编辑器运行在固定 1280×720 画布，设备适配比例为 1。
 
 UIEditor 生成的 ScreenGui 和全部 GuiObject 显式开启 AutoLocalize，布局与约束节点不写此属性；自动翻译由 Roblox 的游戏本地化表提供，App 不模拟翻译服务。
 
@@ -37,7 +39,7 @@ UIEditor 生成的 ScreenGui 和全部 GuiObject 显式开启 AutoLocalize，布
 ```lua
 local FX = _G.FX
 local FXLoader = FX.Loader
-local Base = FXLoader:RequireFromParent(script, "Generated.COnlineRewardUIBaseCompClass")
+local Base = FXLoader:RequireFromParent(script, "Generated.COnlineRewardView")
 local Business = FX.Class("COnlineRewardUICompClass", Base)
 
 -- 数据和事件先就绪，再执行首次刷新。
@@ -52,7 +54,7 @@ end
 return Business
 ```
 
-`Main.client.lua` 在游戏框架初始化后 require 业务类，再由玩家对象 AddComponent。重生、真实数据订阅和协议处理仍由业务接入负责。每个界面仅导入交互基类，文件名使用实际类名，例如 `COnlineRewardUIBaseCompClass.lua`；接入源码保留在编辑器文档中。
+`Main.client.lua` 在游戏框架初始化后 require 业务类，再由玩家对象 AddComponent。重生、真实数据订阅和协议处理仍由业务接入负责。每个界面仅导入交互基类，文件名使用实际类名，例如 `COnlineRewardView.lua`；接入源码保留在编辑器文档中。
 
 ## 校验与重复更新
 

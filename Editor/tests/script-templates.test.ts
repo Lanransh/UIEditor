@@ -15,9 +15,9 @@ test('new interfaces reject invalid identifiers and reserved names', () => {
 test('named empty templates inherit the generated base and preserve source on round-trip and rename', () => {
   const document = robloxStrategy.createDocument(' OnlineReward ');
   assert.equal(document.name, 'OnlineReward');
-  assert.deepEqual(scriptClassNames(document.name), { source: 'COnlineRewardUIBaseCompClass', integration: 'COnlineRewardUIPreviewCompClass' });
-  assert.match(document.scripts.source, /local COnlineRewardUIBaseCompClass = FX.Class\("COnlineRewardUIBaseCompClass", "CUIEditorUICompClass"\)/);
-  assert.match(document.scripts.integration, /FX.Class\("COnlineRewardUIPreviewCompClass", "COnlineRewardUIBaseCompClass"\)/);
+  assert.deepEqual(scriptClassNames(document.name), { source: 'COnlineRewardView', integration: 'COnlineRewardPreview' });
+  assert.match(document.scripts.source, /local COnlineRewardView = FX.Class\("COnlineRewardView", "CUIView"\)/);
+  assert.match(document.scripts.integration, /FX.Class\("COnlineRewardPreview", "COnlineRewardView"\)/);
   assert.doesNotMatch(document.scripts.integration, /print\(|RewardId|ClaimReward/);
   assert.equal(document.root.children.length, 0);
   assert.deepEqual(robloxStrategy.validate(JSON.parse(JSON.stringify(document))), document);
@@ -27,6 +27,12 @@ test('named empty templates inherit the generated base and preserve source on ro
 test('reward example uses the same inheritable class names as new interfaces', () => {
   const document = rewardExample();
   const classes = scriptClassNames('OnlineReward');
-  assert.ok(document.scripts.source.includes(`FX.Class("${classes.source}", "CUIEditorUICompClass")`));
+  assert.ok(document.scripts.source.includes(`FX.Class("${classes.source}", "CUIView")`));
   assert.ok(document.scripts.integration.includes(`FX.Class("${classes.integration}", "${classes.source}")`));
+});
+
+
+test('UI suffix does not repeat in View and Preview names', () => {
+  assert.deepEqual(scriptClassNames('WelfareUI'), { source: 'CWelfareView', integration: 'CWelfarePreview' });
+  assert.deepEqual(scriptClassNames('Welfare'), scriptClassNames('WelfareUI'));
 });

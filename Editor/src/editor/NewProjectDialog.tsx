@@ -37,7 +37,7 @@ export function NewProjectDialog({ recent, onCreate, onCancel }: { recent: Recen
           </label>)}
         </div>
       </fieldset>
-      <p id="template-style-help">选择整套风格将复制模板、设计规范、AI 提示词、必要资源及 skills，并创建项目独立的 AgentWorkspace。之后 AI 根据项目规则自行选择模板。现有工程不会被覆盖。</p>
+      <p id="template-style-help">所有新工程都会创建独立的 AI 工作区，包含 Roblox 制作与代码接入技能。选择风格会另外复制视觉规范、模板、资源及专项 skills。现有工程不会被覆盖。</p>
       {recent.length > 0 && <>
       <fieldset className="template-source-options" aria-describedby="template-clone-help">
         <legend>或从历史工程克隆模板（兼容入口）</legend>
@@ -48,7 +48,7 @@ export function NewProjectDialog({ recent, onCreate, onCancel }: { recent: Recen
           </label>)}
         </div>
       </fieldset>
-      <p id="template-clone-help">历史克隆与风格选择互斥，仅复制模板参考，不复制提示词、项目UI或项目图片，不创建 AI 工作区。下一步选择新工程的父文件夹。</p>
+      <p id="template-clone-help">历史克隆与风格选择互斥，仅从来源工程复制模板参考，不复制来源提示词、项目UI或项目图片。新工程会获得独立的 Roblox AI 工作区。下一步选择新工程的父文件夹。</p>
       </>}
       <div className="new-interface-actions"><button type="button" onClick={onCancel}>取消</button><button type="submit" disabled={!styles && !error}>下一步</button></div>
     </form>

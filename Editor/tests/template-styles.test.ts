@@ -24,7 +24,7 @@ async function fixture(t: TestContext) {
   await writeFile(join(style, 'assets', 'icon.txt'), Buffer.from([0, 128, 255, 42]));
   await writeFile(join(style, 'assets', 'nested', 'more.txt'), 'more');
   await mkdir(join(style, '.agents', 'skills', 'check', 'references'), { recursive: true });
-  await writeFile(join(style, '.agents', 'skills', 'check', 'SKILL.md'), '# 检查\n[规范](../../../Game-DESIGN.md)\n[规则](references/rules.md)\n');
+  await writeFile(join(style, '.agents', 'skills', 'check', 'SKILL.md'), '---\r\nname: check\r\ndescription: Style check\r\n---\r\n# 检查\n[规范](../../../Game-DESIGN.md)\n[规则](references/rules.md)\n');
   await writeFile(join(style, '.agents', 'skills', 'check', 'references', 'rules.md'), '自检规则');
   await mkdir(join(style, 'references'));
   await writeFile(join(style, 'references', 'notes.md'), '专项说明');
@@ -50,7 +50,7 @@ test('发现风格：名称、作者说明、真实模板数量；坏风格可�
   assert.equal(good.templateCount, 1);
   assert.equal(good.preview?.name, 'Small');
   assert.equal(good.problem, undefined);
-  assert.match(styles.find(item => item.id === '坏风格')!.problem!, /AGENTS.md/);
+  assert.match(styles.find(item => item.id === '坏风格')!.problem!, /Game-DESIGN.md/);
   assert.equal(styles.find(item => item.id === '坏风格')!.preview, undefined);
   assert.equal(styles.length, 2);
   assert.equal(styleDirectory(library, good.id), style);
@@ -99,7 +99,7 @@ test('整套独立复制：模板子目录、提示词原始字节、文字规�
   const { project } = await createProject(parent, undefined, style);
   assert.deepEqual((await readdir(project.path)).sort(), ['AgentWorkspace', 'interfaces', 'project.json', 'template-references']);
   for (const file of files) assert.deepEqual(await readFile(join(project.path, projectStylePath(file.path))), file.content, file.path);
-  assert.equal(await readFile(join(project.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), agents);
+  assert.equal(await readFile(join(project.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), await readFile(resolve('../ProjectTypes/Roblox/AGENTS.md'), 'utf8'));
   assert.equal(await readFile(join(project.path, 'AgentWorkspace', 'Game-DESIGN.md'), 'utf8'), design);
   assert.ok(files.every(file => !file.path.includes('Runtime') && !file.path.includes('node_modules') && !file.path.endsWith('.log') && file.path !== 'unrelated.txt'));
 
@@ -108,7 +108,7 @@ test('整套独立复制：模板子目录、提示词原始字节、文字规�
   const second = (await createProject(secondParent, undefined, style)).project;
   await writeFile(join(project.path, 'AgentWorkspace', 'AGENTS.md'), '项目定制入口');
   await writeFile(join(style, 'AGENTS.md'), '全局定制入口');
-  assert.equal(await readFile(join(second.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), agents);
+  assert.equal(await readFile(join(second.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), await readFile(resolve('../ProjectTypes/Roblox/AGENTS.md'), 'utf8'));
   assert.equal(await readFile(join(project.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), '项目定制入口');
   assert.equal((await openProject(project.path)).manifest.id, project.manifest.id);
   const existing = await createProject(parent, undefined, join(root, 'nonexistent-style'));
@@ -125,10 +125,10 @@ test('来源缺失、必要文档为空、模板损坏或无模板时回滚；�
   const { root, style, parent } = await fixture(t);
   await assert.rejects(createProject(parent, undefined, join(root, 'missing')), /无法读取模板风格 missing/);
   assert.deepEqual(await readdir(parent), []);
-  await writeFile(join(style, 'AGENTS.md'), ' ');
+  await writeFile(join(style, 'Game-DESIGN.md'), ' ');
   await assert.rejects(createProject(parent, undefined, style), /文档为空/);
   assert.deepEqual(await readdir(parent), []);
-  await writeFile(join(style, 'AGENTS.md'), '# good');
+  await writeFile(join(style, 'Game-DESIGN.md'), '# good');
   const template = join(style, 'template-references', '窗口', 'Small.rbxui.json');
   for (const content of ['{bad', JSON.stringify({ format: 'bad' })]) {
     await writeFile(template, content);
@@ -148,13 +148,13 @@ test('来源缺失、必要文档为空、模板损坏或无模板时回滚；�
 
 test('必要文档必须是普通文件，不把同名目录或模板根目录文件当作制作包', async t => {
   const { style, parent } = await fixture(t);
-  await rm(join(style, 'AGENTS.md'));
-  await mkdir(join(style, 'AGENTS.md'));
-  await writeFile(join(style, 'AGENTS.md', 'fake.txt'), 'not an entry');
-  await assert.rejects(createProject(parent, undefined, style), /AGENTS.md.*其他文件类型/);
+  await rm(join(style, 'Game-DESIGN.md'));
+  await mkdir(join(style, 'Game-DESIGN.md'));
+  await writeFile(join(style, 'Game-DESIGN.md', 'fake.txt'), 'not an entry');
+  await assert.rejects(createProject(parent, undefined, style), /Game-DESIGN.md.*其他文件类型/);
   assert.deepEqual(await readdir(parent), []);
-  await rm(join(style, 'AGENTS.md'), { recursive: true });
-  await writeFile(join(style, 'AGENTS.md'), '# AI');
+  await rm(join(style, 'Game-DESIGN.md'), { recursive: true });
+  await writeFile(join(style, 'Game-DESIGN.md'), '# AI');
   await rm(join(style, 'template-references'), { recursive: true });
   await writeFile(join(style, 'template-references'), 'not a folder');
   await assert.rejects(createProject(parent, undefined, style), /其他文件类型/);
@@ -183,7 +183,7 @@ test('拒绝链接根、链接子目录及 skills 父目录联接，不把项目
 test('相对文档引用必须在目标项目闭合，不依赖本机绝对路径或遗漏资源', async t => {
   const { style, parent } = await fixture(t);
   for (const link of ['assets/missing.png', '../../outside.txt', 'C:/external.txt', 'file:///external.txt']) {
-    await writeFile(join(style, 'AGENTS.md'), `# AI\n[资源](${link})`);
+    await writeFile(join(style, 'Game-DESIGN.md'), `# AI\n[资源](${link})`);
     await assert.rejects(createProject(parent, undefined, style), /引用/);
     assert.deepEqual(await readdir(parent), []);
   }
@@ -191,7 +191,7 @@ test('相对文档引用必须在目标项目闭合，不依赖本机绝对路�
   const image = robloxStrategy.createNode('ImageLabel');
   image.imageAssetId = 'source-only-id';
   document.root.children.push(image);
-  await writeFile(join(style, 'AGENTS.md'), '# AI');
+  await writeFile(join(style, 'Game-DESIGN.md'), '# AI');
   await writeDocument(join(style, 'template-references', 'Image.rbxui.json'), document);
   await assert.rejects(createProject(parent, undefined, style), /来源图片库/);
 });
@@ -200,11 +200,11 @@ test('访问受限明确反馈，复制中途失败清理已创建的文件和�
   const { style, parent, library } = await fixture(t);
   const originalRead = fs.readFile;
   t.mock.method(fs, 'readFile', async (...args: Parameters<typeof fs.readFile>) => {
-    if (String(args[0]) === join(style, 'AGENTS.md')) throw Object.assign(new Error('permission denied'), { code: 'EACCES' });
+    if (String(args[0]) === join(style, 'Game-DESIGN.md')) throw Object.assign(new Error('permission denied'), { code: 'EACCES' });
     return originalRead(...args);
   });
   syncBuiltinESMExports();
-  assert.match((await listTemplateStyles(library))[0].problem!, /AGENTS.md.*permission denied/);
+  assert.match((await listTemplateStyles(library))[0].problem!, /Game-DESIGN.md.*permission denied/);
   await assert.rejects(createProject(parent, undefined, style), /permission denied/);
   assert.deepEqual(await readdir(parent), []);
   t.mock.restoreAll();
@@ -218,13 +218,13 @@ test('访问受限明确反馈，复制中途失败清理已创建的文件和�
   t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports(); });
   await assert.rejects(createProject(parent, undefined, style), error => describeError(error).includes('磁盘空间不足'));
   assert.deepEqual(await readdir(parent), []);
-  assert.ok((await readFile(join(style, 'AGENTS.md'), 'utf8')).includes('作者风格'));
+  assert.ok((await readFile(join(style, 'Game-DESIGN.md'), 'utf8')).includes('作者自定义文字规范'));
 });
 
 test('打包画风更新后新建工程读取新版，不使用外置旧副本或修改已有工程', async t => {
   const { root, style, agents, design } = await fixture(t);
   const application = join(root, 'ToolRuntime', 'UIEditor-win32-x64');
-  const resources = join(application, 'resources', 'TemplateStyles');
+  const resources = join(application, 'resources', 'TemplateStyles', 'Roblox');
   const external = join(root, 'ToolRuntime', 'TemplateStyles');
   await fs.cp(style, join(resources, '定制 风格'), { recursive: true });
   await fs.cp(style, join(external, '定制 风格'), { recursive: true });
@@ -244,11 +244,11 @@ test('打包画风更新后新建工程读取新版，不使用外置旧副本�
   const nextParent = join(root, 'next');
   await mkdir(nextParent);
   const next = (await createProject(nextParent, undefined, styleDirectory(active, '定制 风格'))).project;
-  assert.equal(await readFile(join(next.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), updatedAgents);
+  assert.equal(await readFile(join(next.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), await readFile(resolve('../ProjectTypes/Roblox/AGENTS.md'), 'utf8'));
   assert.equal(await readFile(join(next.path, 'AgentWorkspace', 'Game-DESIGN.md'), 'utf8'), updatedDesign);
   assert.deepEqual(await readFile(join(next.path, templatePath)), await readFile(join(resources, '定制 风格', templatePath)));
   await openProject(first.path);
-  assert.equal(await readFile(join(first.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), agents);
+  assert.equal(await readFile(join(first.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), await readFile(resolve('../ProjectTypes/Roblox/AGENTS.md'), 'utf8'));
   assert.equal(await readFile(join(first.path, 'AgentWorkspace', 'Game-DESIGN.md'), 'utf8'), design);
   assert.deepEqual(await readFile(join(first.path, templatePath)), originalTemplate);
   assert.equal(await readFile(join(external, '定制 风格', 'Game-DESIGN.md'), 'utf8'), design);
@@ -256,10 +256,10 @@ test('打包画风更新后新建工程读取新版，不使用外置旧副本�
 
 test('开发直接读取仓库画风，打包直接读取应用资源，不回退到外置目录', async t => {
   const { root, style } = await fixture(t);
-  assert.equal(templateStylesDirectory(false, join(root, 'Editor'), join(root, 'electron.exe')), join(root, 'TemplateStyles'));
+  assert.equal(templateStylesDirectory(false, join(root, 'Editor'), join(root, 'electron.exe')), join(root, 'TemplateStyles', 'Roblox'));
   const application = join(root, 'ToolRuntime', 'UIEditor-win32-x64');
   const active = templateStylesDirectory(true, join(application, 'resources', 'app.asar'), join(application, 'UIEditor.exe'));
-  assert.equal(active, join(application, 'resources', 'TemplateStyles'));
+  assert.equal(active, join(application, 'resources', 'TemplateStyles', 'Roblox'));
   await fs.cp(style, join(root, 'ToolRuntime', 'TemplateStyles', '定制 风格'), { recursive: true });
   assert.deepEqual(await listTemplateStyles(active), []);
   await assert.rejects(previewTemplateStyle(active, '定制 风格'), /无法读取/);
@@ -268,7 +268,7 @@ test('开发直接读取仓库画风，打包直接读取应用资源，不回�
 
 test('随应用提供的 多彩棋格风格：7 个鲜明配色模板和完整工作规则，排除展示页，项目内链接闭合', async t => {
   const { parent } = await fixture(t);
-  const root = resolve('../TemplateStyles');
+  const root = resolve('../TemplateStyles/Roblox');
   const style = join(root, '多彩棋格风格');
   const styles = await listTemplateStyles(root);
   assert.equal(styles.length, 1);
@@ -312,13 +312,60 @@ test('随应用提供的 多彩棋格风格：7 个鲜明配色模板和完整�
   const design = await readFile(join(project.path, 'AgentWorkspace', 'Game-DESIGN.md'), 'utf8');
   for (const rule of ['GothamBold', '30', 'CloseSurfaceImg', 'CloseBtn', 'PaidPurchaseBtn', '#FFD633', '#E58A25', '#DF1A23', '标题不固定红色', 'Current / Target']) assert.ok(design.includes(rule), rule);
   const agents = await readFile(join(project.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8');
-  for (const content of [agents, design]) {
+  for (const content of [design]) {
     for (const rule of ['默认只参考布局', '只有用户明确要求参考配色', '不保留', '英文', '按钮语义色']) assert.ok(content.includes(rule), rule);
   }
   const check = await readFile(join(project.path, 'AgentWorkspace', '.agents', 'skills', 'ui-editor-style-check', 'SKILL.md'), 'utf8');
-  for (const content of [agents, design, check]) {
+  for (const content of [design, check]) {
     for (const color of ['#FFD633', '#E58A25']) assert.ok(content.includes(color), color);
     assert.doesNotMatch(content, /付费紫色|紫色用于付费|#D03BF2|#691582/i);
   }
   for (const rule of ['默认只对照布局', '不沿用截图颜色', '原语言已转成英文', '各状态文案均为英文']) assert.ok(check.includes(rule), rule);
+});
+
+
+test('工程类型与风格技能并存；目录或声明同名均拒绝，不留下半成品', async t => {
+  const { root, style, parent } = await fixture(t);
+  const type = join(root, 'ProjectTypes', 'Roblox');
+  await fs.cp(resolve('../ProjectTypes/Roblox'), type, { recursive: true });
+  const created = (await createProject(parent, undefined, style, type)).project;
+  assert.ok((await readFile(join(created.path, 'AgentWorkspace', '.agents', 'skills', 'roblox-ui-authoring', 'SKILL.md'), 'utf8')).includes('name: roblox-ui-authoring'));
+  assert.ok((await readFile(join(created.path, 'AgentWorkspace', '.agents', 'skills', 'check', 'SKILL.md'), 'utf8')).includes('name: check'));
+  assert.ok(!(await readTemplateStyle(style)).files.some(file => file.path === 'AGENTS.md'));
+  const target = join(root, 'conflict');
+  await mkdir(target);
+  const skill = join(style, '.agents', 'skills', 'check', 'SKILL.md');
+  await writeFile(skill, '---\nname: roblox-ui-authoring\ndescription: conflict\n---\n');
+  await assert.rejects(createProject(target, undefined, style, type), /技能同名/);
+  assert.deepEqual(await readdir(target), []);
+  await writeFile(skill, '---\nname: check\ndescription: check\n---\n');
+  await mkdir(join(style, '.agents', 'skills', 'roblox-ui-authoring'));
+  await writeFile(join(style, '.agents', 'skills', 'roblox-ui-authoring', 'notes.txt'), 'must not merge into common skill');
+  await assert.rejects(createProject(target, undefined, style, type), /冲突/);
+  assert.deepEqual(await readdir(target), []);
+});
+
+test('空白与历史克隆都有独立平台包；公共包更新只影响新工程；缺失和链接包拒绝', async t => {
+  const { root, parent } = await fixture(t);
+  const type = join(root, 'ProjectTypes', 'Roblox');
+  await fs.cp(resolve('../ProjectTypes/Roblox'), type, { recursive: true });
+  const first = (await createProject(parent, undefined, undefined, type)).project;
+  const entry = join(first.path, 'AgentWorkspace', 'AGENTS.md');
+  const original = await readFile(entry, 'utf8');
+  await assert.rejects(readFile(join(first.path, 'AgentWorkspace', 'Game-DESIGN.md')), /ENOENT/);
+  await writeFile(join(type, 'AGENTS.md'), '# Updated platform entry');
+  const nextParent = join(root, 'next');
+  await mkdir(nextParent);
+  const next = (await createProject(nextParent, first.path, undefined, type)).project;
+  assert.equal(await readFile(join(next.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), '# Updated platform entry');
+  await openProject(first.path);
+  assert.equal(await readFile(entry, 'utf8'), original);
+  const target = join(root, 'rejected');
+  await mkdir(target);
+  await assert.rejects(createProject(target, undefined, undefined, join(root, 'missing')), /无法读取/);
+  assert.deepEqual(await readdir(target), []);
+  const linked = join(root, 'linked-type');
+  await symlink(type, linked, 'junction');
+  await assert.rejects(createProject(target, undefined, undefined, linked), /链接/);
+  assert.deepEqual(await readdir(target), []);
 });

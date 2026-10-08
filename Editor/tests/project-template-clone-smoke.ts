@@ -1,6 +1,6 @@
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { listDocumentAssets, readDocument, writeDocument } from '../electron/documents';
 import { robloxStrategy } from '../src/editor/roblox';
@@ -81,7 +81,12 @@ try {
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
   const clone = join(cloneParent, 'UIEditorWorkspace');
   assert.deepEqual(await readDocument(join(clone, 'template-references', '奖励', 'Reward.rbxui.json')), document);
-  assert.ok(!(await readdir(clone)).includes('interfaces'));
+  assert.deepEqual(await readdir(join(clone, 'interfaces')), []);
+  for (const workspace of [source, clone, join(emptyParent, 'UIEditorWorkspace')]) {
+    assert.equal(await readFile(join(workspace, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), await readFile(resolve('../ProjectTypes/Roblox/AGENTS.md'), 'utf8'));
+    assert.ok((await readdir(join(workspace, 'AgentWorkspace', '.agents', 'skills'))).includes('roblox-ui-authoring'));
+    await assert.rejects(readFile(join(workspace, 'AgentWorkspace', 'Game-DESIGN.md')), /ENOENT/);
+  }
   await page.getByRole('button', { name: '模板参考', exact: true }).click();
   await page.getByRole('button', { name: 'UI 资产 Reward', exact: true }).waitFor();
   assert.deepEqual(await readDocument(join(source, 'template-references', '奖励', 'Reward.rbxui.json')), document);

@@ -12,11 +12,11 @@ import { documentCommand } from '../src/editor/commands';
 
 const directory = resolve('native-bin');
 const sourceClass = (body: string) => `local FX = _G.FX
-local UI = FX.Class("COnlineRewardUIBaseCompClass", "FCUICompClass")
+local UI = FX.Class("COnlineRewardView", "FCUICompClass")
 ${body}
 return UI`;
 const previewClass = (body: string) => `local FX = _G.FX
-local Preview = FX.Class("COnlineRewardUIPreviewCompClass", "COnlineRewardUIBaseCompClass")
+local Preview = FX.Class("COnlineRewardPreview", "COnlineRewardView")
 ${body}
 return Preview`;
 async function start(body: string) {
@@ -137,8 +137,8 @@ test('FX inheritance supports constructors, super calls, custom methods and dest
 end
 function UI:Add(value) self.count += value end
 function UI:OnReady()
- assert(self:IsA("FCUICompClass") and self:IsA("COnlineRewardUIBaseCompClass"))
- assert(self:GetClassName() == "COnlineRewardUIPreviewCompClass")
+ assert(self:IsA("FCUICompClass") and self:IsA("COnlineRewardView"))
+ assert(self:GetClassName() == "COnlineRewardPreview")
  assert(FX.Loader:PlayerGui(self:GetRootNode().Name) == self:GetRootNode())
  self:Add(2)
  print("ready", self.count)
@@ -349,7 +349,7 @@ function UI:OnReady()
     assert(self:GetCompName() == "ScreenGuiComp")
     assert(self:GetRootNode().Name == "ScreenGui")
     assert(self:IsA("FCUICompClass"))
-    assert(FX.GetClass("CUIEditorUICompClass").Super == FX.GetClass("FCUICompClass"))
+    assert(FX.GetClass("CUIEditorUICompClass").Super == FX.GetClass("CUIView"))
     self:EmitUIAction("Ready", { Id = "contract" })
 end
 function UI:Render(state)
@@ -491,4 +491,36 @@ end`);
   await assert.rejects(session.command({ type: 'event', node: buttonId(frame.document) }), /属性/);
   assert.equal(JSON.stringify(frame), before);
   await assert.rejects(session.command({ type: 'show' }), /结束/);
+});
+
+
+test('View cleanup runs once, releases removed children early and finishes other cleanup after an error', async () => {
+  const document = rewardExample();
+  document.scripts.source = `local FX = _G.FX
+local UI = FX.Class("COnlineRewardView", "CUIView")
+function UI:OnReady()
+ local release = self:TrackCleanup(function() print("early") end)
+ release()
+ release()
+ self:TrackCleanup(function() print("remaining") end)
+ self:TrackCleanup(function() error("cleanup-failed") end)
+ local button = FX.Loader:PlayerGui("OnlineRewardUI.ClaimButton")
+ self.Connection = self:TrackConnection(button.Activated:Connect(function() end))
+end
+function UI:Render() end
+function UI:Dtor()
+ local ok, problem = pcall(function() UI.Super.Dtor(self) end)
+ assert(not ok and string.find(problem, "cleanup-failed", 1, true))
+ assert(not self.Connection.Connected)
+ UI.Super.Dtor(self)
+ assert(not pcall(function() self:TrackCleanup(function() end) end))
+ print("cleaned")
+end
+return UI`;
+  const { session, frame } = await LuauSession.start(directory, document);
+  try {
+    assert.deepEqual(frame.logs.map(log => log.message), ['early']);
+    const stopped = await session.command({ type: 'stop' });
+    assert.deepEqual(stopped.logs.map(log => log.message), ['remaining', 'cleaned']);
+  } finally { session.abort(); }
 });

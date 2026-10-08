@@ -30,14 +30,15 @@ export function interfaceNameError(name: string): string {
 export function scriptClassNames(name: string) {
   const error = interfaceNameError(name);
   if (error) throw new Error(error);
-  return { source: `C${name.trim()}UIBaseCompClass`, integration: `C${name.trim()}UIPreviewCompClass` };
+  const stem = name.trim().replace(/UI$/, '') || name.trim();
+  return { source: `C${stem}View`, integration: `C${stem}Preview` };
 }
 export interface UIScripts { source: string; integration: string }
 export function emptyScripts(name = 'Untitled'): UIScripts {
   const classes = scriptClassNames(name);
   return { source: `local FX = _G.FX
 local FXLoader = FX.Loader
-local ${classes.source} = FX.Class("${classes.source}", "CUIEditorUICompClass")
+local ${classes.source} = FX.Class("${classes.source}", "CUIView")
 
 -- 先用 FXLoader:PlayerGui("实际ScreenGui名") 获取界面，再用 Here(root, "Panel.Button") 查子节点。
 function ${classes.source}:OnReady()
@@ -57,23 +58,6 @@ function ${classes.integration}:Ctor(owner)
     ${classes.integration}.Super.Ctor(self, owner)
     self.Config = {}
     self.State = {}
-end
-
--- 提供展示配置，业务标识与文案分开保存。
--- @return table 界面配置
-function ${classes.integration}:GetUIConfig()
-    return self.Config
-end
-
--- 提供模拟状态，不能作为真实发奖依据。
--- @return table 当前显示状态
-function ${classes.integration}:GetUIState()
-    return self.State
-end
-
--- 数据就绪后触发首帧展示。
-function ${classes.integration}:BindUIData()
-    self:RefreshUI()
 end
 
 -- 处理展示层动作；只更新模拟数据，再调用 RefreshUI。

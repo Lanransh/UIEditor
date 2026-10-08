@@ -12,7 +12,7 @@
 
 version=3 的 scripts 只包含 source（交互源码）和 integration（接入源码）。两份脚本都返回自己的类，每份最多 256 KiB 字符。允许带语法错误保存，运行前必须编译成功。已有 version=2 文件加载时，将配置、模拟状态和节点引用转为两份类脚本中的代码，后续保存为 version=3；不支持 version=1。
 
-新建名称去除首尾空格后必须满足 `^[A-Za-z_][A-Za-z0-9_]*$`，并排除 Luau 保留字及编辑器保留的上下文关键字。输入 `OnlineReward` 时，交互类和变量名为 `COnlineRewardUIBaseCompClass`，接入类和变量名为 `COnlineRewardUIPreviewCompClass`。接入类继承对应交互基类；初始 Config/State 为空，函数与条件语句采用四空格缩进的多行写法，不包含示例业务和打印。模板仅在创建时生成；后续修改文档名称不重写源码，加载旧文件也不套用新命名。
+新建名称去除首尾空格后必须满足 `^[A-Za-z_][A-Za-z0-9_]*$`，并排除 Luau 保留字及编辑器保留的上下文关键字。输入 `OnlineReward` 时，交互类和变量名为 `COnlineRewardView`，接入类和变量名为 `COnlineRewardPreview`。接入类继承对应交互基类；初始 Config/State 为空，函数与条件语句采用四空格缩进的多行写法，不包含示例业务和打印。模板仅在创建时生成；后续修改文档名称不重写源码，加载旧文件也不套用新命名。
 
 键盘及菜单撤销重做统一使用文档历史；程序同步源码不记录额外编辑，切换文档清理编辑器实例与模型。运行时两份源码只读。语法高亮不提供类型诊断，编译错误仍由运行时反馈。
 
@@ -20,7 +20,7 @@ version=3 的 scripts 只包含 source（交互源码）和 integration（接入
 
 ```lua
 local FX = _G.FX
-local UI = FX.Class("COnlineRewardUIBaseCompClass", "CUIEditorUICompClass")
+local UI = FX.Class("COnlineRewardView", "CUIView")
 
 function UI:OnReady()
     local root = FX.Loader:PlayerGui("OnlineRewardUI")
@@ -37,9 +37,9 @@ end
 return UI
 ```
 
-接入源码使用 `FX.Class("COnlineRewardUIPreviewCompClass", "COnlineRewardUIBaseCompClass")`，返回 Preview 类。在 `Preview:Ctor(owner)` 中先调用 `Preview.Super.Ctor(self, owner)`，再赋值 `self.Config` 和 `self.State`。接入类可覆盖 GetUIConfig/GetUIState/BindUIData/OnUIAction 和生命周期，也可定义自有方法；覆盖生命周期时用 Super 显式调用父类。临时配置和状态可直接修改；修改后调用 RefreshUI 驱动展示。
+接入源码使用 `FX.Class("COnlineRewardPreview", "COnlineRewardView")`，返回 Preview 类。在 `Preview:Ctor(owner)` 中先调用 `Preview.Super.Ctor(self, owner)`，再赋值 `self.Config` 和 `self.State`。接入类可覆盖 GetUIConfig/GetUIState/BindUIData/OnUIAction 和生命周期，也可定义自有方法；覆盖生命周期时用 Super 显式调用父类。临时配置和状态可直接修改；修改后调用 RefreshUI 驱动展示。
 
-App 提供 FX.Class、FX.GetClass、Super、New、IsA、GetClassName 的兼容实现，注册预览所需的 FCUICompClass，并加载 UIEditor 唯一维护的 CUIEditorUICompClass 公共类（与导入包同源）；新交互类继承后者，旧直接继承前者的文档保留兼容；没有加载完整游戏框架。基类提供 Ctor、Dtor、GetOwner、GetRootNode、TrackConnection、Show、Hide，以及数据与动作接口。游戏参考类原有的网络、组件管理及动画服务不在 App 模拟范围内；数据与动作接口属于当前编辑器的交互合同，实际游戏接入由导出的公共 CUIEditorUICompClass 提供这些接口，原有 FCUICompClass 保持不变；见 [导入设计](roblox-import.md)。
+App 提供 FX.Class、FX.GetClass、Super、New、IsA、GetClassName 的兼容实现，注册预览所需的 FCUICompClass，并加载 UIEditor 唯一维护的 CUIView 公共类（与导入包同源）；新交互类继承后者，旧直接继承前者的文档保留兼容；没有加载完整游戏框架。基类提供 Ctor、Dtor、GetOwner、GetRootNode、TrackConnection、Show、Hide，以及数据与动作接口。游戏参考类原有的网络、组件管理及动画服务不在 App 模拟范围内；数据与动作接口属于当前编辑器的交互合同，实际游戏接入由导出的公共 CUIView 提供这些接口，原有 FCUICompClass 保持不变；见 [导入设计](roblox-import.md)。
 
 初始化顺序为接入类 Ctor → OnReady → BindUIData（默认首次 RefreshUI）→ Show/OnShow。停止执行 Hide/OnHide → 可选旧版 OnDispose → Dtor，并统一断开连接。新会话和重置重新构造接入实例，不共享上一轮状态。EmitUIAction 记录动作后调用实例的 OnUIAction；RefreshUI 读取 GetUIState 返回值并调用 Render，拒绝递归刷新。
 
@@ -59,6 +59,7 @@ Parent = nil 将子树移出预览，保留对象、属性和连接，后续可�
 | self:RefreshUI() | 读取状态并调用 Render |
 | self:EmitUIAction(name, payload) | 记录动作与可序列化参数并调用接入处理 |
 | self:TrackConnection(connection) | 跟踪连接，Dtor 清理 |
+| self:TrackCleanup(callback) | 登记资源清理，返回可提前调用的幂等 release；Dtor 清理剩余资源 |
 | self:SetButtonEnabled(node, boolean) | 设置 App 模拟按钮是否分发点击 |
 | print / warn / error | 输出普通信息、警告或终止会话的错误；错误保留原始源码行号 |
 
@@ -89,3 +90,10 @@ VM 内存上限 64 MiB、每条命令执行预算 250 ms，主进程 2 秒看门
 输出位于忽略的 native-bin，包含 exe、宿主脚本及依赖许可证；打包复制到 resources/native-bin，普通用户不需要编译器或网络。BuildAndRun.bat 在辅助程序缺失时构建它；修改 native 源码后需主动再次执行 build:runtime。
 
 `npm test` 包含真实 Luau 执行、超时、类继承、数据维护、原子更新和连接清理测试，先构建辅助程序。`npm run test:runtime` 检查 Electron 中的三个一级页签、按钮、接入状态、重置、错误恢复及文档隔离。`node tests/runtime-smoke.mjs --packaged` 验证已打包程序的运行链路。上述检查不能证明 Roblox 的显示或设备性能。
+
+旧 `CUIEditorUICompClass` 作为 `CUIView` 的兼容子类保留；旧文件不自动重写。
+新界面名末尾的 `UI` 后缀会去除一次，例如 WelfareUI 生成 CWelfareView / CWelfarePreview。
+页面默认启用 ScreenAdaptation；MainUI 可在类上设置 `UI.ScreenAdaptation = false` 后自行适配。
+
+复杂福利工程固定在 `Editor/tests/fixtures/roblox-welfare/UIEditorWorkspace`；`npm run test:welfare`
+从测试目录复制到临时目录，验证领取、进度、稳定条目、资源清理与 MCP 保存重开，不依赖来源游戏路径。

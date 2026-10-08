@@ -62,7 +62,7 @@ AI 优先一次取得关键节点 ID，再提交带明确预期的验证批次�
 
 Hub 右上角“设置”提供 Codex MCP 配置，不提供 AI 工作区打开按钮。配置管理 CODEX_HOME/config.toml（未设置时为用户 .codex/config.toml）中的 ui-editor command/args/enabled，保留其他配置并验证 TOML。启动路径包含显式发现文件地址，不依赖 Codex 工作目录；写入前检查配置是否变化，再原子替换。
 
-开发构建输出 Editor/mcp-dist/server.mjs；打包复制到 resources/mcp-dist，ASAR 外由 Node 启动，原生宿主位于 resources/native-bin。Hub 检查服务文件与 Node。选择模板风格创建的项目拥有独立 AgentWorkspace，AI 从项目入口读取详细规范及模板，制作和保存仍通过 MCP，重开不覆盖提示词；流程见 [模板风格与项目 AI 工作区](template-styles.md)。ToolRuntime/AgentWorkspace/UIEditor_Roblox 保留通用说明和示例，用于空白或兼容项目，不覆盖项目风格；重新打包不删除该目录。
+开发构建输出 Editor/mcp-dist/server.mjs；打包复制到 resources/mcp-dist，ASAR 外由 Node 启动，原生宿主位于 resources/native-bin。Hub 检查服务文件与 Node。所有新工程拥有独立 AgentWorkspace，由 ProjectTypes/Roblox 提供公共入口、节点与代码技能，TemplateStyles/Roblox 提供可选视觉规范、模板和风格专项技能。制作和保存仍通过 MCP，重开不覆盖提示词；流程见 [模板风格与项目 AI 工作区](template-styles.md)。旧全局 AI 入口已退役，历史视觉示例仅作为仓库参考资料保留。
 
 ## 验证
 

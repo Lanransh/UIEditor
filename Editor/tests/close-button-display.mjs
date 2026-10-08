@@ -19,7 +19,7 @@ try {
   await page.evaluate(async () => { await import('/tests/fixtures/roblox-display.tsx'); });
   await page.waitForFunction(() => window.displayQA);
   for (const name of ['CloseButton', 'SmallWindow', 'MediumWindow', 'LargeWindow']) {
-    const document = JSON.parse(await readFile(resolve('../TemplateStyles/多彩棋格风格/template-references', `${name}.rbxui.json`), 'utf8'));
+    const document = JSON.parse(await readFile(resolve('../TemplateStyles/Roblox/多彩棋格风格/template-references', `${name}.rbxui.json`), 'utf8'));
     const find = (node, name) => node.name === name ? node : node.children.map(child => find(child, name)).find(Boolean);
     const surface = find(document.root, 'CloseSurfaceImg');
     const button = find(surface, 'CloseBtn');

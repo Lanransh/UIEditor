@@ -8,12 +8,12 @@ export interface StyleFile { path: string; content: Buffer }
 const ignored = new Set(['node_modules', '.git', '.cache', 'Runtime', 'test-results', 'dist', 'dist-electron']);
 
 export function templateStylesDirectory(packaged: boolean, applicationPath: string, executablePath: string): string {
-  return packaged ? join(dirname(executablePath), 'resources', 'TemplateStyles') : join(dirname(applicationPath), 'TemplateStyles');
+  return packaged ? join(dirname(executablePath), 'resources', 'TemplateStyles', 'Roblox') : join(dirname(applicationPath), 'TemplateStyles', 'Roblox');
 }
 
 async function regular(path: string, directory: boolean) {
   const info = await lstat(path);
-  if (info.isSymbolicLink() || (directory ? !info.isDirectory() : !info.isFile())) throw new Error(`风格路径不能是链接或其他文件类型：${path}`);
+  if (info.isSymbolicLink() || (directory ? !info.isDirectory() : !info.isFile())) throw new Error(`资源包路径不能是链接或其他文件类型：${path}`);
 }
 
 export function styleDirectory(root: string, id: unknown): string {
@@ -25,7 +25,7 @@ export function projectStylePath(path: string): string {
   return path.startsWith(`template-references${sep}`) ? path : join('AgentWorkspace', path);
 }
 
-function validateDocumentLinks(files: StyleFile[]) {
+export function validateDocumentLinks(files: StyleFile[]) {
   const projectRoot = resolve('style-project');
   const paths = files.map(file => resolve(projectRoot, projectStylePath(file.path)));
   for (const file of files.filter(file => file.path.endsWith('.md'))) {
@@ -33,21 +33,31 @@ function validateDocumentLinks(files: StyleFile[]) {
       const link = match[1].replace(/\s+["'][^"']*["']$/, '').replace(/^<|>$/g, '').split('#')[0];
       if (!link || /^(https?:|mailto:)/i.test(link)) continue;
       const destination = decodeURIComponent(link);
-      if (isAbsolute(destination) || /^[a-z][a-z0-9+.-]*:/i.test(destination)) throw new Error(`风格文档含非项目内引用 ${file.path}：${link}`);
+      if (isAbsolute(destination) || /^[a-z][a-z0-9+.-]*:/i.test(destination)) throw new Error(`资源包文档含非项目内引用 ${file.path}：${link}`);
       const target = resolve(dirname(resolve(projectRoot, projectStylePath(file.path))), destination);
       const local = relative(projectRoot, target);
       if (isAbsolute(local) || local === '..' || local.startsWith(`..${sep}`) || !paths.some(path => path === target || path.startsWith(`${target}${sep}`))) {
-        throw new Error(`风格文档引用在项目内不存在 ${file.path}：${link}`);
+        throw new Error(`资源包文档引用在项目内不存在 ${file.path}：${link}`);
       }
     }
   }
 }
 
-// Snapshot the allowlisted package before creating any project files. Documents
-// and resources are copied byte-for-byte; user-authored prompts are never rewritten.
-export async function readTemplateStyle(directory: string): Promise<{ files: StyleFile[]; description: string; templateCount: number; preview: UIDocument; templates: TemplateStylePreview['templates'] }> {
+export function validateSkillNames(files: StyleFile[]) {
+  const names = new Set<string>();
+  for (const file of files.filter(file => file.path.startsWith(join('.agents', 'skills') + sep) && file.path.endsWith(`${sep}SKILL.md`))) {
+    const header = file.content.toString('utf8').match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1];
+    const name = header?.match(/^name:[ \t]*["']?([a-z0-9-]+)["']?[ \t]*\r?$/m)?.[1];
+    if (!name) throw new Error(`技能缺少有效 name：${file.path}`);
+    if (names.has(name)) throw new Error(`工程类型与风格技能同名：${name}`);
+    names.add(name);
+  }
+}
+
+export async function readAgentPackage(directory: string, required: string[]): Promise<StyleFile[]> {
+  const label = required.includes('AGENTS.md') ? '工程类型' : '模板风格';
   try { await regular(dirname(directory), true); await regular(directory, true); }
-  catch (error) { throw new Error(`无法读取模板风格 ${basename(directory)}：${(error as Error).message}`); }
+  catch (error) { throw new Error(`无法读取${label} ${basename(directory)}：${(error as Error).message}`); }
   const root = await realpath(directory);
   const files: StyleFile[] = [];
   async function collect(path: string) {
@@ -65,14 +75,12 @@ export async function readTemplateStyle(directory: string): Promise<{ files: Sty
       files.push({ path: local, content: await readFile(path) });
     }
   }
-  for (const name of ['AGENTS.md', 'Game-DESIGN.md']) {
-    await regular(join(root, name), false).catch(error => { throw new Error(`无法读取风格必要文档 ${name}：${(error as Error).message}`); });
-    await collect(join(root, name)).catch(error => { throw new Error(`无法读取风格必要文档 ${name}：${(error as Error).message}`); });
-    if (!files.at(-1)!.content.toString('utf8').trim()) throw new Error(`风格必要文档为空：${name}`);
+  for (const name of required) {
+    await regular(join(root, name), false).catch(error => { throw new Error(`无法读取${label}必要文档 ${name}：${(error as Error).message}`); });
+    await collect(join(root, name)).catch(error => { throw new Error(`无法读取${label}必要文档 ${name}：${(error as Error).message}`); });
+    if (!files.at(-1)!.content.toString('utf8').trim()) throw new Error(`${label}必要文档为空：${name}`);
   }
-  await regular(join(root, 'template-references'), true).catch(error => { throw new Error(`无法读取风格模板目录 template-references：${(error as Error).message}`); });
-  await collect(join(root, 'template-references'));
-  for (const name of ['assets', 'references', join('.agents', 'skills')]) {
+  for (const name of ['assets', 'references', 'examples', 'template-references', join('.agents', 'skills')]) {
     const path = join(root, name);
     if (name.startsWith('.agents')) {
       const agent = await lstat(join(root, '.agents')).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
@@ -82,11 +90,18 @@ export async function readTemplateStyle(directory: string): Promise<{ files: Sty
     if (info) { await regular(path, true); await collect(path); }
   }
   for (const entry of await readdir(root)) {
-    if (entry.endsWith('.md') && !['AGENTS.md', 'Game-DESIGN.md'].includes(entry)) {
+    if (entry !== 'AGENTS.md' && entry.endsWith('.md') && !required.includes(entry)) {
       await regular(join(root, entry), false);
       await collect(join(root, entry));
     }
   }
+  return files;
+}
+
+// Snapshot the allowlisted package before creating any project files. Documents
+// and resources are copied byte-for-byte; user-authored prompts are never rewritten.
+export async function readTemplateStyle(directory: string): Promise<{ files: StyleFile[]; description: string; templateCount: number; preview: UIDocument; templates: TemplateStylePreview['templates'] }> {
+  const files = await readAgentPackage(directory, ['Game-DESIGN.md']);
   const templates = files.filter(file => file.path.startsWith(`template-references${sep}`) && file.path.toLowerCase().endsWith('.rbxui.json'));
   if (!templates.length) throw new Error('风格没有可读取的 .rbxui.json 模板。');
   const documents = new Map<string, UIDocument>();
@@ -105,6 +120,7 @@ export async function readTemplateStyle(directory: string): Promise<{ files: Sty
     } catch (error) { throw new Error(`风格模板损坏 ${file.path}：${(error as Error).message}`); }
   }
   validateDocumentLinks(files);
+  validateSkillNames(files);
   const design = files.find(file => file.path === 'Game-DESIGN.md')!.content.toString('utf8');
   const description = design.split(/\r?\n/).map(line => line.trim()).find(line => line && !line.startsWith('#')) ?? '';
   // The author's first template reference is the cover, not a hardcoded window

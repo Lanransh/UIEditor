@@ -3,7 +3,7 @@ import { basename, dirname, join, resolve, relative, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { WORKSPACE_DIRECTORY, type Project, type ProjectManifest, type RecentProject } from '../src/shared/project';
 import { listDocumentAssets, readDocument } from './documents';
-import { projectStylePath, readTemplateStyle } from './template-styles';
+import { projectStylePath, readTemplateStyle, readAgentPackage, validateDocumentLinks, validateSkillNames } from './template-styles';
 
 function code(error: unknown): string | undefined {
   return (error as NodeJS.ErrnoException)?.code;
@@ -40,7 +40,7 @@ export async function openProject(directory: string): Promise<Project> {
 
 export type CreateResult = { kind: 'created' | 'existing'; project: Project };
 
-export async function createProject(parent: string, templateSource?: string, styleSource?: string): Promise<CreateResult> {
+export async function createProject(parent: string, templateSource?: string, styleSource?: string, projectTypeSource = resolve('../ProjectTypes/Roblox')): Promise<CreateResult> {
   if (templateSource !== undefined && styleSource !== undefined) throw new Error('模板风格与历史工程克隆不能同时使用。');
   const directory = join(await realpath(parent), WORKSPACE_DIRECTORY);
   try {
@@ -57,14 +57,22 @@ export async function createProject(parent: string, templateSource?: string, sty
   const templateFiles: string[] = [];
   const templateDirectories = new Set<string>();
   try {
-    const templates: { path: string; content: string | Buffer }[] = [];
+    const common = await readAgentPackage(projectTypeSource, ['AGENTS.md']);
+    validateDocumentLinks(common);
+    validateSkillNames(common);
+    const templates: { path: string; content: string | Buffer }[] = common.map(item => ({ path: projectStylePath(item.path), content: item.content }));
+    await mkdir(join(directory, 'interfaces'));
+    templateDirectories.add(join(directory, 'interfaces'));
     if (styleSource !== undefined) {
       const style = await readTemplateStyle(styleSource);
+      validateSkillNames([...common, ...style.files]);
+      const commonSkills = new Set(common.filter(item => item.path.startsWith(join('.agents', 'skills') + sep)).map(item => item.path.split(sep)[2].toLowerCase()));
+      const occupied = new Set(common.map(item => projectStylePath(item.path).toLowerCase()));
       for (const item of style.files) {
+        const skill = item.path.startsWith(join('.agents', 'skills') + sep) ? item.path.split(sep)[2].toLowerCase() : null;
+        if (occupied.has(projectStylePath(item.path).toLowerCase()) || (skill && commonSkills.has(skill))) throw new Error(`工程类型与风格文件或技能冲突：${item.path}`);
         templates.push({ path: projectStylePath(item.path), content: item.content });
       }
-      await mkdir(join(directory, 'interfaces'));
-      templateDirectories.add(join(directory, 'interfaces'));
     }
     if (templateSource !== undefined) {
       const source = await openProject(templateSource);

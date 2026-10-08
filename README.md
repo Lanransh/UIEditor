@@ -12,11 +12,11 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 - 批处理和打包默认使用与参考工程相同的 npm Electron 镜像；可通过 `ELECTRON_MIRROR` 环境变量覆盖。
 - 可将 Windows 便携 Node.js 放到 `ToolRuntime/Runtime/nodejs/`，批处理优先使用其中的 `node.exe` 和 `npm.cmd`。
 - 打包入口：`ToolRuntime/UIEditor-win32-x64/UIEditor.exe`。运行打包应用无需额外安装 Node.js；分发时需保留整个应用目录，不能只复制 exe。
-- app.asar 只收集 `dist`、`dist-electron` 和 `package.json`，Luau、MCP 与模板风格通过额外资源复制；运行依赖已由 Vite/esbuild 打入构建产物，不再复制或扫描 `node_modules`。打包过程显示阶段与耗时，首次下载、解压 Electron 仍需等待。
+- app.asar 只收集 `dist`、`dist-electron` 和 `package.json`，Luau、MCP、工程类型包与模板风格通过额外资源复制；运行依赖已由 Vite/esbuild 打入构建产物，不再复制或扫描 `node_modules`。打包过程显示阶段与耗时，首次下载、解压 Electron 仍需等待。
 
 ## 使用
 
-1. 点击“创建工程”，先选择整套模板风格，再选择父文件夹。程序创建固定的 `UIEditorWorkspace/project.json`，不要求输入名称；风格模板及子目录复制到 `template-references/`，AI 提示词、详细规范、资源和 skills 原样复制到项目 `AgentWorkspace/`。默认也可选择空白工程；有历史时保留仅克隆模板的兼容入口，与风格选择互斥。
+1. 点击“创建工程”，先选择整套模板风格，再选择父文件夹。程序创建固定的 `UIEditorWorkspace/project.json`，不要求输入名称；所有新工程从 `ProjectTypes/Roblox/` 创建独立 `AgentWorkspace/`，包含公共入口与制作技能；选定风格再从 `TemplateStyles/Roblox/` 复制模板到 `template-references/`，视觉规范、资源和专项 skills 进入 AI 工作区。默认也可选择空白工程；有历史时保留仅克隆模板的兼容入口，与风格选择互斥。
 2. 工程创建后进入工作台，通过“文件 → 新建界面”创建 ScreenGui 或在底部“模板参考”中打开独立副本。鼠标移到左侧节点行，点击右侧“+”展开类型列表，选择类型即添加子节点；右侧编辑名称、父节点和属性，中间为 1280×720 画布。
 3. 点击“打开工程”选择已有的 `UIEditorWorkspace` 文件夹，或点击最近工程卡片。
 4. 同一父目录已有有效工程时，会询问是否打开；已有无效目录时不覆盖内容。
@@ -26,11 +26,11 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 
 ### 模板风格与项目 AI
 
-唯一维护源为仓库根目录 `TemplateStyles/`，开发版直接读取；
-打包版直接读取应用内的 `resources/TemplateStyles/`，不再使用外置副本。
-每个二级文件夹是一套风格，必要文件是 `AGENTS.md`、`Game-DESIGN.md`
-及 `template-references/**/*.rbxui.json`；资源和 skills 按需提供。
-规则及相对引用约定见 [风格库说明](TemplateStyles/README.md)。
+工程公共入口和技能维护于 `ProjectTypes/Roblox/`；视觉风格维护于
+`TemplateStyles/Roblox/<风格名>/`。打包版读取 resources 下同名目录。
+风格必需 `Game-DESIGN.md` 及 `template-references/**/*.rbxui.json`，
+可提供资源和专项 skills，不提供工程入口或重复公共代码规范。
+规则见 [工程类型包](ProjectTypes/README.md) 和 [风格库说明](TemplateStyles/README.md)。
 当前 **多彩棋格风格** 包含 7 个鲜明配色独立模板，标题可按主题选色，
 保留 Stud 平铺纹理，不包含 TemplatePage 展示页或全画布展示背景。
 
@@ -59,7 +59,7 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 
 ## 开发与验证
 
-Hub 右上角“设置”提供 Codex MCP 配置以启用 `ui-editor`。AI 在当前打开的工程内通过节点查询和代码事务制作界面，用 `uie.scripts.get/set` 直接读写交互代码和接入代码，再运行、模拟点击、读取日志和截图。执行结果可在 App 内撤销重做，MCP 不提供 undo/redo。风格项目从项目 `AgentWorkspace` 开始；`ToolRuntime/AgentWorkspace/UIEditor_Roblox` 保留通用说明和示例供空白/兼容工程使用，不覆盖项目风格。接口与边界见 [MCP 自动化](Docs/design/mcp-automation.md)。
+Hub 右上角“设置”提供 Codex MCP 配置以启用 `ui-editor`。AI 在当前打开的工程内通过节点查询和代码事务制作界面，用 `uie.scripts.get/set` 直接读写交互代码和接入代码，再运行、模拟点击、读取日志和截图。执行结果可在 App 内撤销重做，MCP 不提供 undo/redo。所有新工程从项目 `AgentWorkspace` 开始；工程类型提供平台技能，风格提供视觉规范和专项技能。旧工程重开不会自动改写。接口与边界见 [MCP 自动化](Docs/design/mcp-automation.md)。
 
 ```powershell
 cd Editor

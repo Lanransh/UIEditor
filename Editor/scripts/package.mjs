@@ -36,7 +36,7 @@ const paths = await packager({
   arch: 'x64',
   asar: true,
   prune: false,
-  extraResource: ['native-bin', 'mcp-dist', '../TemplateStyles'],
+  extraResource: ['native-bin', 'mcp-dist', '../TemplateStyles', '../ProjectTypes'],
   overwrite: true,
   download: { cacheRoot: resolve('../ToolRuntime/Runtime/ElectronDownloadCache') },
   ignore: [ignoredPackageContent],

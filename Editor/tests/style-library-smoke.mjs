@@ -24,9 +24,9 @@ try {
   const result = await page.evaluate(() => window.projects.previewStyle('多彩棋格风格'));
   assert.ok(result.ok, result.error);
   const source = result.value;
-  assert.equal(source.directory, resolve('../TemplateStyles/多彩棋格风格'));
+  assert.equal(source.directory, resolve('../TemplateStyles/Roblox/多彩棋格风格'));
   assert.equal(await templates.getByRole('button').count(), 7);
-  const paths = ['AGENTS.md', 'Game-DESIGN.md', ...source.templates.map(template => join('template-references', template.path))];
+  const paths = ['Game-DESIGN.md', ...source.templates.map(template => join('template-references', template.path))];
   const original = await Promise.all(paths.map(path => readFile(join(source.directory, path))));
   await dialog.getByText('已有工程使用独立副本，不会随画风库更新。', { exact: true }).waitFor();
   await dialog.getByText(source.directory, { exact: true }).waitFor();

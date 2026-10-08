@@ -16,7 +16,7 @@ export function rewardExample() {
   });
   document.scripts = {
     integration: `local FX = _G.FX
-local Preview = FX.Class("COnlineRewardUIPreviewCompClass", "COnlineRewardUIBaseCompClass")
+local Preview = FX.Class("COnlineRewardPreview", "COnlineRewardView")
 
 -- 初始化在线奖励的模拟数据。
 -- @param owner table 编辑器提供的组件宿主
@@ -54,7 +54,7 @@ end
 
 return Preview`,
     source: `local FX = _G.FX
-local UI = FX.Class("COnlineRewardUIBaseCompClass", "CUIEditorUICompClass")
+local UI = FX.Class("COnlineRewardView", "CUIView")
 local FXLoader = FX.Loader
 
 -- 绑定静态设计节点，连接随组件销毁清理。
