@@ -4,6 +4,8 @@
 
 `uie.code.execute` 接收 `{sessionId, revision, language, source, dryRun?, label?}`。源码最多 256 KiB，单次执行预算 250 ms，VM 64 MiB，主进程 2 秒看门狗。成功返回 `success/changed/revision/logs/operationCount/nodeCount`；执行或校验失败返回 `success:false/error/stage/logs`，此前改动不提交。
 
+优先调用 `uie.editor.get_capabilities({detail:"summary"})` 读取 API 与支持类型；创建或修改节点前按需用 `{className:"Frame"}` 获取属性和父子约束。省略参数保持完整返回。
+
 ## 节点与源码
 
 | API | 行为 |
@@ -29,7 +31,11 @@
 
 `find` 与 MCP 查询共同采用名称 exact/contains、className、parentId、recursive、offset、limit。默认递归，默认 50 条，最多 200 条。过滤条件取交集。parentId 指定时不包含父节点自身；recursive=false 只查直属子节点。
 
-MCP `uie.nodes.get` 使用 `{id?,depth?,view?,target?,format?,maxNodes?}`，省略 id 查询根。JSON 默认深度 0；format="tree" 返回紧凑文本树，默认深度 3；最大深度 64。maxNodes 默认 200、最多 2000，达到限制明确返回截断提示。`uie.nodes.find` 支持相同 target 及原有过滤、分页条件。省略 target 查询当前画布，view=runtime 查询当前运行副本，结果带 runtimeSessionId 和 frameSequence。
+MCP `uie.nodes.get` 使用 `{id?,depth?,view?,target?,format?,maxNodes?,compact?}`，省略 id 查询根。JSON 默认深度 0；format="tree" 返回紧凑文本树，默认深度 3；最大深度 64。maxNodes 默认 200、最多 2000，达到限制明确返回截断提示。`uie.nodes.find` 支持相同 target 及原有过滤、分页条件。省略 target 查询当前画布，view=runtime 查询当前运行副本，结果带 runtimeSessionId 和 frameSequence。
+
+nodes.get/find 可传 compact=true，JSON 节点摘要仅保留 id/name/className，省略重复 path/parentId；get 仍保留属性、图片引用、children 和截断信息，find 保留分页。文本树不受 compact 影响。省略或传 false 保持原返回。
+
+先取浅层树（如 depth=2、maxNodes=80）定位目标，再按 id/parentId 查询相关子树；按 truncated/nextOffset 补查，不把截断当成不存在。脚本只需一份时指定 kind，已取得且未变更的结果不重复全量打印。
 
 ## 保存模板与其他工程的读取
 

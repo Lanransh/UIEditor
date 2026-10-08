@@ -79,6 +79,12 @@ try {
   await page.getByRole('dialog', { name: '创建工程', exact: true }).getByRole('button', { name: '下一步', exact: true }).click();
   await page.getByRole('button', { name: '运行', exact: true }).waitFor();
   const capability = await call('uie.editor.get_capabilities'); assert.equal(capability.authoring.language, 'luau'); assert.ok(capability.nodes.TextButton);
+  const summary = await call('uie.editor.get_capabilities', { detail: 'summary' });
+  assert.ok(summary.nodeTypes.includes('TextButton')); assert.equal(summary.nodes, undefined);
+  assert.ok(JSON.stringify(summary).length < JSON.stringify(capability).length * 0.25);
+  const selected = await call('uie.editor.get_capabilities', { className: 'TextButton' });
+  assert.deepEqual(selected.nodes, { TextButton: capability.nodes.TextButton });
+  assert.equal((await raw('uie.editor.get_capabilities', { className: 'Missing' })).isError, true);
   const initial = await state('full');
   assert.equal(initial.document, null);
   assert.equal((await state()).nodeCount, 0);
@@ -91,7 +97,7 @@ try {
   panel.properties.BackgroundColor3 = '#12ab34';
   reference.root.children.push(panel);
   reference.scripts.source = 'error("Saved screenshot must not execute scripts")';
-  const referencePath = join(projectPath, 'template-references', '奖励', 'Reference.rbxui.json');
+  const referencePath = join(projectPath, 'AgentWorkspace', 'styles', 'templates', '奖励', 'Reference.rbxui.json');
   await writeDocument(referencePath, reference);
   const targets = await call('uie.document.list', { library: 'templates' });
   assert.equal(targets.interfaces[0].documentId, reference.id);
@@ -102,6 +108,9 @@ try {
   assert.match(tree.tree, /ReferenceImg/); assert.equal(tree.truncated, false);
   assert.equal((await call('uie.nodes.find', { target, name: 'ReferenceImg' })).nodes[0].id, panel.id);
   assert.equal((await call('uie.nodes.get', { target, id: panel.id })).node.properties.BackgroundColor3, '#12ab34');
+  const compactSaved = await call('uie.nodes.get', { target, id: panel.id, compact: true });
+  assert.equal(compactSaved.node.path, undefined); assert.equal(compactSaved.node.properties.BackgroundColor3, '#12ab34');
+  assert.deepEqual((await call('uie.nodes.find', { target, name: 'ReferenceImg', compact: true })).nodes, [{ id: panel.id, name: panel.name, className: panel.className }]);
   assert.equal((await call('uie.scripts.get', { target, kind: 'source' })).scripts.source, reference.scripts.source);
   assert.equal((await raw('uie.nodes.get', { target, view: 'runtime' })).isError, true);
   const preview = await raw('uie.debug.screenshot', { target });
@@ -199,19 +208,24 @@ print("Created reward UI")`;
   assert.equal(batch.success, true, JSON.stringify(batch));
   assert.equal(batch.results.length, 8); assert.equal(batch.skipped, 0); assert.equal(batch.state, 'edit');
   assert.deepEqual((await state('full')).document, created.document);
-  const batchFailure = await mutate('uie.runtime.batch', { steps: [
+  const batchFailure = await mutate('uie.runtime.batch', { compact: true, steps: [
     { action: 'run' }, { action: 'assert', id: button.id, properties: { Text: 'Wrong' } }, { action: 'stop' },
   ] });
   assert.equal(batchFailure.success, false); assert.equal(batchFailure.skipped, 1);
   assert.match(batchFailure.results[1].error, /Text/); assert.equal(batchFailure.state, 'runtime');
   await mutate('uie.runtime.control', { action: 'stop' });
   await mutate('uie.scripts.set', { source: fixture.scripts.source.replace('self:EmitUIAction("ClaimReward"', 'root.Enabled = false\n        self:EmitUIAction("ClaimReward"') });
-  const hiddenBatch = await mutate('uie.runtime.batch', { steps: [
+  const hiddenBatch = await mutate('uie.runtime.batch', { compact: true, steps: [
     { action: 'run' }, { action: 'click', id: button.id, dispatched: true },
     { action: 'assert', id: created.document.root.id, properties: { Enabled: false } },
     { action: 'click', id: button.id, dispatched: false, reason: 'hidden' }, { action: 'stop' },
   ] });
   assert.equal(hiddenBatch.success, true, JSON.stringify(hiddenBatch));
+  assert.equal(hiddenBatch.state, 'edit'); assert.ok(hiddenBatch.sessionId);
+  assert.equal(hiddenBatch.results[0].result.sessionId, undefined);
+  assert.equal(hiddenBatch.results[2].result.disabled, undefined);
+  assert.equal(hiddenBatch.results[3].result.reason, 'hidden');
+  assert.ok(hiddenBatch.results[1].result.result.logs.some((log: any) => log.kind === 'action'));
   await uiHistory('undo');
   const run = await mutate('uie.runtime.control', { action: 'run' }); assert.equal(run.result.ok, true, JSON.stringify(run.result));
   assert.equal((await call('uie.nodes.get', { id: button.id, view: 'runtime' })).node.properties.Text, 'Ready');

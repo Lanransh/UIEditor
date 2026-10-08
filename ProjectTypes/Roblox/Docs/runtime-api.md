@@ -31,4 +31,6 @@ App 使用真实 Luau 和模拟节点，覆盖公开支持的属性与接口；�
 
 节点支持 MouseEnter/MouseLeave/MouseMoved、MouseWheelForward/Backward、InputBegan/InputChanged/InputEnded 和 GetPropertyChangedSignal(property)。Input 回调提供鼠标 UserInputType、UserInputState、Position/Delta（X/Y/Z），位置为 1280×720 逻辑画布像素；仅实现有限鼠标数据，不是完整引擎 InputObject。滚动容器的默认滚动无须脚本；监听 CanvasPosition 可响应滚动变化。不支持键盘、文本输入和焦点事件。
 
+runtime.batch 可传 compact=true：成功步骤移除重复的编辑会话及工程元数据，成功断言只回传所检查的字段；顶层仍提供 sessionId/revision 和最终状态。运行身份、帧序号、动作参数及日志保留；失败步骤保持完整结果和错误。diagnostics 只移除重复元数据，保留日志、错误、游标和截断标记。步骤日志与诊断日志可能重叠，本轮不按文本去重，以免误删重复动作证据。省略或传 false 保持完整返回。
+
 AI 优先使用 runtime.batch 的 hover/scroll/drag/click，并通过 assert 检查属性、hovered/pressed/disabled；nodes.get/find 的 view=runtime 和 get_diagnostics 返回 interaction.hoveredId/pressedId，诊断日志包含输入与脚本结果。按 ID 操作检查显隐和禁用，不检查遮挡；关键状态另外截图。运行中克隆的 ID 不跨 reset 复用。

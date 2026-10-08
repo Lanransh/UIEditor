@@ -13,7 +13,8 @@ export function integer(value: unknown, fallback: number, min: number, max: numb
   if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) throw new Error(`整数必须在 ${min}–${max} 范围。`);
   return value;
 }
-export function nodeSummary(root: UINode, node: UINode): unknown {
+export function nodeSummary(root: UINode, node: UINode, compact = false): unknown {
+  if (compact) return { id: node.id, name: node.name, className: node.className };
   const parts = [node.name]; let parent = findParent(root, node.id);
   while (parent) { parts.unshift(parent.name); parent = findParent(root, parent.id); }
   return { id: node.id, name: node.name, className: node.className, parentId: findParent(root, node.id)?.id ?? null, path: parts.join('/') };
@@ -30,9 +31,9 @@ export function getNode(document: UIDocument, args: Record<string, unknown>): un
     for (const child of node.children) {
       if (count >= budget) break;
       if (remaining) children.push(visit(child, remaining - 1));
-      else { ++count; children.push(nodeSummary(document.root, child)); }
+      else { ++count; children.push(nodeSummary(document.root, child, args.compact === true)); }
     }
-    return { ...(nodeSummary(document.root, node) as object), properties: node.properties, ...(node.imageAssetId ? { imageAssetId: node.imageAssetId } : {}), children, ...(children.length < node.children.length ? { truncated: true, omittedChildren: node.children.length - children.length } : {}) };
+    return { ...(nodeSummary(document.root, node, args.compact === true) as object), properties: node.properties, ...(node.imageAssetId ? { imageAssetId: node.imageAssetId } : {}), children, ...(children.length < node.children.length ? { truncated: true, omittedChildren: node.children.length - children.length } : {}) };
   };
   return visit(node, depth);
 }
@@ -46,7 +47,7 @@ export function findNodes(document: UIDocument, args: Record<string, unknown>) {
   const candidates = args.recursive === false ? parent.children : args.parentId === undefined ? allNodes(parent) : allNodes(parent).slice(1);
   const nodes = candidates.filter(node => (args.name === undefined || (args.match === 'contains' ? node.name.includes(String(args.name)) : node.name === args.name)) && (args.className === undefined || node.className === args.className));
   const offset = integer(args.offset, 0, 0, 5000), limit = integer(args.limit, 50, 1, 200);
-  return { nodes: nodes.slice(offset, offset + limit).map(node => nodeSummary(document.root, node)), total: nodes.length, nextOffset: offset + limit < nodes.length ? offset + limit : null };
+  return { nodes: nodes.slice(offset, offset + limit).map(node => nodeSummary(document.root, node, args.compact === true)), total: nodes.length, nextOffset: offset + limit < nodes.length ? offset + limit : null };
 }
 
 export function nodeTree(document: UIDocument, args: Record<string, unknown>) {

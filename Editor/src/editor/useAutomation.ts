@@ -66,7 +66,7 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
               return { ...stamp(), saved: true, asset: result.value.find(asset => asset.id === a.id) };
             } finally { f.busy(false); }
           }
-          case 'uie.editor.get_capabilities': return { ...stamp(), ...getCapabilities(e.strategy) };
+          case 'uie.editor.get_capabilities': return { ...stamp(), ...getCapabilities(e.strategy, a) };
           case 'uie.nodes.get': { const view = readDocument(); return { ...stamp(), ...('runtimeSessionId' in view ? { runtimeSessionId: view.runtimeSessionId, frameSequence: view.frameSequence, interaction: e.runtime.inspect().interaction } : {}), ...(a.format === 'tree' ? nodeTree(view.document, a) : { node: getNode(view.document, a) }) }; }
           case 'uie.nodes.find': { const view = readDocument(); return { ...stamp(), ...('runtimeSessionId' in view ? { runtimeSessionId: view.runtimeSessionId, frameSequence: view.frameSequence, interaction: e.runtime.inspect().interaction } : {}), ...findNodes(view.document, a) }; }
           case 'uie.code.execute': {

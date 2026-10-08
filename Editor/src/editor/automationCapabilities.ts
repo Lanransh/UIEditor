@@ -16,6 +16,11 @@ export const robloxAutomation: AutomationCapabilities = {
     api: ['_G.FX.Class', 'FX.Loader:PlayerGui("ScreenGui.Child")', 'FX.Loader:Here(root,"Child.Descendant")', 'node:Clone()', 'node:Destroy()', 'node:GetChildren()', 'node:GetPropertyChangedSignal(property):Connect(callback)', 'node.Name', 'node.Parent', 'CUIEditorUICompClass', 'OnReady', 'Render', 'GetUIConfig', 'GetUIState', 'RefreshUI', 'OnUIAction', 'EmitUIAction', 'TrackConnection', 'SetButtonEnabled'],
   },
 };
-export function getCapabilities(strategy: ProjectStrategy) {
-  return { projectType: strategy.mode, ...strategy.automation, imageAssets: { platform: 'roblox', tools: ['uie.assets.search', 'uie.assets.get', 'uie.assets.configure'], apply: 'ui.assets.apply(nodeId,assetId)', resolution: 'asset Roblox ID; missing catalog entry uses document snapshot' }, nodes: strategy.nodes, parenting: Object.fromEntries(Object.keys(strategy.nodes).map(parent => [parent, Object.keys(strategy.nodes).filter(child => strategy.canParent(strategy.createNode(parent), strategy.createNode(child)))])) };
+export function getCapabilities(strategy: ProjectStrategy, args: Record<string, unknown> = {}) {
+  const types = Object.keys(strategy.nodes);
+  if (args.className !== undefined && !types.includes(String(args.className))) throw new Error('不支持的节点类型。');
+  const selected = args.className === undefined ? types : [String(args.className)];
+  const base = { projectType: strategy.mode, ...strategy.automation, imageAssets: { platform: 'roblox', tools: ['uie.assets.search', 'uie.assets.get', 'uie.assets.configure'], apply: 'ui.assets.apply(nodeId,assetId)', resolution: 'asset Roblox ID; missing catalog entry uses document snapshot' } };
+  if (args.detail === 'summary') return { ...base, nodeTypes: selected, nodeDetails: 'Use get_capabilities({className}) for properties and allowed children, or omit filters for full capabilities.' };
+  return { ...base, nodes: Object.fromEntries(selected.map(name => [name, strategy.nodes[name]])), parenting: Object.fromEntries(selected.map(parent => [parent, types.filter(child => strategy.canParent(strategy.createNode(parent), strategy.createNode(child)))])) };
 }

@@ -145,3 +145,46 @@ test('assertions reject missing runtime/nodes and compare structured properties 
   ] }, f.dispatch, f.inspect, () => {});
   assert.equal(report.success, true);
 });
+
+
+test('compact batch keeps action evidence and diagnostics, and leaves failures intact', async () => {
+  async function run(compact: boolean, fail = false) {
+    const f = fixture();
+    const log = { kind: 'action', message: 'Claim {"entryId":"reward-1"}' };
+    const report = await executeRuntimeBatch({ ...stamp, compact, steps: [
+      { action: 'run' }, { action: 'click', id: f.button.id, dispatched: true },
+      { action: 'assert', id: f.button.id, properties: { Text: fail ? 'Wrong' : 'Claimed' } }, { action: 'stop' },
+    ] }, async request => {
+      const value = await f.dispatch(request);
+      return request.name.endsWith('get_diagnostics')
+        ? { ...stamp, projectId: 'project', ...value, logs: [log], lastError: null, truncated: true, consoleCursor: 7 }
+        : { ...stamp, projectId: 'project', ...value, result: { ...value.result, logs: [log] }, runtimeSessionId: request.arguments.action === 'stop' ? null : 'runtime', frameSequence: 3 };
+    }, f.inspect, () => {});
+    return { report, f, log };
+  }
+  const { report, f, log } = await run(true);
+  assert.equal(report.success, true);
+  assert.equal(f.inspect(), null);
+  const click = report.results[1].result as any;
+  assert.equal(click.sessionId, undefined);
+  assert.equal(click.projectId, undefined);
+  assert.equal(click.runtimeSessionId, 'runtime');
+  assert.equal(click.frameSequence, 3);
+  assert.equal(click.dispatched, true);
+  assert.deepEqual(click.result.logs, [log]);
+  const assertion = report.results[2].result as any;
+  assert.deepEqual(assertion.properties, { Text: 'Claimed' });
+  assert.equal(assertion.disabled, undefined);
+  assert.deepEqual(report.diagnostics.logs, [log]);
+  assert.equal(report.diagnostics.truncated, true);
+  assert.equal(report.diagnostics.consoleCursor, 7);
+  assert.equal(report.diagnostics.sessionId, undefined);
+  const full = (await run(false)).report;
+  assert.equal((full.results[1].result as any).sessionId, stamp.sessionId);
+  assert.ok(JSON.stringify(report).length < JSON.stringify(full).length);
+  const failed = (await run(true, true)).report;
+  assert.equal(failed.success, false);
+  assert.equal(failed.skipped, 1);
+  assert.match(failed.results[2].error!, /Wrong.*Claimed/);
+  assert.equal((failed.results[2].result as any).disabled, true);
+});

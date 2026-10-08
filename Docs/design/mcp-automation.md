@@ -8,6 +8,10 @@
 
 ## 工具与查询
 
+get_capabilities 省略参数或 detail="full" 保持完整能力返回；detail="summary" 返回 API、运行限制与 nodeTypes，省略节点属性和父子规则。需要节点详细约束时传 className（如 Frame），返回该类型完整属性与允许的子类型；未知类型报错。摘要中的 nodeDetails 指引补查，不能把未加载的规则当成不支持。
+
+nodes.get/find 可传 compact=true，JSON 节点摘要仅保留 id/name/className，省略重复 path/parentId；get 仍保留属性、图片引用、children 和截断信息，find 保留分页。文本树不受 compact 影响。省略或传 false 保持原返回。
+
 固定工具包含 editor.get_state/get_capabilities、nodes.get/find、code.execute、scripts.get/set、document.list/new/open/save、runtime.control/click/hover/scroll/drag/batch、debug.get_diagnostics/screenshot、assets.search/get/configure 和 project.list，均带 uie 前缀。不提供选中节点、MCP undo/redo 或制作代码内部的历史 API。尚未新建或打开界面时，get_state 返回 nodeCount=0，full 详情的 document 为 null；状态同时返回 projectId、projectName 和当前 documentId（无文档时为 null），当前文件 library、库内 relativePath 和 mode（edit/unsaved），以及绝对路径 workspacePath、agentWorkspacePath、gameDesignPath 和 gameDesignExists；文档编辑、保存、运行及当前画布截图要求先新建或打开界面。图片查询、配置和 ui.assets.apply 见 [图片资产](image-assets.md)。
 
 scripts.get 读取交互代码 source、接入代码 integration，可用 kind 指定其中一份，省略时读取两份。scripts.set 要求 sessionId/revision，可传 source、integration 或同时传两者，未传字段保持原值。源码长度及结构校验沿用文档边界；语法错误允许保存并在运行时反馈。运行中禁止修改源码。code.execute 内的 ui.scripts.get/set 仍可将源码与节点修改组合提交。
@@ -62,6 +66,8 @@ properties 的 JSON 值及可选 disabled 状态，只读取运行副本。所�
 步骤，不回滚已执行动作，也不隐式 stop；失败后仍运行时先截图取证，再显式停止
 后修复。每批执行前检查 8 秒预算，超过预算不再开始下一步，需拆成较小批次；
 原有单步运行超时和桥接超时仍生效。批量操作不修改设计文档、dirty 或历史。
+
+runtime.batch 可传 compact=true：成功步骤移除重复的编辑会话及工程元数据，成功断言只回传所检查的字段；顶层仍提供 sessionId/revision 和最终状态。运行身份、帧序号、动作参数及日志保留；失败步骤保持完整结果和错误。diagnostics 只移除重复元数据，保留日志、错误、游标和截断标记。步骤日志与诊断日志可能重叠，本轮不按文本去重，以免误删重复动作证据。省略或传 false 保持完整返回。
 
 AI 优先一次取得关键节点 ID，再提交带明确预期的验证批次；普通领取、重复点击、
 重置及另一领取分支可以放在同一批次。截图保留设计态、确有视觉差异的关键运行态

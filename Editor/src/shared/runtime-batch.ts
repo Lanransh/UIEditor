@@ -63,6 +63,7 @@ export async function executeRuntimeBatch(
   validateRuntimeBatchSteps(args.steps);
   verify();
   const startedAt = Date.now();
+  const metadata = new Set(['sessionId', 'revision', 'projectId', 'projectName', 'documentId', 'projectType', 'state', 'dirty', 'relativePath', 'library', 'mode']);
   const results: { index: number; action: string; success: boolean; result?: unknown; error?: string }[] = [];
   for (const [index, step] of args.steps.entries()) {
     let result: any;
@@ -97,11 +98,20 @@ export async function executeRuntimeBatch(
           if (step.reason !== undefined && result.reason !== step.reason) throw new Error('reason 不匹配。');
         }
       }
+      if (args.compact === true) {
+        if (step.action === 'assert') {
+          result = Object.fromEntries(Object.entries(result).filter(([key]) => key === 'id' || (key === 'properties' ? step.properties !== undefined : Object.hasOwn(step, key))));
+        } else {
+          // Keep runtime identities, frame sequence, action payloads and logs as evidence.
+          result = Object.fromEntries(Object.entries(result).filter(([key]) => !metadata.has(key)));
+        }
+      }
       results.push({ index, action: step.action, success: true, result });
     } catch (error) {
       results.push({ index, action: step.action, success: false, result, error: error instanceof Error ? error.message : String(error) });
       break;
     }
   }
-  return { success: results.every(result => result.success), results, skipped: args.steps.length - results.length, diagnostics: await dispatch({ name: 'uie.debug.get_diagnostics', arguments: {} }) };
+  const diagnostics = await dispatch({ name: 'uie.debug.get_diagnostics', arguments: {} });
+  return { success: results.every(result => result.success), results, skipped: args.steps.length - results.length, diagnostics: args.compact === true ? Object.fromEntries(Object.entries(diagnostics).filter(([key]) => !metadata.has(key))) : diagnostics };
 }
