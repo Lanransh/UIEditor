@@ -52,6 +52,21 @@ Config 是页面所需配置，State 是当前展示数据；接入层可以把�
 转换为页面容易消费的结构。纯 UI 状态，如当前页签和展开状态，可由页面维护，
 不必把每一次切页发给游戏业务。
 
+### 页面数据契约必须随交互脚本交付
+
+`state` 没有跨页面统一的业务结构。公共 RefreshUI 调用 Render(GetUIState())；默认
+GetUIState 返回 self.State，GetUIConfig 返回 self.Config。具体字段由各 View 与接入层约定，
+框架不会自动推导或补齐。模拟接入和真实游戏接入应提供同一种结构。
+
+AI 编写交互脚本时，必须在 source 文件头或 Render 附近写明完整数据结构与最小完整示例，
+使导出的 View 本身足以供接入者使用；仅写 `@param state table` 或让使用者翻模拟代码不够。
+字段需注明类型、含义、单位、必填/缺省行为、枚举与 ID 对应关系，同时说明首次准备、
+刷新方式和动作参数。具体制作要求维护在
+[工程类型的接入规范](../../ProjectTypes/Roblox/Docs/presentation-contract.md)。
+现有福利示例的实际字段说明见
+[福利接入契约](../../Editor/tests/fixtures/roblox-welfare/README.md#state-数据契约)。
+此要求约束后续脚本制作；并不表示已有脚本均已补齐注释或已有自动类型校验。
+
 ### 2.2 推荐子组件契约
 
 子组件只绑定给定节点子树，不自行查找全局 PlayerGui；整屏适配由页面级 View

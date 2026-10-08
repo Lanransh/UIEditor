@@ -16,8 +16,9 @@
 - 开发版读取维护源；打包版读取应用 resources/ProjectTypes/Roblox 与
   resources/TemplateStyles/Roblox，不依赖 ToolRuntime 的外置 AI 工作区或风格库。
 - 两种资源包随应用打包，修改维护源后需重新构建打包才能影响打包版新建工程。
-- 创建时保存独立副本；更新库不改已有工程，打开和重开不覆盖用户定制文件。
-  工程移动后继续使用项目内相对引用，不依赖来源本机路径。
+- 公共 AGENTS.md、Docs/、.agents/skills/ 在创建和实际打开工程时同步；相同内容不重写，废弃公共文件清理。
+- 风格只在新建时复制到 styles/，之后归项目维护，打开和重开不读取或更新 styles/。
+  AGENTS.LOCAL.md 仅缺失时创建，已有内容保留。工程移动后继续使用相对引用。
 - ToolRuntime/AgentWorkspace 已退役。旧 Stud 资源、来源与视觉示例保存在
   Docs/references/legacy-roblox-ui，仅作历史参考，不分发为当前项目规范。
 - UI_EDITOR_USER_DATA 只重定向运行数据，不改变资源包读取位置。
@@ -43,7 +44,8 @@ TemplatePage 展示页；没有修改来源工程原件。
 
 工程类型包必需非空 AGENTS.md。风格包必需非空 Game-DESIGN.md 和至少一份
 有效 template-references/**/*.rbxui.json；风格根 AGENTS.md 不复制到工程。
-可选根 Markdown、assets/、references/、examples/ 和 .agents/skills/，保留子目录。
+风格可选根 Markdown、assets/、references/、examples/ 和 .agents/skills/，保留子目录。
+公共包使用 AGENTS.md、Docs/ 与 .agents/skills/。
 技能 SKILL.md 声明有效 name；专项技能从 Game-DESIGN.md 链接，公共技能从平台入口链接。
 
 合并时拒绝重复目标路径、同名技能目录及重复技能 name，不静默覆盖或合并技能内部文件。
@@ -56,24 +58,26 @@ HTTP 链接仅作补充资料；App 不下载。复制忽略 node_modules、Git�
 UIEditorWorkspace/
 ├─ project.json
 ├─ interfaces/
-├─ template-references/          # 有模板时存在
 └─ AgentWorkspace/
-   ├─ AGENTS.md                  # 工程类型提供
-   ├─ Game-DESIGN.md             # 选定风格提供，可选
-   ├─ assets/、references/       # 按实际包内容复制
-   └─ .agents/skills/
-      ├─ roblox-ui-authoring/    # 工程类型公共制作与接入
-      ├─ roblox-luau-standards/  # 工程类型编码规则
-      └─ ui-editor-style-check/ # 当前风格的专项技能，可选
+   ├─ AGENTS.md                  # 编辑器维护，不提交
+   ├─ AGENTS.LOCAL.md            # 项目维护，提交
+   ├─ Docs/                     # 编辑器公共规范，不提交
+   ├─ .agents/skills/           # 编辑器技能入口，不提交
+   └─ styles/                   # 项目风格，新建时复制，以后不自动更新
+      ├─ Game-DESIGN.md
+      ├─ templates/
+      ├─ assets/、references/
+      └─ skills/
 ```
 
-文档按目标布局组织：根规范到模板使用 ../template-references/，到资源和技能使用
-工作区相对路径。文件原样复制，不批量改写文档或模板中的类名、属性与元数据。
+源风格包保留原布局：template-references/、Game-DESIGN.md、.agents/skills/。
+安装时分别映射到 styles/templates/、styles/Game-DESIGN.md、styles/skills/；
+Markdown 相对链接随路径调整，模板及二进制资源保持原字节。项目模板读写统一使用 styles/templates/。
 
 图片预览保存在模板 JSON 中，Roblox ID 独立保存；不允许通过 imageAssetId
 关联来源工程或全局图片目录，以免后续被来源图片变化覆盖。
 需要从项目图片库制作模板时，保存为含 previewImage 与 Image 的独立快照。
-原始模板、提示词及资源按字节复制，不重写元数据、文档、类名或设计属性。
+模板与资源按字节复制，提示词仅调整相对链接，不重写元数据、类名或设计属性。
 源码类的适配由项目 AI 制作新界面时处理，不修改模板原件。
 
 ## 新建、校验与失败
@@ -115,13 +119,16 @@ Hub 的“画风库”打开独立只读查看窗口：左侧列出真实封面�
 
 工程内容不依赖全局库，项目移动后仍能使用相对引用；
 修改项目不回写风格库，修改库不更新已建工程。
-打开/重开不生成默认提示词，不覆盖用户定制文档。
+实际打开前同步公共提示词，并补齐 Git 忽略规则；不覆盖 AGENTS.LOCAL.md 或 styles。
+只读校验工程及列出最近工程不触发同步。同步失败时不激活工程，显示具体错误，可修复后重试。
+编辑器不包含通用旧工作区迁移逻辑，也不自动修改 Git 索引。
 project.json 保持既有版本和字段，不保存源工程本机路径。
 
 ## 项目 AI 工作入口
 
-AgentWorkspace/AGENTS.md 是工程类型提供的独立入口。制作使用 roblox-ui-authoring，
-编写 Luau 同时使用 roblox-luau-standards；存在 Game-DESIGN.md 时读取风格规范及其专项技能。
+AgentWorkspace/AGENTS.md 是编辑器维护的入口，明确要求读取 AGENTS.LOCAL.md。
+制作使用 roblox-ui-authoring，编写 Luau 同时使用 roblox-luau-standards；具体规范位于 Docs/。
+存在 styles/Game-DESIGN.md 时读取风格规范及其明确链接的专项技能，不依赖 styles/skills 自动发现。
 没有选定风格也能使用平台能力，不强制套用默认蓝色窗口、签到示例或多彩棋格主题。
 
 公共制作技能指导通过 MCP 读取工程模板结构与截图，确认当前工程身份、节点能力和运行限制，
@@ -137,7 +144,8 @@ UIEditor 模拟状态不能作为真实资格、支付或发奖依据；App 检�
 `tests/template-styles.test.ts` 覆盖发现、损坏、访问受限、平台与风格独立复制、技能冲突、空白工程工作区、
 独立性、移动、已有目标保护、相对引用、链接拒绝、复制失败回滚、
 开发/打包的单一读取路径、外置旧副本隔离，以及更新后新工程使用新版、
-已有工程保留原快照。
+已有工程风格保留原快照。agent-workspace.test.ts 验证公共规范更新、LOCAL/styles 保护、
+重复同步不改写、Git 忽略与链接路径拒绝。
 `npm run test:styles` 构建后运行相关单元测试、真实风格选择与历史克隆冒烟；
 `npm run test:styles:packaged` 验证已打包应用的同一流程。
 可使用 UI_EDITOR_PACKAGE_OUTPUT/ UI_EDITOR_PACKAGED_EXECUTABLE 隔离打包验证，

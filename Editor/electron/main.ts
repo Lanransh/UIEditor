@@ -6,7 +6,7 @@ import { mkdir, stat } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { createProject, describeError, openProject, RecentProjects } from './projects';
 import type { Project, Result, RecentProjectView } from '../src/shared/project';
-import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset, moveDocumentAsset, listTemplateFolders, templateFolderPath } from './documents';
+import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset, moveDocumentAsset, listTemplateFolders, templateFolderPath, documentAssetDirectory } from './documents';
 import { robloxStrategy } from '../src/editor/roblox';
 import { LuauSession, RuntimeError } from './runtime';
 import { ToolkitClient } from './toolkit';
@@ -18,6 +18,7 @@ import { executeCode, getCodeAdapter } from './code-executor';
 import { openInterface, saveInterface } from './automation-files';
 import { createCodexMcpSettingsStore } from './codex-mcp-settings.cjs';
 import { ImageAssetStore, permanentImageRoot } from './image-assets';
+import { syncAgentWorkspace } from './agent-workspace';
 import { ensureWorkspaceLauncher } from './workspace-launcher';
 import { listTemplateStyles, previewTemplateStyle, styleDirectory, templateStylesDirectory } from './template-styles';
 import { resolveImageAssets, type ImageAssetUpdate, type ImageLibrary } from '../src/shared/imageAssets';
@@ -48,7 +49,11 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: !background },
     });
     app.on('second-instance', (_event, _argv, _cwd, data) => {
-      if (!background) { if (window.isMinimized()) window.restore(); window.focus(); }
+      if (!background) {
+        if (window.isMinimized()) window.restore();
+        window.show();
+        window.focus();
+      }
       const path = (data as { workspacePath?: unknown } | null)?.workspacePath;
       if (typeof path !== 'string') return;
       void (async () => {
@@ -251,6 +256,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       });
     }
     async function remember(project: Project): Promise<Project> {
+      await syncAgentWorkspace(project.path, join(app.isPackaged ? process.resourcesPath : dirname(app.getAppPath()), 'ProjectTypes', 'Roblox'));
       await ensureWorkspaceLauncher(project.path, process.execPath, app.isPackaged ? undefined : app.getAppPath());
       stopRuntime();
       activeProject = project; documentPath = null; dirty = false;
@@ -370,7 +376,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     });
     handle('document:create-template-folder', async name => {
       const project = requireProject();
-      await mkdir(join(project.path, 'template-references'), { recursive: true });
+      await mkdir(documentAssetDirectory(project.path, 'templates'), { recursive: true });
       await mkdir(templateFolderPath(project.path, name));
       return null;
     });
@@ -378,7 +384,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       const project = requireProject();
       const { document: source, folder } = argument as { document: unknown; folder?: string };
       const document = robloxStrategy.validate(source);
-      const directory = folder === undefined || folder === '' ? join(project.path, 'template-references') : templateFolderPath(project.path, folder);
+      const directory = folder === undefined || folder === '' ? documentAssetDirectory(project.path, 'templates') : templateFolderPath(project.path, folder);
       if (folder && !(await listTemplateFolders(project.path)).includes(folder)) throw new Error('模板文件夹不存在，请刷新后重试。');
       const path = join(directory, `${safeFileName(document.name)}.rbxui.json`);
       const exists = await stat(path).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });

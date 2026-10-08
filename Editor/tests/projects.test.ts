@@ -18,23 +18,23 @@ test('新工程仅克隆模板参考，保留子文件夹、同名文件和完�
   const root = await fixture(t);
   const source = (await createProject(root)).project;
   const document = robloxStrategy.createDocument('Reward');
-  await writeDocument(join(source.path, 'template-references', 'Reward.rbxui.json'), document);
-  await writeDocument(join(source.path, 'template-references', '中文 分类', 'Reward.rbxui.json'), document);
+  await writeDocument(join(source.path, 'AgentWorkspace', 'styles', 'templates', 'Reward.rbxui.json'), document);
+  await writeDocument(join(source.path, 'AgentWorkspace', 'styles', 'templates', '中文 分类', 'Reward.rbxui.json'), document);
   await writeDocument(join(source.path, 'interfaces', 'ProjectOnly.rbxui.json'), document);
   await mkdir(join(source.path, 'image-assets'));
   await writeFile(join(source.path, 'image-assets', 'keep.txt'), 'project image');
-  await writeFile(join(source.path, 'template-references', 'ignored.txt'), 'not a template');
+  await writeFile(join(source.path, 'AgentWorkspace', 'styles', 'templates', 'ignored.txt'), 'not a template');
   const parent = join(root, '新工程');
   await mkdir(parent);
   const target = (await createProject(parent, source.path)).project;
   assert.notEqual(target.manifest.id, source.manifest.id);
-  assert.deepEqual((await readdir(target.path)).sort(), ['AgentWorkspace', 'interfaces', 'project.json', 'template-references']);
+  assert.deepEqual((await readdir(target.path)).sort(), ['.gitignore', 'AgentWorkspace', 'interfaces', 'project.json']);
   assert.equal((await listDocumentAssets(target.path, 'templates')).length, 2);
-  const copy = join(target.path, 'template-references', '中文 分类', 'Reward.rbxui.json');
+  const copy = join(target.path, 'AgentWorkspace', 'styles', 'templates', '中文 分类', 'Reward.rbxui.json');
   assert.deepEqual(await readDocument(copy), document);
   await writeDocument(copy, robloxStrategy.createDocument('Changed'));
-  assert.deepEqual(await readDocument(join(source.path, 'template-references', '中文 分类', 'Reward.rbxui.json')), document);
-  assert.deepEqual(await readDocument(join(target.path, 'template-references', 'Reward.rbxui.json')), document);
+  assert.deepEqual(await readDocument(join(source.path, 'AgentWorkspace', 'styles', 'templates', '中文 分类', 'Reward.rbxui.json')), document);
+  assert.deepEqual(await readDocument(join(target.path, 'AgentWorkspace', 'styles', 'templates', 'Reward.rbxui.json')), document);
 });
 
 test('不克隆或来源没有模板时创建空工程', async t => {
@@ -44,15 +44,15 @@ test('不克隆或来源没有模板时创建空工程', async t => {
     const parent = join(root, templateSource ? 'empty-source' : 'no-clone');
     await mkdir(parent);
     const target = (await createProject(parent, templateSource)).project;
-    assert.deepEqual((await readdir(target.path)).sort(), ['AgentWorkspace', 'interfaces', 'project.json']);
+    assert.deepEqual((await readdir(target.path)).sort(), ['.gitignore', 'AgentWorkspace', 'interfaces', 'project.json']);
   }
 });
 
 test('来源无效或模板损坏时创建失败，不留下工程或改变来源文件', async t => {
   const root = await fixture(t);
   const source = (await createProject(root)).project;
-  await writeDocument(join(source.path, 'template-references', 'Good.rbxui.json'), robloxStrategy.createDocument('Good'));
-  const broken = join(source.path, 'template-references', 'Broken.rbxui.json');
+  await writeDocument(join(source.path, 'AgentWorkspace', 'styles', 'templates', 'Good.rbxui.json'), robloxStrategy.createDocument('Good'));
+  const broken = join(source.path, 'AgentWorkspace', 'styles', 'templates', 'Broken.rbxui.json');
   await writeFile(broken, '{bad');
   const parent = join(root, 'target');
   await mkdir(parent);
@@ -66,7 +66,7 @@ test('来源无效或模板损坏时创建失败，不留下工程或改变来�
 test('目标已存在时不克隆模板、不改动目标，也不读取失效来源', async t => {
   const root = await fixture(t);
   const target = (await createProject(root)).project;
-  const file = join(target.path, 'template-references', 'Keep.rbxui.json');
+  const file = join(target.path, 'AgentWorkspace', 'styles', 'templates', 'Keep.rbxui.json');
   const document = robloxStrategy.createDocument('Keep');
   await writeDocument(file, document);
   const result = await createProject(root, join(root, 'missing', 'UIEditorWorkspace'));
@@ -80,8 +80,8 @@ test('克隆不跟随模板子目录链接，拒绝链接形式的模板根目�
   const source = (await createProject(root)).project;
   const outside = join(root, 'outside');
   await writeDocument(join(outside, 'External.rbxui.json'), robloxStrategy.createDocument('External'));
-  const templates = join(source.path, 'template-references');
-  await mkdir(templates);
+  const templates = join(source.path, 'AgentWorkspace', 'styles', 'templates');
+  await mkdir(templates, { recursive: true });
   await symlink(outside, join(templates, 'linked'), 'junction');
   const parent = join(root, 'target');
   await mkdir(parent);

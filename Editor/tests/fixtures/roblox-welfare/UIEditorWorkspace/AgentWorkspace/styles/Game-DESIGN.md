@@ -28,18 +28,18 @@
 
 ## 二、模板复用规则
 
-项目内 `template-references` 是本风格的模板来源，不使用 TemplatePage 展示页。
-以下链接按复制后的 `AgentWorkspace` 所在位置组织：
+当前 styles 下的 `templates` 是本风格的模板来源，不使用 TemplatePage 展示页。
+以下链接按复制后的 `styles/Game-DESIGN.md` 所在位置组织：
 
 | 用途 | 模板文件 | 当前 document.name / ScreenGui | 复用节点 |
 | --- | --- | --- | --- |
-| 确认、短说明、少量内容 | [SmallWindow](../template-references/SmallWindow.rbxui.json) | SmallWindow / SmallWindowUI | PopupPanelImg、TitleBox 完整子树 |
-| 设置、常规功能、双区内容 | [MediumWindow](../template-references/MediumWindow.rbxui.json) | SmallWindow / MediumWindowUI | PopupPanelImg、TitleBox 完整子树 |
-| 列表、详情、多区域内容 | [LargeWindow](../template-references/LargeWindow.rbxui.json) | SmallWindow / LargeWindowUI | PopupPanelImg、TitleBox 完整子树 |
-| 独立关闭操作 | [CloseButton](../template-references/CloseButton.rbxui.json) | CloseButton / CloseButtonUI | CloseSurfaceImg，实际点击节点 CloseBtn |
-| 独立标题、无标题窗口 | [Title](../template-references/Title.rbxui.json) | Title / TitleUI | TitleImg 完整子树 |
-| 确认、取消、购买、装备 | [OperationButtonExamples](../template-references/OperationButtonExamples.rbxui.json) | OperationButtonExamples / OperationButtonExamplesUI | ContentImg 下对应的 *Btn 完整子树 |
-| 进度、经验、能量、加载 | [ProgressBar](../template-references/ProgressBar.rbxui.json) | ProgressBar / ProgressBarUI | ProgressBarImg 完整子树 |
+| 确认、短说明、少量内容 | [SmallWindow](templates/SmallWindow.rbxui.json) | SmallWindow / SmallWindowUI | PopupPanelImg、TitleBox 完整子树 |
+| 设置、常规功能、双区内容 | [MediumWindow](templates/MediumWindow.rbxui.json) | SmallWindow / MediumWindowUI | PopupPanelImg、TitleBox 完整子树 |
+| 列表、详情、多区域内容 | [LargeWindow](templates/LargeWindow.rbxui.json) | SmallWindow / LargeWindowUI | PopupPanelImg、TitleBox 完整子树 |
+| 独立关闭操作 | [CloseButton](templates/CloseButton.rbxui.json) | CloseButton / CloseButtonUI | CloseSurfaceImg，实际点击节点 CloseBtn |
+| 独立标题、无标题窗口 | [Title](templates/Title.rbxui.json) | Title / TitleUI | TitleImg 完整子树 |
+| 确认、取消、购买、装备 | [OperationButtonExamples](templates/OperationButtonExamples.rbxui.json) | OperationButtonExamples / OperationButtonExamplesUI | ContentImg 下对应的 *Btn 完整子树 |
+| 进度、经验、能量、加载 | [ProgressBar](templates/ProgressBar.rbxui.json) | ProgressBar / ProgressBarUI | ProgressBarImg 完整子树 |
 
 使用规则：
 
@@ -352,7 +352,7 @@
 5. 按功能组织内容区，操作按钮按语义复用对应 `*Btn`。
 6. 需要进度时复用完整进度组件，适配长度，设计态保留满值。
 7. 添加需求所需的交互与模拟数据，不靠运行时生成设计视觉。
-8. 按 [制作与自检技能](.agents/skills/ui-editor-style-check/SKILL.md)
+8. 按 [制作与自检技能](skills/ui-editor-style-check/SKILL.md)
    完成节点核对、模拟点击、诊断、截图检查、保存及重开。
 9. 交付时说明所选模板、保存位置、样式差异和实际验证结果；
    未执行的 App 检查、Studio 与设备验收单独标明。
@@ -376,4 +376,4 @@ App 模拟不能作为真实支付、资格校验或发奖依据；真实业务�
 - 禁止修改模板原件、来源工程或无关业务代码。
 - 禁止把 App 模拟通过说成 Studio、设备显示或真实业务安全验证通过。
 
-制作与自检同时遵循[风格专项技能](.agents/skills/ui-editor-style-check/SKILL.md)。
+制作与自检同时遵循[风格专项技能](skills/ui-editor-style-check/SKILL.md)。

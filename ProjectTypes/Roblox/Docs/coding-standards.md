@@ -1,11 +1,6 @@
----
-name: roblox-luau-standards
-description: 在 UIEditor 中编写或修改 Luau 制作代码、交互类和模拟接入类时使用，统一可读格式、中文函数注释、命名和 FX.Loader 点分隔路径。
----
-
 # UIEditor Luau 编码规范
 
-编写代码前读取工作区 AGENTS.md 和 [运行接口](../roblox-ui-authoring/references/runtime-api.md)，确认当前编辑器能力。参考来源为 Roblox_Y1/Game 的 roblox-luau-standards；这里只移植编码约定，不引入游戏仓库的业务模块或验证授权。
+编写代码前读取工作区 AGENTS.md 和 [运行接口](runtime-api.md)，确认当前编辑器能力。参考来源为 Roblox_Y1/Game 的 roblox-luau-standards；这里只移植编码约定，不引入游戏仓库的业务模块或验证授权。
 
 - 使用四个空格缩进。赋值、比较、算术、拼接运算符两侧留空格，逗号后留空格，例如 `local path = "Panel.Day" .. day .. "RewardImg.ClaimBtn"`。
 - 一行一个语句。禁止单行 if/for/函数及紧凑事件回调；表字段多或较长时逐行排列，长调用拆成多行。

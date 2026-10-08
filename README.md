@@ -16,7 +16,7 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 
 ## 使用
 
-1. 点击“创建工程”，先选择整套模板风格，再选择父文件夹。程序创建固定的 `UIEditorWorkspace/project.json`，不要求输入名称；所有新工程从 `ProjectTypes/Roblox/` 创建独立 `AgentWorkspace/`，包含公共入口与制作技能；选定风格再从 `TemplateStyles/Roblox/` 复制模板到 `template-references/`，视觉规范、资源和专项 skills 进入 AI 工作区。默认也可选择空白工程；有历史时保留仅克隆模板的兼容入口，与风格选择互斥。
+1. 点击“创建工程”，先选择整套模板风格，再选择父文件夹。程序创建固定的 `UIEditorWorkspace/project.json`，不要求输入名称；所有新工程从 `ProjectTypes/Roblox/` 创建独立 `AgentWorkspace/`，包含公共入口与制作技能；选定风格再从 `TemplateStyles/Roblox/` 复制模板到 `AgentWorkspace/styles/templates/`，视觉规范、资源和专项 skills 进入 `styles/`。默认也可选择空白工程；有历史时保留仅克隆模板的兼容入口，与风格选择互斥。
 2. 工程创建后进入工作台，通过“文件 → 新建界面”创建 ScreenGui 或在底部“模板参考”中打开独立副本。鼠标移到左侧节点行，点击右侧“+”展开类型列表，选择类型即添加子节点；右侧编辑名称、父节点和属性，中间为 1280×720 画布。
 3. 点击“打开工程”选择已有的 `UIEditorWorkspace` 文件夹，或点击最近工程卡片。
 4. 同一父目录已有有效工程时，会询问是否打开；已有无效目录时不覆盖内容。
@@ -36,7 +36,9 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 
 修改维护源后重新构建打包并运行新版 App，新建工程即使用新版，无需手动同步。
 旧 `ToolRuntime/TemplateStyles/` 不再读取且不自动清理；其中的定制画风需纳入维护源。
-新工程是独立副本：库修改不更新已有项目，项目修改不回写库；
+项目 styles 是独立副本：库修改不更新已有项目风格，项目修改不回写库；
+打开工程自动同步公共 AGENTS.md、Docs 与 skills，缺失时创建 AGENTS.LOCAL.md。
+公共内容由生成的 .gitignore 排除，AGENTS.LOCAL.md 和 styles 应提交；
 打开工程不覆盖项目定制提示词。移动时带上整个 UIEditorWorkspace 即可。
 缺文档、坏模板、资源链接不闭合、链接目录或权限错误会给出具体反馈；
 复制失败清理本次创建内容，目标已有文件不会被覆盖。
@@ -103,7 +105,7 @@ npm run dev
 - `Editor/src/`：React Hub、静态 UI 工作台、策略与共享接口类型。
 - `Editor/electron/`：文件管理、原生目录选择、受限 IPC 和应用生命周期。
 - `Editor/scripts/`、`Editor/tests/`：开发、打包脚本及自动化验证。
-- `TemplateStyles/`：风格制作包的唯一维护源；打包版直接读取分发资源，新建项目原样复制。
+- `TemplateStyles/`：风格制作包的唯一维护源；打包版直接读取分发资源，新建项目复制，之后不自动更新项目 styles。
 - `SharedAssets/image-assets/catalog.json`：可提交的永久图片及 Roblox ID；上传后提交清单，其他电脑拉取即可复用，不需要重新上传。
 - `ToolRuntime/`：打包应用和运行数据，详见[运行目录说明](ToolRuntime/README.md)。
 - `Docs/`：[设计文档](Docs/design/README.md)，记录当前行为、数据格式与职责边界。

@@ -41,7 +41,7 @@ try {
   assert.equal(await dialog.count(), 0);
   const source = join(sourceParent, 'UIEditorWorkspace');
   const document = robloxStrategy.createDocument('Reward');
-  await writeDocument(join(source, 'template-references', '奖励', 'Reward.rbxui.json'), document);
+  await writeDocument(join(source, 'AgentWorkspace', 'styles', 'templates', '奖励', 'Reward.rbxui.json'), document);
   await writeDocument(join(source, 'interfaces', 'ProjectOnly.rbxui.json'), document);
   await hub();
 
@@ -80,7 +80,7 @@ try {
   await dialog.getByRole('button', { name: '下一步' }).click();
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
   const clone = join(cloneParent, 'UIEditorWorkspace');
-  assert.deepEqual(await readDocument(join(clone, 'template-references', '奖励', 'Reward.rbxui.json')), document);
+  assert.deepEqual(await readDocument(join(clone, 'AgentWorkspace', 'styles', 'templates', '奖励', 'Reward.rbxui.json')), document);
   assert.deepEqual(await readdir(join(clone, 'interfaces')), []);
   for (const workspace of [source, clone, join(emptyParent, 'UIEditorWorkspace')]) {
     assert.equal(await readFile(join(workspace, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), await readFile(resolve('../ProjectTypes/Roblox/AGENTS.md'), 'utf8'));
@@ -89,13 +89,13 @@ try {
   }
   await page.getByRole('button', { name: '模板参考', exact: true }).click();
   await page.getByRole('button', { name: 'UI 资产 Reward', exact: true }).waitFor();
-  assert.deepEqual(await readDocument(join(source, 'template-references', '奖励', 'Reward.rbxui.json')), document);
+  assert.deepEqual(await readDocument(join(source, 'AgentWorkspace', 'styles', 'templates', '奖励', 'Reward.rbxui.json')), document);
   await hub();
   const unknownSource = await page.evaluate(path => window.projects.create(path), join(root, 'unknown', 'UIEditorWorkspace'));
   assert.ok(!unknownSource.ok && unknownSource.error.includes('最近列表中找不到'));
   const failedParent = join(root, '损坏模板目标');
   await mkdir(failedParent);
-  await writeFile(join(source, 'template-references', 'Broken.rbxui.json'), '{bad');
+  await writeFile(join(source, 'AgentWorkspace', 'styles', 'templates', 'Broken.rbxui.json'), '{bad');
   await pick(failedParent);
   await create();
   await dialog.getByRole('radio', { name: '来源 工程', exact: true }).check();

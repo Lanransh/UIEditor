@@ -22,7 +22,7 @@ try {
   await page.getByRole('button', { name: '创建工程', exact: true }).click();
   await page.getByRole('dialog', { name: '创建工程', exact: true }).getByRole('button', { name: '下一步', exact: true }).click();
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
-  assert.equal(await readFile(join(workspace, '.gitignore'), 'utf8'), '/Run.bat\n');
+  assert.ok((await readFile(join(workspace, '.gitignore'), 'utf8')).includes('/Run.bat\n'));
   assert.ok((await readFile(join(workspace, 'Run.bat'), 'utf8')).includes('UI_EDITOR_OPEN_WORKSPACE=%~dp0'));
   await application.close();
   application = null;
@@ -30,7 +30,7 @@ try {
   application = await electron.launch({ args: ['.'], env: { ...env, UI_EDITOR_OPEN_WORKSPACE: workspace } });
   page = await application.firstWindow();
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
-  assert.equal(await readFile(join(workspace, '.gitignore'), 'utf8'), '# keep\n/Run.bat\n');
+  assert.ok((await readFile(join(workspace, '.gitignore'), 'utf8')).startsWith('# keep\n/Run.bat\n'));
   await page.getByRole('button', { name: '文件', exact: true }).click();
   await page.getByRole('button', { name: '返回 Hub', exact: true }).click();
   await page.getByRole('heading', { name: '选择工程', exact: true }).waitFor();

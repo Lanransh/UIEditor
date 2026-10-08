@@ -80,7 +80,7 @@ UIGradient 首版使用 ColorStart/ColorEnd 和 TransparencyStart/TransparencyEn
 损坏文件显示“预览不可用”，不阻断其他卡片。缩略图不写入 UI 文件。
 
 UI 资产目录还提供“模板参考”，是当前工程的持久库，存放在
-`UIEditorWorkspace/template-references/`，随工程保存、移动和重新打开，工程之间不共享
+`UIEditorWorkspace/AgentWorkspace/styles/templates/`，随工程保存、移动和重新打开，工程之间不共享
 模板或文件夹。旧 Runtime 中的全局模板保留原文件，不自动归入任何工程。
 它复用项目UI的递归列表、文件校验与静态缩略图。
 文件菜单及节点右键“保存…”保存当前完整文档快照；节点右键进入选择项目UI或模板参考，
@@ -114,7 +114,7 @@ UDim/UDim2 的 Scale 支持小数，Offset 必须是整数；属性编辑、MCP 
 主进程使用同目录临时文件加重命名保存；失败清理临时文件，保留旧文件及未保存状态。
 实际读写路径来自原生对话框、本会话已打开/保存的文件或主进程列出的工程界面资产。
 资产打开请求须匹配所选库目录内的普通 UI 文件，拒绝目录、符号链接和库外路径；
-项目库限当前工程 `interfaces`，模板参考限当前工程 `template-references`，
+项目库限当前工程 `interfaces`，模板参考限当前工程 `AgentWorkspace/styles/templates`，
 永久UI限 Runtime 的 `ui-assets` 目录。
 读取时仍完整校验界面文档。不接受渲染进程指定保存目标路径。
 

@@ -1,12 +1,15 @@
 # 工程类型制作包
 
-当前仅维护 Roblox/。该目录提供新工程的 AgentWorkspace 入口与共享 skills，
-不包含风格配色、模板或默认主题。空白、历史模板克隆和风格工程都安装此包。
+当前仅维护 Roblox/。该目录提供编辑器维护的 AGENTS.md、Docs/ 与 .agents/skills/。
+Docs 保存编码规范、接口、脚本契约与示例；skills 负责引导读取和执行，不重复维护正文。
+开发读取本目录，打包读取 resources/ProjectTypes/Roblox。
 
-AGENTS.md 必须非空；可使用 .agents/skills/、references/、assets/、examples/ 和根 Markdown。
-技能必须声明有效 name。相对链接在生成工作区内闭合；不要硬链接可选的风格文件。
-风格包独立校验，其文件及技能不能覆盖平台包。复制按字节保留，创建失败清理本次内容。
+创建或实际打开工程时同步上述三个位置，清理公共目录中已废弃的文件；相同内容不重写。
+AGENTS.LOCAL.md 仅在缺失时创建，styles/ 不参与打开时的同步。最近工程列表只读检查不触发同步。
+工程 .gitignore 忽略公共位置和 Run.bat；AGENTS.LOCAL.md 与 styles/ 应提交到项目 Git。
+已被 Git 跟踪的旧公共文件需人工取消跟踪，编辑器不自动操作项目 Git 索引。
 
-开发读取本目录，打包读取 resources/ProjectTypes/Roblox。已有工程不自动升级或改写。
-维护代码接入约定时更新 roblox-ui-authoring 的 references/presentation-contract.md；
-节点与接口说明以当前 MCP 能力及实现为依据，不把方案中的方法写成内置 API。
+AGENTS.md 必须非空；公共包只分发 AGENTS.md、Docs/、.agents/skills/。
+技能必须声明有效 name，相对链接在生成工作区内闭合，不硬链接可选的风格文件。
+风格包独立校验，仅新建工程时安装到 AgentWorkspace/styles/；详见 TemplateStyles/README.md。
+维护脚本接入契约时更新 Roblox/Docs/presentation-contract.md 与配套示例。

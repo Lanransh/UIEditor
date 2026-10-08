@@ -1,10 +1,16 @@
 # Roblox 工程 UI 制作入口
 
+<!-- UIEditor managed workspace: 打开工程时自动同步，请勿在这里写项目要求。 -->
+
+开始任务前必须读取项目补充要求 `AGENTS.LOCAL.md`（@AGENTS.LOCAL.md）。
+本文件、Docs/ 和 .agents/skills/ 由编辑器维护，不提交到项目 Git。
+AGENTS.LOCAL.md 和 styles/ 由项目维护并提交；不修改编辑器维护的文件。
+
 本工作区属于父目录 UIEditorWorkspace，交付物是工程中可继续编辑、保存和重开的 Roblox UI。
 制作或修改 UI 时使用 [Roblox UI 制作技能](.agents/skills/roblox-ui-authoring/SKILL.md)；
 编写 Luau 时同时读取 [编码规范](.agents/skills/roblox-luau-standards/SKILL.md)。
 
-工程类型决定节点、脚本、运行与导出合同。若本工作区存在 Game-DESIGN.md，先读取其中的
+工程类型决定节点、脚本、运行与导出合同。若本工作区存在 styles/Game-DESIGN.md，先读取其中的
 视觉规范及链接的风格专项技能，再选择匹配模板。风格只补充视觉制作方法，不改写平台接口。
 没有风格规范时按用户需求与工程现有模板制作，不默认套用其他风格。
 

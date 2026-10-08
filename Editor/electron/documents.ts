@@ -7,7 +7,7 @@ import type { UIDocument } from '../src/shared/uiDocument';
 import type { DocumentAsset, DocumentLibrary } from '../src/shared/documents';
 
 export function documentAssetDirectory(rootPath: string, library: DocumentLibrary): string {
-  return join(rootPath, { project: 'interfaces', templates: 'template-references', permanent: 'ui-assets' }[library]);
+  return join(rootPath, { project: 'interfaces', templates: join('AgentWorkspace', 'styles', 'templates'), permanent: 'ui-assets' }[library]);
 }
 
 export async function listDocumentAssets(rootPath: string, library: DocumentLibrary = 'project'): Promise<DocumentAsset[]> {

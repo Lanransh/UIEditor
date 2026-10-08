@@ -1,9 +1,10 @@
 import { mkdir, readFile, writeFile, unlink, rmdir, rename, realpath, lstat } from 'node:fs/promises';
 import { basename, dirname, join, resolve, relative, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { AGENT_IGNORE_RULES, LOCAL_INSTRUCTIONS } from './agent-workspace';
 import { WORKSPACE_DIRECTORY, type Project, type ProjectManifest, type RecentProject } from '../src/shared/project';
-import { listDocumentAssets, readDocument } from './documents';
-import { projectStylePath, readTemplateStyle, readAgentPackage, validateDocumentLinks, validateSkillNames } from './template-styles';
+import { listDocumentAssets, readDocument, documentAssetDirectory } from './documents';
+import { relocateStyleFile, readTemplateStyle, readAgentPackage, validateDocumentLinks, validateSkillNames } from './template-styles';
 
 function code(error: unknown): string | undefined {
   return (error as NodeJS.ErrnoException)?.code;
@@ -60,27 +61,29 @@ export async function createProject(parent: string, templateSource?: string, sty
     const common = await readAgentPackage(projectTypeSource, ['AGENTS.md']);
     validateDocumentLinks(common);
     validateSkillNames(common);
-    const templates: { path: string; content: string | Buffer }[] = common.map(item => ({ path: projectStylePath(item.path), content: item.content }));
+    const templates: { path: string; content: string | Buffer }[] = common.map(item => ({ path: join('AgentWorkspace', item.path), content: item.content }));
+    templates.push({ path: join('AgentWorkspace', 'AGENTS.LOCAL.md'), content: LOCAL_INSTRUCTIONS });
+    templates.push({ path: '.gitignore', content: AGENT_IGNORE_RULES.join('\n') + '\n' });
     await mkdir(join(directory, 'interfaces'));
     templateDirectories.add(join(directory, 'interfaces'));
     if (styleSource !== undefined) {
       const style = await readTemplateStyle(styleSource);
       validateSkillNames([...common, ...style.files]);
       const commonSkills = new Set(common.filter(item => item.path.startsWith(join('.agents', 'skills') + sep)).map(item => item.path.split(sep)[2].toLowerCase()));
-      const occupied = new Set(common.map(item => projectStylePath(item.path).toLowerCase()));
+      const occupied = new Set(common.map(item => item.path.toLowerCase()));
       for (const item of style.files) {
         const skill = item.path.startsWith(join('.agents', 'skills') + sep) ? item.path.split(sep)[2].toLowerCase() : null;
-        if (occupied.has(projectStylePath(item.path).toLowerCase()) || (skill && commonSkills.has(skill))) throw new Error(`工程类型与风格文件或技能冲突：${item.path}`);
-        templates.push({ path: projectStylePath(item.path), content: item.content });
+        if (occupied.has(item.path.toLowerCase()) || (skill && commonSkills.has(skill))) throw new Error(`工程类型与风格文件或技能冲突：${item.path}`);
+        templates.push(relocateStyleFile(item));
       }
     }
     if (templateSource !== undefined) {
       const source = await openProject(templateSource);
-      const root = join(source.path, 'template-references');
+      const root = documentAssetDirectory(source.path, 'templates');
       const info = await lstat(root).catch(error => { if (code(error) === 'ENOENT') return null; throw error; });
       if (info && (!info.isDirectory() || info.isSymbolicLink())) throw new Error('来源工程的模板参考目录无效。');
       for (const asset of await listDocumentAssets(source.path, 'templates')) {
-        templates.push({ path: join('template-references', relative(root, asset.path)), content: JSON.stringify(await readDocument(asset.path), null, 2) + '\n' });
+        templates.push({ path: join('AgentWorkspace', 'styles', 'templates', relative(root, asset.path)), content: JSON.stringify(await readDocument(asset.path), null, 2) + '\n' });
       }
     }
     const { open } = await import('node:fs/promises');
@@ -91,7 +94,7 @@ export async function createProject(parent: string, templateSource?: string, sty
     for (const template of templates) {
       const target = join(directory, template.path);
       let folder = directory;
-      for (const part of relative(directory, dirname(target)).split(sep)) {
+      for (const part of relative(directory, dirname(target)).split(sep).filter(Boolean)) {
         folder = join(folder, part);
         if (!templateDirectories.has(folder)) {
           await mkdir(folder);

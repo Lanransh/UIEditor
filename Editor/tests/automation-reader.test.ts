@@ -28,7 +28,7 @@ async function fixture() {
 test('UUID reads default to current project, support other projects/global library and survive file rename', async () => {
   const f = await fixture();
   try {
-    const path = join(f.first.path, 'template-references', '奖励', 'Reward.rbxui.json');
+    const path = join(f.first.path, 'AgentWorkspace', 'styles', 'templates', '奖励', 'Reward.rbxui.json');
     await writeDocument(path, f.document);
     await writeDocument(join(f.second.path, 'interfaces', 'Reward.rbxui.json'), { ...f.document, name: 'Other' });
     await writeDocument(join(f.runtime, 'ui-assets', 'Reward.rbxui.json'), f.document);
@@ -37,7 +37,7 @@ test('UUID reads default to current project, support other projects/global libra
     assert.equal(listing.interfaces[0].relativePath, '奖励/Reward.rbxui.json');
     assert.equal((await f.reader.read({ library: 'templates', documentId: f.document.id })).document.name, 'Reward');
     assert.equal((await f.reader.read({ projectId: f.second.manifest.id.toUpperCase(), documentId: f.document.id })).document.name, 'Other');
-    await rename(path, join(f.first.path, 'template-references', '奖励', 'Renamed.rbxui.json'));
+    await rename(path, join(f.first.path, 'AgentWorkspace', 'styles', 'templates', '奖励', 'Renamed.rbxui.json'));
     assert.equal((await f.reader.read({ library: 'templates', documentId: f.document.id })).document.id, f.document.id);
     const hub = new AutomationReader(f.runtime, f.recent, () => null);
     await assert.rejects(hub.listDocuments({}), /打开工程/);
@@ -51,7 +51,7 @@ test('UUID reads default to current project, support other projects/global libra
 test('lists isolate broken files and reject ambiguous document/project UUIDs and linked libraries', async () => {
   const f = await fixture();
   try {
-    const library = join(f.first.path, 'template-references');
+    const library = join(f.first.path, 'AgentWorkspace', 'styles', 'templates');
     await writeDocument(join(library, 'A.rbxui.json'), f.document);
     await writeDocument(join(library, 'B.rbxui.json'), f.document);
     await writeFile(join(library, 'Broken.rbxui.json'), '{bad');
@@ -78,7 +78,7 @@ test('saved nodes resolve images from the source project, and global reads work 
     await store.update({ id: asset.id, name: asset.name, tags: '', robloxId: '123456' });
     const image = robloxStrategy.createNode('ImageLabel'); image.imageAssetId = asset.id;
     f.document.root.children.push(image);
-    await writeDocument(join(f.second.path, 'template-references', 'Reward.rbxui.json'), f.document);
+    await writeDocument(join(f.second.path, 'AgentWorkspace', 'styles', 'templates', 'Reward.rbxui.json'), f.document);
     const saved = await f.reader.read({ projectId: f.second.manifest.id, library: 'templates', documentId: f.document.id });
     assert.equal(saved.document.root.children[1].properties.Image, 'rbxassetid://123456');
     assert.equal((await f.reader.images({ projectId: f.second.manifest.id, library: 'project' })).assets[0].id, asset.id);

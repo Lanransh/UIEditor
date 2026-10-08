@@ -2,7 +2,7 @@ import { _electron as electron, type ElectronApplication, type Page } from 'play
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { readTemplateStyle, projectStylePath, readAgentPackage } from '../electron/template-styles';
+import { readTemplateStyle, projectStylePath, relocateStyleFile, readAgentPackage } from '../electron/template-styles';
 
 const packaged = process.argv.includes('--packaged');
 const executable = process.env.UI_EDITOR_PACKAGED_EXECUTABLE ?? resolve(process.env.UI_EDITOR_PACKAGE_OUTPUT || '../ToolRuntime', 'UIEditor-win32-x64', 'UIEditor.exe');
@@ -82,11 +82,11 @@ try {
   await screenshot('style-dialog.png');
   await dialog.getByRole('button', { name: '下一步', exact: true }).click();
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
-  for (const file of snapshot.files) assert.deepEqual(await readFile(join(workspace, projectStylePath(file.path))), file.content, file.path);
+  for (const file of snapshot.files) assert.deepEqual(await readFile(join(workspace, projectStylePath(file.path))), relocateStyleFile(file).content, file.path);
   assert.ok((await readdir(workspace)).includes('interfaces'));
   const typeRoot = packaged ? join(dirname(executable), 'resources', 'ProjectTypes', 'Roblox') : resolve('../ProjectTypes/Roblox');
   for (const file of await readAgentPackage(typeRoot, ['AGENTS.md'])) {
-    assert.deepEqual(await readFile(join(workspace, projectStylePath(file.path))), file.content, file.path);
+    assert.deepEqual(await readFile(join(workspace, 'AgentWorkspace', file.path)), file.content, file.path);
   }
   await page.getByRole('button', { name: '模板参考', exact: true }).click();
   await page.getByRole('button', { name: 'UI 资产 SmallWindow', exact: true }).waitFor();
@@ -123,8 +123,10 @@ try {
   await dialog.getByRole('button', { name: '下一步', exact: true }).click();
   await page.getByRole('button', { name: '创建工程', exact: true }).waitFor({ state: 'visible' });
 
-  const agents = join(workspace, 'AgentWorkspace', 'AGENTS.md');
+  const agents = join(workspace, 'AgentWorkspace', 'AGENTS.LOCAL.md');
   await writeFile(agents, '# 用户的项目定制入口\n绝不覆盖。');
+  await writeFile(join(workspace, 'AgentWorkspace', 'AGENTS.md'), '# 过期公共入口');
+  await writeFile(join(workspace, 'AgentWorkspace', 'Docs', 'runtime-api.md'), '# 过期接口');
   // Choosing a style for an already-existing project must only open it.
   await pick(source);
   dialog = await createDialog();
@@ -132,6 +134,8 @@ try {
   await dialog.getByRole('button', { name: '下一步', exact: true }).click();
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
   assert.equal(await readFile(agents, 'utf8'), '# 用户的项目定制入口\n绝不覆盖。');
+  assert.deepEqual(await readFile(join(workspace, 'AgentWorkspace', 'AGENTS.md')), await readFile(join(typeRoot, 'AGENTS.md')));
+  assert.deepEqual(await readFile(join(workspace, 'AgentWorkspace', 'Docs', 'runtime-api.md')), await readFile(join(typeRoot, 'Docs', 'runtime-api.md')));
   await hub();
   await application.close();
   await launch();
@@ -139,6 +143,8 @@ try {
   await page.getByRole('button', { name: '打开工程', exact: true }).click();
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
   assert.equal(await readFile(agents, 'utf8'), '# 用户的项目定制入口\n绝不覆盖。');
+  assert.deepEqual(await readFile(join(workspace, 'AgentWorkspace', 'AGENTS.md')), await readFile(join(typeRoot, 'AGENTS.md')));
+  assert.deepEqual(await readFile(join(workspace, 'AgentWorkspace', 'Docs', 'runtime-api.md')), await readFile(join(typeRoot, 'Docs', 'runtime-api.md')));
   await hub();
   const unknown = await page.evaluate(() => window.projects.create({ kind: 'style', id: '../outside' }));
   assert.ok(!unknown.ok && unknown.error.includes('标识无效'));

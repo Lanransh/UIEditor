@@ -35,8 +35,8 @@
 
 ## 二、模板复用规则
 
-项目内 `template-references` 是本风格的模板来源，不使用 TemplatePage 展示页。
-以下链接按复制后的 `AgentWorkspace` 所在位置组织：
+项目内 `styles/templates` 是本风格的模板来源，不使用 TemplatePage 展示页。
+以下链接使用风格包布局；创建工程时由编辑器转换为 styles 内的相对路径：
 
 | 用途 | 模板文件 | 当前 document.name / ScreenGui | 复用节点 |
 | --- | --- | --- | --- |

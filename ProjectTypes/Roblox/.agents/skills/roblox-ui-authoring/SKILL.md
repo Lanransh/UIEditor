@@ -7,12 +7,13 @@ description: 在 UIEditor 的 Roblox 工程中制作、修改和验证可编辑 
 
 ## 平台与风格
 
-先读工作区 AGENTS.md。工程有 Game-DESIGN.md 时读取它及其中的风格专项技能。
+先读工作区 AGENTS.md。工程有 styles/Game-DESIGN.md 时读取它及其中的风格专项技能。
 平台技能管理节点能力、代码和验证；风格技能管理视觉制作，不复制平台流程。
 
-制作前读取 [制作接口](references/editor-api.md)；编写交互时读取
-[运行接口](references/runtime-api.md)、[展示与业务接入](references/presentation-contract.md)
-和 [Luau 编码规范](../roblox-luau-standards/SKILL.md)。接口以当前 MCP 返回的能力为准。
+制作前读取 [制作接口](../../../Docs/editor-api.md)；编写交互时读取
+[运行接口](../../../Docs/runtime-api.md)、[展示与业务接入](../../../Docs/presentation-contract.md)
+[脚本数据契约示例](../../../Docs/script-contract-example.md) 和
+[Luau 编码规范](../roblox-luau-standards/SKILL.md)。接口以当前 MCP 返回的能力为准。
 
 ## 制作流程
 
@@ -28,6 +29,7 @@ description: 在 UIEditor 的 Roblox 工程中制作、修改和验证可编辑 
    事务整体进入 App 撤销历史，MCP 没有 undo/redo。制作 VM 不读文件，不编造 API。
 5. 静态视觉保存在设计节点中；source 负责展示与交互，integration 提供模拟业务。
    按需求克隆动态条目，普通页面不重复编写通用屏幕适配；接入细节见业务接入参考。
+   在 source 中写入可随导出保留的 Config/State 与动作契约注释，具体要求见业务接入参考。
 
 ## 验证与交付
 

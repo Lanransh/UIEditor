@@ -21,20 +21,48 @@ export function styleDirectory(root: string, id: unknown): string {
   return join(root, id);
 }
 
-export function projectStylePath(path: string): string {
+function packageDocumentPath(path: string): string {
   return path.startsWith(`template-references${sep}`) ? path : join('AgentWorkspace', path);
+}
+
+export function projectStylePath(path: string): string {
+  const parts = path.split(sep);
+  if (parts[0] === 'template-references') return join('AgentWorkspace', 'styles', 'templates', ...parts.slice(1));
+  if (parts[0] === '.agents' && parts[1] === 'skills') return join('AgentWorkspace', 'styles', 'skills', ...parts.slice(2));
+  return join('AgentWorkspace', 'styles', path);
+}
+
+// Only relocate Markdown links. Template bytes and all other author content stay intact.
+export function relocateStyleFile(file: StyleFile): StyleFile {
+  const path = projectStylePath(file.path);
+  if (!file.path.endsWith('.md')) return { path, content: file.content };
+  const root = resolve('style-project');
+  const oldPath = resolve(root, packageDocumentPath(file.path));
+  const newPath = resolve(root, path);
+  const content = file.content.toString('utf8').replace(/(\[[^\]]*\]\()([^)\n]+)(\))/g, (match, before, rawLink, after) => {
+    const title = rawLink.match(/\s+["'][^"']*["']$/)?.[0] ?? '';
+    const link = rawLink.slice(0, rawLink.length - title.length).replace(/^<|>$/g, '');
+    if (/^(?:[a-z][a-z0-9+.-]*:|#)/i.test(link)) return match;
+    const [destination, ...fragment] = link.split('#');
+    const target = relative(root, resolve(dirname(oldPath), decodeURIComponent(destination)));
+    const local = target.startsWith(`AgentWorkspace${sep}`) ? relative('AgentWorkspace', target) : target;
+    const mapped = relative(dirname(newPath), resolve(root, projectStylePath(local))).split(sep).join('/');
+    const relocated = mapped + (fragment.length ? '#' + fragment.join('#') : '');
+    return before + (rawLink.startsWith('<') ? `<${relocated}>` : relocated) + title + after;
+  });
+  return { path, content: Buffer.from(content) };
 }
 
 export function validateDocumentLinks(files: StyleFile[]) {
   const projectRoot = resolve('style-project');
-  const paths = files.map(file => resolve(projectRoot, projectStylePath(file.path)));
+  const paths = files.map(file => resolve(projectRoot, packageDocumentPath(file.path)));
   for (const file of files.filter(file => file.path.endsWith('.md'))) {
     for (const match of file.content.toString('utf8').matchAll(/\[[^\]]*\]\(([^)\n]+)\)/g)) {
       const link = match[1].replace(/\s+["'][^"']*["']$/, '').replace(/^<|>$/g, '').split('#')[0];
       if (!link || /^(https?:|mailto:)/i.test(link)) continue;
       const destination = decodeURIComponent(link);
       if (isAbsolute(destination) || /^[a-z][a-z0-9+.-]*:/i.test(destination)) throw new Error(`资源包文档含非项目内引用 ${file.path}：${link}`);
-      const target = resolve(dirname(resolve(projectRoot, projectStylePath(file.path))), destination);
+      const target = resolve(dirname(resolve(projectRoot, packageDocumentPath(file.path))), destination);
       const local = relative(projectRoot, target);
       if (isAbsolute(local) || local === '..' || local.startsWith(`..${sep}`) || !paths.some(path => path === target || path.startsWith(`${target}${sep}`))) {
         throw new Error(`资源包文档引用在项目内不存在 ${file.path}：${link}`);
@@ -80,7 +108,7 @@ export async function readAgentPackage(directory: string, required: string[]): P
     await collect(join(root, name)).catch(error => { throw new Error(`无法读取${label}必要文档 ${name}：${(error as Error).message}`); });
     if (!files.at(-1)!.content.toString('utf8').trim()) throw new Error(`${label}必要文档为空：${name}`);
   }
-  for (const name of ['assets', 'references', 'examples', 'template-references', join('.agents', 'skills')]) {
+  for (const name of ['Docs', 'assets', 'references', 'examples', 'template-references', join('.agents', 'skills')]) {
     const path = join(root, name);
     if (name.startsWith('.agents')) {
       const agent = await lstat(join(root, '.agents')).catch(error => { if (error.code === 'ENOENT') return null; throw error; });

@@ -79,7 +79,7 @@ test('模板参考保存于工程目录，与项目UI隔离且校验资产路径
   const project = await mkdtemp(join(tmpdir(), 'ui-template-library-'));
   assert.deepEqual(await listDocumentAssets(project, 'templates'), []);
   const document = robloxStrategy.createDocument('TemplateDemo');
-  const path = join(project, 'template-references', '分类', 'TemplateDemo.rbxui.json');
+  const path = join(project, 'AgentWorkspace', 'styles', 'templates', '分类', 'TemplateDemo.rbxui.json');
   await writeDocument(path, document);
   const projectFile = join(project, 'interfaces', 'ProjectOnly.rbxui.json');
   await writeDocument(projectFile, document);
@@ -87,8 +87,8 @@ test('模板参考保存于工程目录，与项目UI隔离且校验资产路径
   assert.deepEqual(await openDocumentAsset(project, path, 'templates'), { path, document });
   await assert.rejects(openDocumentAsset(project, projectFile, 'templates'), /模板参考库/);
   await assert.rejects(openDocumentAsset(project, path), /当前工程/);
-  await assert.rejects(openDocumentAsset(project, join(project, 'template-references', '分类'), 'templates'), /模板参考库/);
-  const link = join(project, 'template-references', '链接');
+  await assert.rejects(openDocumentAsset(project, join(project, 'AgentWorkspace', 'styles', 'templates', '分类'), 'templates'), /模板参考库/);
+  const link = join(project, 'AgentWorkspace', 'styles', 'templates', '链接');
   await symlink(join(project, 'interfaces'), link, process.platform === 'win32' ? 'junction' : 'dir');
   assert.equal((await listDocumentAssets(project, 'templates')).length, 1);
   await writeFile(path, '{bad');
@@ -126,7 +126,7 @@ test('UI在三个库之间移动，保留原始字节，拒绝同名覆盖与工
   await assert.rejects(moveDocumentAsset(runtime, permanent.path, 'permanent', runtime, 'permanent'), /其他资产文件夹/);
 
   const template = await moveDocumentAsset(runtime, permanent.path, 'permanent', project, 'templates');
-  assert.equal(template.path, join(project, 'template-references', 'MoveDemo.rbxui.json'));
+  assert.equal(template.path, join(project, 'AgentWorkspace', 'styles', 'templates', 'MoveDemo.rbxui.json'));
   assert.equal(await readFile(template.path, 'utf8'), content);
   await assert.rejects(readFile(permanent.path), { code: 'ENOENT' });
   const target = join(project, 'interfaces', 'MoveDemo.rbxui.json');

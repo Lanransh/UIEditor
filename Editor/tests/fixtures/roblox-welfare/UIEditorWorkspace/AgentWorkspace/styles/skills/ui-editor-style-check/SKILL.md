@@ -5,7 +5,7 @@ description: 在当前项目通过 ui-editor MCP 制作或修改多彩棋格风�
 
 # 制作与自检
 
-先读 [项目入口](../../../AGENTS.md) 和 [设计规范](../../../Game-DESIGN.md)。
+先读 [项目入口](../../../AGENTS.md) 和 [设计规范](../../Game-DESIGN.md)。
 本技能随项目复制，不依赖全局工作区、源游戏工程或 Figma。
 
 ## 模板复用

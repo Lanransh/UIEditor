@@ -16,7 +16,7 @@ Windows 桌面应用，使用 Electron、React、TypeScript 和 Vite。采用中
 
 工作台顶部依次显示“文件”“编辑”；文件菜单提供新建界面、打开、保存、另存为、导入 Roblox 和返回 Hub；编辑菜单提供撤销、重做。左侧为 Roblox 节点树，中间工作区通过“界面 / 交互脚本 / 接入脚本”切换画布和代码，右侧属性面板共用于节点与图片资产，底部通过“UI 资产 / 图片资产 / 输出”三个页签切换内容，共用可调整的面板高度。中央工作区页签上方单独一排提供运行控制；“运行 / 停止”共用按钮，“重置 / 打开 / 隐藏”仅在运行后显示，运行就绪后可用。“打开 / 隐藏”主动显示或隐藏当前界面，具体接口见 [交互脚本与接入运行时](ui-runtime.md)。UI 资产页左侧显示“永久UI”“项目UI”“模板参考”，图片资产页左侧显示“永久图片”“项目图片”，默认选中项目UI，可切换选中库；项目UI入口的悬浮提示显示当前工程路径。项目UI以卡片列出工程 `interfaces` 目录内的 UI 文件，右键选择“打开”后加载界面及节点树；当前未保存界面也显示卡片和未保存标记。保存或切换界面后重新读取资产列表，重新进入工程时从磁盘恢复列表。永久UI保存跨工程资产，卡片右键“移动”支持三个UI库互移；图片库、内置 Stud 与问号占位图、唯一 Roblox ID，以及共用属性面板流程见 [图片资产](image-assets.md)。无资产引用的节点仍可通过属性面板选择本地预览图。节点及保存操作见 [Roblox 静态 UI 编辑](roblox-ui.md)。
 节点树与画布、画布与属性面板、工作区与资产目录之间的三条分隔线支持拖拽，分别调整左右面板宽度和底部资产区高度；聚焦分隔线后也可用对应方向键调整。左右面板宽度按工作台宽度的比例保存，窗口放大或缩小时三栏同步按比例调整，拖拽后使用新的比例。尺寸限制保留面板和画布的可用空间，缩小窗口时自动收敛；资产库目录宽度随节点树对齐。
-UI 资产页另有“模板参考”目录，保存在当前工程 `template-references` 中，随工程移动和重新打开，不跨工程共享；支持保存完整界面快照、静态缩略图及打开独立副本，不与当前编辑文件关联。具体存储与副本规则见 [Roblox 静态 UI 编辑](roblox-ui.md)。
+UI 资产页另有“模板参考”目录，保存在当前工程 `AgentWorkspace/styles/templates` 中，随工程移动和重新打开，不跨工程共享；支持保存完整界面快照、静态缩略图及打开独立副本，不与当前编辑文件关联。具体存储与副本规则见 [Roblox 静态 UI 编辑](roblox-ui.md)。
 返回 Hub 重新加载历史和工程可用状态；不可用工程可以移出历史，但不能直接进入。移出历史不修改工程文件。
 
 ## 撤销与重做接入
@@ -41,10 +41,10 @@ React 通过 `useEditorHistory(initialState)` 获取 `state`、`execute`、`undo
 | `createdAt` | 创建时保存 ISO 时间戳 |
 
 工程元数据不包含节点或业务数据；界面另存为 `.rbxui.json`。创建工程目录和元数据采用非覆盖操作；失败时仅清理本次创建的文件及空目录。
-所有新工程都有 `interfaces/` 与 `AgentWorkspace/`，有模板时另有 `template-references/`；平台包与可选风格包分别维护，提示词及规范原样复制，不增加全局来源路径到 project.json，重开不重新复制。
+所有新工程都有 `interfaces/` 与 `AgentWorkspace/`，有模板时位于 `AgentWorkspace/styles/templates/`；公共提示词在实际打开时同步，项目风格只在新建时复制，重开不更新 styles。不增加全局来源路径到 project.json。
 工程不依赖最近列表，可独立移动后重新打开。
-每次创建或成功打开工程时生成本地 `Run.bat`，指向当前编辑器并通过 `UI_EDITOR_OPEN_WORKSPACE` 打开批处理所在工程；普通启动仍进入 Hub。已有编辑器实例时将工程交给该实例，当前界面未保存或工程操作未完成时提示用户先完成操作。仅更新带 UIEditor 生成标记的启动文件，不覆盖用户自建 Run.bat。
-工作区 `.gitignore` 仅追加 `/Run.bat` 并保留已有规则。工程元数据、`interfaces` 中的 UI 文件、模板参考 `template-references` 及项目图片 `image-assets` 均应提交到 Git；启动文件含本机路径，不提交。永久图片及其 Roblox ID 保存于编辑器仓库的 `SharedAssets/image-assets/catalog.json`，随 UIEditor 提交并跨电脑复用；Runtime 不作为永久图片的权威来源，存储与旧数据迁移边界见 [图片资产](image-assets.md)。
+每次创建或成功打开工程时生成本地 `Run.bat`，指向当前编辑器并通过 `UI_EDITOR_OPEN_WORKSPACE` 打开批处理所在工程；普通启动仍进入 Hub。已有编辑器实例时恢复并显示主窗口，再将工程交给该实例；当前界面未保存或工程操作未完成时提示用户先完成操作。仅更新带 UIEditor 生成标记的启动文件，不覆盖用户自建 Run.bat。
+工作区 `.gitignore` 追加 `/Run.bat`、`/AgentWorkspace/AGENTS.md`、`/AgentWorkspace/Docs/` 和 `/AgentWorkspace/.agents/skills/` 并保留已有规则。AGENTS.LOCAL.md 与 styles/ 由项目维护并提交。工程元数据、`interfaces` 中的 UI 文件、模板参考 `AgentWorkspace/styles/templates` 及项目图片 `image-assets` 均应提交到 Git；启动文件含本机路径，不提交。永久图片及其 Roblox ID 保存于编辑器仓库的 `SharedAssets/image-assets/catalog.json`，随 UIEditor 提交并跨电脑复用；Runtime 不作为永久图片的权威来源，存储与旧数据迁移边界见 [图片资产](image-assets.md)。
 
 仓库根目录保留启动批处理与说明；`Editor/` 集中源码、依赖、开发脚本、测试和构建产物；`Docs/design/` 保存设计文档。
 `ToolRuntime/UIEditor-win32-x64/` 保存打包应用；开发模式与打包应用均使用根目录的 `ToolRuntime/Runtime/` 保存历史、Electron 用户数据、会话、日志和缓存。
