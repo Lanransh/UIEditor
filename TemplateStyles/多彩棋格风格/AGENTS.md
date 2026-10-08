@@ -17,6 +17,9 @@
 - 沿用本风格的字体、字号、加粗、配色、描边、圆角、Stud 平铺、
   高光与压边；默认不是自由设计另一套视觉风格。
   不混用其他风格，不用通用蓝色窗口、签到示例替代项目模板。
+- 带独立贴边高光、底部压边的按钮，无隐藏溢出内容需求时使用
+  `ClipsDescendants=false`，避免 Roblox 缩小预览出现亮缝；
+  不把 UICorner 当作子节点圆角裁剪，不一律关闭所有容器的裁剪。
 - 标题不固定红色，模板默认红色；按界面主题选择规范中的红、橙、黄、绿、
   蓝、青、紫或粉色，同步调整压边色。按钮保持原有语义色。
   标题、按钮和进度文字使用白字描边，不替换为马卡龙浅色或降低整窗透明度。
@@ -76,7 +79,8 @@
 - `ui.nodes.setPreviewImage(id, {name, dataUrl})` 设置嵌入预览图；
   `Image` 仍单独保存真实 Roblox ID。不要传本机文件路径作为图片属性。
 - 位置尺寸用 `UDim2.fromOffset` / `UDim2.fromScale` 或明确的 Scale/Offset；
-  保留原模板 AnchorPoint、ZIndex、ClipsDescendants 和子节点顺序。
+  保留原模板 AnchorPoint、ZIndex 和子节点顺序；裁剪按 Game-DESIGN 的
+  “裁剪与缩放亮缝”规则判断，不机械沿用模板的 ClipsDescendants。
 - `ui.scripts.get/set` 可在同一制作事务中调整脚本。
   source 管动作和展示，integration 管临时配置和模拟状态，视觉节点保存于设计态。
 
