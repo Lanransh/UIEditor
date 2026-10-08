@@ -1,6 +1,6 @@
 import { allNodes, findNode, findParent, type UIDocument, type UINode } from './uiDocument';
 
-export const toolNames = ['uie.editor.get_state', 'uie.editor.get_capabilities', 'uie.nodes.get', 'uie.nodes.find', 'uie.code.execute', 'uie.scripts.get', 'uie.scripts.set', 'uie.document.list', 'uie.document.new', 'uie.document.open', 'uie.document.save', 'uie.runtime.control', 'uie.runtime.click', 'uie.debug.get_diagnostics', 'uie.debug.screenshot', 'uie.assets.search', 'uie.assets.get', 'uie.assets.configure', 'uie.project.list'] as const;
+export const toolNames = ['uie.editor.get_state', 'uie.editor.get_capabilities', 'uie.nodes.get', 'uie.nodes.find', 'uie.code.execute', 'uie.scripts.get', 'uie.scripts.set', 'uie.document.list', 'uie.document.new', 'uie.document.open', 'uie.document.save', 'uie.runtime.control', 'uie.runtime.click', 'uie.debug.get_diagnostics', 'uie.debug.screenshot', 'uie.assets.search', 'uie.assets.get', 'uie.assets.configure', 'uie.project.list', 'uie.runtime.batch'] as const;
 export type AutomationRequest = { name: string; arguments: Record<string, unknown> };
 export interface AutomationAPI {
   onRequest(handler: (request: AutomationRequest) => Promise<unknown>): () => void;

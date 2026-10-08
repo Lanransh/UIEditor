@@ -36,7 +36,7 @@ let app: Awaited<ReturnType<typeof electron.launch>> | undefined;
 try {
   assert.equal((await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'test', version: '1' } })).serverInfo.name, 'ui-editor');
   const listed = (await rpc('tools/list')).tools;
-  assert.equal(listed.length, 19); assert.ok(listed.some((tool: any) => tool.name === 'uie.scripts.set')); assert.ok(!listed.some((tool: any) => tool.name.startsWith('uie.history.')));
+  assert.equal(listed.length, 20); assert.ok(listed.some((tool: any) => tool.name === 'uie.runtime.batch')); assert.ok(listed.some((tool: any) => tool.name === 'uie.scripts.set')); assert.ok(!listed.some((tool: any) => tool.name.startsWith('uie.history.')));
   assert.equal((await raw('uie.history.undo')).isError, true);
   assert.equal((await raw('uie.editor.get_state')).isError, true);
   const parent = join(root, 'project'); await mkdir(parent);
@@ -185,6 +185,33 @@ print("Created reward UI")`;
   assert.equal((await state('full')).document.name, 'Renamed');
   await uiHistory('undo'); assert.equal((await state('full')).document.name, 'OnlineReward');
   await uiHistory('redo'); assert.equal((await state('full')).document.name, 'Renamed');
+  await uiHistory('undo');
+  const batch = await mutate('uie.runtime.batch', { steps: [
+    { action: 'run' },
+    { action: 'assert', id: button.id, properties: { Text: 'Ready' }, disabled: false },
+    { action: 'click', id: button.id, dispatched: true, reason: null },
+    { action: 'assert', id: button.id, properties: { Text: 'Claimed' }, disabled: true },
+    { action: 'click', id: button.id, dispatched: false, reason: 'disabled' },
+    { action: 'reset' },
+    { action: 'assert', id: button.id, properties: { Text: 'Ready' }, disabled: false },
+    { action: 'stop' },
+  ] });
+  assert.equal(batch.success, true, JSON.stringify(batch));
+  assert.equal(batch.results.length, 8); assert.equal(batch.skipped, 0); assert.equal(batch.state, 'edit');
+  assert.deepEqual((await state('full')).document, created.document);
+  const batchFailure = await mutate('uie.runtime.batch', { steps: [
+    { action: 'run' }, { action: 'assert', id: button.id, properties: { Text: 'Wrong' } }, { action: 'stop' },
+  ] });
+  assert.equal(batchFailure.success, false); assert.equal(batchFailure.skipped, 1);
+  assert.match(batchFailure.results[1].error, /Text/); assert.equal(batchFailure.state, 'runtime');
+  await mutate('uie.runtime.control', { action: 'stop' });
+  await mutate('uie.scripts.set', { source: fixture.scripts.source.replace('self:EmitUIAction("ClaimReward"', 'root.Enabled = false\n        self:EmitUIAction("ClaimReward"') });
+  const hiddenBatch = await mutate('uie.runtime.batch', { steps: [
+    { action: 'run' }, { action: 'click', id: button.id, dispatched: true },
+    { action: 'assert', id: created.document.root.id, properties: { Enabled: false } },
+    { action: 'click', id: button.id, dispatched: false, reason: 'hidden' }, { action: 'stop' },
+  ] });
+  assert.equal(hiddenBatch.success, true, JSON.stringify(hiddenBatch));
   await uiHistory('undo');
   const run = await mutate('uie.runtime.control', { action: 'run' }); assert.equal(run.result.ok, true, JSON.stringify(run.result));
   assert.equal((await call('uie.nodes.get', { id: button.id, view: 'runtime' })).node.properties.Text, 'Ready');

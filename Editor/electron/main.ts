@@ -143,6 +143,10 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
         pending.set(requestId, { resolve, reject, timer }); window.webContents.send('automation:request', { ...request, requestId });
       });
       const cursor = typeof request.arguments.consoleCursor === 'number' ? request.arguments.consoleCursor : 0;
+      if (request.name === 'uie.runtime.batch') {
+        const batch = value as { diagnostics: object };
+        return { ...batch, diagnostics: { ...batch.diagnostics, console: consoleLogs, consoleCursor } };
+      }
       return request.name === 'uie.debug.get_diagnostics' ? { ...(value as object), console: consoleLogs.filter(log => log.cursor > cursor), consoleCursor, consoleTruncated: cursor < (consoleLogs[0]?.cursor ?? consoleCursor + 1) - 1 } : value;
     });
     window.on('closed', () => { cancelAutomation(); bridge.close(); });

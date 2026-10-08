@@ -5,6 +5,7 @@ import { findNode, allNodes, type UIDocument } from '../shared/uiDocument';
 import { getCapabilities } from './automationCapabilities';
 import { documentCommand } from './commands';
 import { resolveImageAssets } from '../shared/imageAssets';
+import { executeRuntimeBatch } from '../shared/runtime-batch';
 
 interface Files { reset(document: UIDocument, path: string | null): void; saved(): string; markSaved(document: UIDocument, path: string): void; path(): string | null; busy(value: boolean): void }
 export function useAutomation(editor: DocumentEditor, files: Files) {
@@ -16,7 +17,7 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
   useEffect(() => {
     if (!window.automation) return;
     let alive = true;
-    const unsubscribe = window.automation.onRequest(async (request: AutomationRequest) => {
+    const handle = async (request: AutomationRequest): Promise<any> => {
       const { editor: e, files: f } = current.current;
       const a = request.arguments, h = e.history.inspect();
       const signature = JSON.stringify(e.imageAssets);
@@ -38,6 +39,7 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
       try {
         if (!e.hasDocument && !['uie.editor.get_state', 'uie.editor.get_capabilities', 'uie.document.list', 'uie.document.new', 'uie.document.open', 'uie.assets.search', 'uie.assets.get', 'uie.assets.configure', 'uie.debug.get_diagnostics'].includes(request.name)) throw new Error('请先新建或打开界面。');
         switch (request.name) {
+          case 'uie.runtime.batch': return { ...await executeRuntimeBatch(a, handle, () => current.current.editor.runtime.inspect().frame, verify), ...state() };
           case 'uie.editor.get_state': return { ...state(), ...(a.detail === 'full' ? { document: e.hasDocument ? resolved() : null } : { nodeCount: e.hasDocument ? allNodes(h.state.root).length : 0 }) };
           case 'uie.assets.search': case 'uie.assets.get': {
             const assets = await e.refreshImages();
@@ -135,7 +137,8 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
           default: throw new Error('不支持的工具。');
         }
       } catch (error) { lastError.current = String(error); throw error; }
-    });
+    };
+    const unsubscribe = window.automation.onRequest(handle);
     return () => { alive = false; unsubscribe(); };
   }, []);
 }

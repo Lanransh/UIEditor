@@ -307,4 +307,10 @@ test('随应用提供的 多彩棋格风格：7 个鲜明配色模板和完整�
   }
   const design = await readFile(join(project.path, 'AgentWorkspace', 'Game-DESIGN.md'), 'utf8');
   for (const rule of ['GothamBold', '30', 'CloseSurfaceImg', 'CloseBtn', 'PaidPurchaseBtn', '#D03BF2', '#DF1A23', '标题不固定红色', 'Current / Target']) assert.ok(design.includes(rule), rule);
+  const agents = await readFile(join(project.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8');
+  for (const content of [agents, design]) {
+    for (const rule of ['默认只参考布局', '只有用户明确要求参考配色', '不保留', '英文', '按钮语义色']) assert.ok(content.includes(rule), rule);
+  }
+  const check = await readFile(join(project.path, 'AgentWorkspace', '.agents', 'skills', 'ui-editor-style-check', 'SKILL.md'), 'utf8');
+  for (const rule of ['默认只对照布局', '不沿用截图颜色', '原语言已转成英文', '各状态文案均为英文']) assert.ok(check.includes(rule), rule);
 });

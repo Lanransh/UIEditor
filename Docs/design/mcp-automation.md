@@ -8,7 +8,7 @@
 
 ## 工具与查询
 
-固定工具包含 editor.get_state/get_capabilities、nodes.get/find、code.execute、scripts.get/set、document.list/new/open/save、runtime.control/click、debug.get_diagnostics/screenshot、assets.search/get/configure 和 project.list，均带 uie 前缀。不提供选中节点、MCP undo/redo 或制作代码内部的历史 API。尚未新建或打开界面时，get_state 返回 nodeCount=0，full 详情的 document 为 null；状态同时返回 projectId、projectName 和当前 documentId（无文档时为 null）；文档编辑、保存、运行及当前画布截图要求先新建或打开界面。图片查询、配置和 ui.assets.apply 见 [图片资产](image-assets.md)。
+固定工具包含 editor.get_state/get_capabilities、nodes.get/find、code.execute、scripts.get/set、document.list/new/open/save、runtime.control/click/batch、debug.get_diagnostics/screenshot、assets.search/get/configure 和 project.list，均带 uie 前缀。不提供选中节点、MCP undo/redo 或制作代码内部的历史 API。尚未新建或打开界面时，get_state 返回 nodeCount=0，full 详情的 document 为 null；状态同时返回 projectId、projectName 和当前 documentId（无文档时为 null）；文档编辑、保存、运行及当前画布截图要求先新建或打开界面。图片查询、配置和 ui.assets.apply 见 [图片资产](image-assets.md)。
 
 scripts.get 读取交互代码 source、接入代码 integration，可用 kind 指定其中一份，省略时读取两份。scripts.set 要求 sessionId/revision，可传 source、integration 或同时传两者，未传字段保持原值。源码长度及结构校验沿用文档边界；语法错误允许保存并在运行时反馈。运行中禁止修改源码。code.execute 内的 ui.scripts.get/set 仍可将源码与节点修改组合提交。
 
@@ -35,6 +35,24 @@ nodes.get/find、scripts.get 和 debug.screenshot 共用可选 target：`{projec
 源码执行成功后严格校验完整文档，再校验当前 sessionId/revision，最后提交一条现有文档命令。节点、属性、层级和两份源码的一次组合修改可以在 App 内整体撤销，scripts.set 的一次修改同样进入文档历史。App redo 恢复已验证快照，不重跑代码。失败、超时、冲突、dry-run 和无变化不影响历史；新编辑清空 redo。手动与 MCP 编辑共用历史，保存不清空历史，新建或打开另一界面重置历史。revision 同时覆盖手动编辑、MCP 提交及 App 内 undo/redo；MCP 不提供历史操作和历史摘要。
 
 ## 运行与文件
+
+`uie.runtime.batch` 将已知验证步骤合并为一次 MCP 往返，要求当前 sessionId/revision。
+steps 为 1–32 个顺序执行的 `run / reset / stop / click / assert`，不接受任意
+代码、设计修改、文件操作或嵌套批次。click 使用稳定节点 id，可断言 dispatched
+和 reason（null、disabled、hidden）；assert 使用稳定节点 id，精确比较指定
+properties 的 JSON 值及可选 disabled 状态，只读取运行副本。所有步骤在执行前
+完整校验，每步前及异步运行操作后检查编辑会话和 revision。
+
+返回 success、逐步 results（零基 index、结果及失败原因）、skipped、当前会话状态
+和有界运行/控制台 diagnostics。第一个运行错误、断言失败或会话冲突即停止后续
+步骤，不回滚已执行动作，也不隐式 stop；失败后仍运行时先截图取证，再显式停止
+后修复。每批执行前检查 8 秒预算，超过预算不再开始下一步，需拆成较小批次；
+原有单步运行超时和桥接超时仍生效。批量操作不修改设计文档、dirty 或历史。
+
+AI 优先一次取得关键节点 ID，再提交带明确预期的验证批次；普通领取、重复点击、
+重置及另一领取分支可以放在同一批次。截图保留设计态、确有视觉差异的关键运行态
+及保存重开后的结果，不为每次点击重复截图。需要运行态截图时让批次停在该状态，
+截图后再继续另一批次。截图与保存重开保持独立，属性断言不能替代视觉检查。
 
 只有编辑和运行状态；运行中禁止设计修改和历史操作。run/stop/reset 与用户工具栏共用运行控制，click 与用户按钮共用事件入口，不可见或禁用时返回未分发原因。运行副本与日志不保存、不进入历史。运行错误结束会话，保留日志并恢复编辑。诊断分别提供运行日志及 App 控制台游标，各最多保留 500 条并报告截断。截图切回界面页、等待绘制，捕获实际画布视口，隐藏选择装饰与提示，返回 PNG 尺寸和缩放；它不是 Roblox 设备渲染结果。
 
