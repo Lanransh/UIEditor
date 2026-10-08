@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { randomUUID } from 'node:crypto';
 import { robloxStrategy } from '../src/editor/roblox';
-import { allNodes, findNode, type UIDocument } from '../src/shared/uiDocument';
+import { allNodes, findNode, type UIDocument, type UINode } from '../src/shared/uiDocument';
 import { validateJSON, type RuntimeFrame, type RuntimeLog } from '../src/shared/runtime';
 
 export class RuntimeError extends Error {
@@ -57,7 +57,7 @@ export class LuauSession {
       throw error;
     }
     const session = new LuauSession(directory, document);
-    const nodes = Object.fromEntries(allNodes(document.root).map(node => [node.id, { name: node.name, children: node.children.map(child => child.id), className: node.className, properties: node.properties, definitions: robloxStrategy.nodes[node.className].properties }]));
+    const nodes = Object.fromEntries(allNodes(document.root).map(node => [node.id, { ...node, children: node.children.map(child => child.id), definitions: robloxStrategy.nodes[node.className].properties }]));
     const enums = Object.fromEntries(Object.values(robloxStrategy.nodes).flatMap(node => Object.entries(node.properties).filter(([, definition]) => definition.kind === 'enum').map(([name, definition]) => [name, definition.choices])));
     try {
       const frame = await session.command({ type: 'start', bootstrap, source: document.scripts.source, integration: document.scripts.integration, enums, nodes, root: document.root.id });
@@ -95,14 +95,11 @@ export class LuauSession {
   }
   private apply(source: unknown): RuntimeFrame {
     validateJSON(source);
-    const result = source as { operations: { node: string; property: string; value: unknown }[]; disabled: string[]; logs: { kind: string; message: string; payload?: unknown }[] };
-    if (!Array.isArray(result.operations) || !Array.isArray(result.disabled) || !Array.isArray(result.logs)) throw new Error('无效的运行结果。');
-    const document = structuredClone(this.document);
-    for (const operation of result.operations) {
-      const node = findNode(document.root, operation.node);
-      if (!node || !Object.hasOwn(node.properties, operation.property)) throw new Error(`不支持的运行属性 ${operation.property}`);
-      node.properties[operation.property] = operation.value as typeof node.properties[string];
-    }
+    const result = source as { root: UINode; disabled: string[]; logs: { kind: string; message: string; payload?: unknown }[] };
+    if (!result.root || !Array.isArray(result.disabled) || !Array.isArray(result.logs)) throw new Error('无效的运行结果。');
+    const normalize = (node: UINode) => { if (!Array.isArray(node.children) && node.children && Object.keys(node.children).length === 0) node.children = []; if (Array.isArray(node.children)) node.children.forEach(normalize); };
+    normalize(result.root);
+    const document = { ...this.document, root: result.root };
     const validated = robloxStrategy.validate(document);
     for (const id of result.disabled) if (typeof id !== 'string' || !findNode(document.root, id)) throw new Error('无效的禁用节点。');
     const logs = readLogs(result.logs);

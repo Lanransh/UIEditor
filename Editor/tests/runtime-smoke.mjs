@@ -178,6 +178,31 @@ try {
   await page.getByRole('button', { name: '接入脚本', exact: true }).click();
   await page.screenshot({ path: resolve(`test-results/${packaged ? 'packaged-' : ''}integration.png`) });
   await page.getByRole('button', { name: '停止', exact: true }).click();
+  await page.getByRole('button', { name: '交互脚本', exact: true }).click();
+  await setScript(saved.scripts.source.replace('function UI:OnReady()', `function UI:OnReady()
+    local root = FXLoader:PlayerGui("OnlineRewardUI")
+    local item = root.ClaimButton:Clone()
+    item.Name = "ClonedReward"
+    item.Text = "Cloned reward"
+    item.Position = UDim2.fromOffset(600, 450)
+    item.Parent = root
+    self:TrackConnection(item.Activated:Connect(function()
+        print("cloned-click")
+        item:Destroy()
+    end))`));
+  await page.getByRole('button', { name: '运行', exact: true }).click();
+  const clone = page.getByRole('button', { name: 'ClonedReward', exact: true });
+  await clone.waitFor();
+  await page.waitForFunction(() => !document.querySelector('.runtime-toolbar button:last-child')?.disabled);
+  await clone.click();
+  await page.getByRole('button', { name: '输出', exact: true }).click();
+  await page.getByRole('log').getByText(/cloned-click/).waitFor();
+  await clone.waitFor({ state: 'hidden' });
+  await page.getByRole('button', { name: '重置', exact: true }).click();
+  await clone.waitFor();
+  await page.getByRole('button', { name: '停止', exact: true }).click();
+  assert.equal(await page.getByTestId('ui-artboard').locator('[aria-label="ClonedReward"]').count(), 0);
+  assert.equal(await readFile(file, 'utf8'), original);
   assert.deepEqual(errors, []);
   console.log(`PASS: ${packaged ? 'packaged offline' : 'development'} Luau, class inheritance, button action, integration state, reset, errors, read-only design, clean stop.`);
 } finally { await app.close(); }

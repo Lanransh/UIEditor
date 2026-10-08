@@ -45,7 +45,13 @@ App 提供 FX.Class、FX.GetClass、Super、New、IsA、GetClassName 的兼容�
 
 ## 节点与支持接口
 
-脚本直接获取节点对象，不需要额外绑定引用名。FX.Loader:Here(root, "父节点.子节点") 按层级查找，只接受点分隔路径；FX.Loader:PlayerGui("界面名.子节点") 从模拟 PlayerGui 查找当前 ScreenGui 或其子节点。生成脚本优先用 PlayerGui 获取界面、Here 获取子节点，不通过 GetRootNode 查找。PlayerGui 仅包含当前文档，空路径、空段和斜杠明确报错。节点支持 Name/ClassName/Parent、FindFirstChild、WaitForChild、IsA、子节点字段、支持属性的读写，以及按钮 Activated:Connect。这里只模拟已有静态节点，不支持 Instance.new 或动态增删。节点路径不存在、同级重名导致歧义或属性不支持时明确报错；修改节点名称或层级后需同步脚本路径。
+脚本直接获取节点对象，不需要额外绑定引用名。FX.Loader:Here(root, "父节点.子节点") 按层级查找，只接受点分隔路径；FX.Loader:PlayerGui("界面名.子节点") 从模拟 PlayerGui 查找当前 ScreenGui 或其子节点。生成脚本优先用 PlayerGui 获取界面、Here 获取子节点，不通过 GetRootNode 查找。PlayerGui 仅包含当前文档，空路径、空段和斜杠明确报错。节点支持 Name/ClassName/Parent、FindFirstChild、WaitForChild、GetChildren、IsA、子节点字段、支持属性的读写，以及按钮 Activated:Connect。支持通过 Clone 克隆已有模板子树、修改 Name、设置 Parent 和 Destroy；不支持 Instance.new。节点路径不存在、同级重名导致歧义或属性不支持时明确报错；修改节点名称或层级后需同步脚本路径。
+
+常用交互代码以 App 预览和 Roblox 游戏复用为目标，节点方法使用 Roblox 的调用写法与主要生命周期语义。App 执行真实 Luau，但节点、布局与事件由宿主模拟，只覆盖公开支持的接口；不是 Roblox 引擎。WaitForChild 找不到时立即报错，不等待引擎对象出现。Roblox 导入保留交互源码，Clone/Parent/Destroy 在游戏中直接使用原生 Instance 接口。
+
+条目模板在设计文档中保留一份完整可编辑子树。Clone() 深拷贝调用时的名称、支持属性、子节点和图片信息，为副本的每个节点生成独立会话 ID；返回的根节点 Parent 为 nil，不复制事件连接。脚本按配置修改副本，设定 Visible、LayoutOrder 等属性，再设置 Parent 挂入容器，并为领取按钮重新连接事件；动作携带稳定业务 ID。模板设为隐藏时，副本也继承隐藏状态，需要显式显示。优先在页面内容容器中克隆条目，继续沿用已有布局组件。
+
+Parent = nil 将子树移出预览，保留对象、属性和连接，后续可重新挂载；GetChildren() 返回当前直接子节点的独立列表。Destroy() 递归移除子树并断开其中的按钮连接，可重复调用，销毁后不能重新挂载。文档根节点不能移除或重新挂载；自引用、后代引用形成的父子循环被拒绝。运行会话中的存活节点（含未挂载副本）最多 5000 个，已挂载树继续遵守节点类型、辅助组件唯一性、属性和深度校验。
 
 | 方法 | 行为 |
 | --- | --- |
@@ -62,9 +68,9 @@ App 提供 FX.Class、FX.GetClass、Super、New、IsA、GetClassName 的兼容�
 
 接入类配置可包含这些值类型，赋给节点属性时转换成界面定义的 Scale/Offset、向量、十六进制颜色或枚举名，主进程继续校验属性。读取节点属性时还原相应值类型。仍接受已有脚本使用的 JSON 形式属性值；错误的值类型或枚举类型会报错。值类型只存在于运行会话，不改变文档保存格式。
 
-事件与刷新串行执行；一次命令的属性更新通过文档校验后整体提交。非法属性或脚本错误结束会话，不提交部分更新。不可见或禁用按钮不分发事件；连接在停止时统一失效。
+事件与刷新串行执行；一次命令返回完整的已挂载运行节点树，通过文档校验后整体提交。非法属性或脚本错误结束会话，不提交部分更新。不可见或禁用按钮不分发事件；连接在停止时统一失效。
 
-首版通过条件判断设置文字、颜色和显隐，不提供状态编辑器、SetState、输入交互、滚动交互、动态节点、定时任务或复杂动画。
+首版通过条件判断设置文字、颜色和显隐，不提供状态编辑器、SetState、输入交互、滚动交互、Instance.new、定时任务或复杂动画。
 
 ## 会话与安全
 

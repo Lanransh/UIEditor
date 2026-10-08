@@ -90,11 +90,12 @@ function FX.Class(name, base)
 end
 function FX.GetClass(name) return classes[name] end
 local handlers, disabled = {}, {}
-local operations, logs = {}, {}
+local logs = {}
+local nextId, nodeCount = 0, 0
 local rendering = false
 local function nodeFor(ref)
     local id = proxyIds[ref] or (nodes[ref] and ref) or (instance and instance._References and instance._References[ref])
-    assert(id and nodes[id], "Unknown node reference: " .. tostring(ref))
+    assert(id and nodes[id] and not nodes[id].destroyed, "Unknown or destroyed node reference: " .. tostring(ref))
     return nodes[id], id
 end
 local API = {}
@@ -113,7 +114,6 @@ function API:Set(ref, property, value)
         value = encode(value)
     end
     node.properties[property] = clone(value)
-    table.insert(operations, { node = id, property = property, value = clone(value) })
 end
 function API:On(ref, event, callback)
     local node, id = nodeFor(ref)
@@ -142,13 +142,71 @@ local function child(parent, name)
     end
     return found
 end
-local function makeProxy(id)
+local makeProxy
+local function reparent(id, parentId)
+    local node = nodeFor(id)
+    assert(id ~= root, "Cannot reparent the document root")
+    if parentId then
+        nodeFor(parentId)
+        local ancestor = parentId
+        while ancestor do
+            assert(ancestor ~= id, "Cannot parent a node to itself or its descendant")
+            ancestor = nodes[ancestor].parent
+        end
+    end
+    if node.parent == parentId then return end
+    if node.parent then
+        local siblings = nodes[node.parent].children
+        table.remove(siblings, table.find(siblings, id))
+    end
+    node.parent = parentId
+    if parentId then table.insert(nodes[parentId].children, id) end
+end
+local function cloneNode(id)
+    local source = nodeFor(id)
+    assert(nodeCount < 5000, "Runtime supports at most 5000 nodes")
+    repeat nextId += 1 until not nodes["runtime-" .. nextId]
+    local copiedId = "runtime-" .. nextId
+    local copied = {
+        name = source.name, className = source.className, properties = clone(source.properties),
+        definitions = source.definitions, children = {},
+        previewImage = clone(source.previewImage), imageAssetId = source.imageAssetId,
+    }
+    nodes[copiedId] = copied
+    nodeCount += 1
+    proxies[copiedId] = makeProxy(copiedId)
+    for _, childId in ipairs(source.children) do
+        local newChildId = cloneNode(childId)
+        nodes[newChildId].parent = copiedId
+        table.insert(copied.children, newChildId)
+    end
+    return copiedId
+end
+local function destroy(id)
+    local node = nodes[id]
+    if node.destroyed then return end
+    assert(id ~= root, "Cannot destroy the document root")
+    reparent(id, nil)
+    for _, childId in ipairs(table.clone(node.children)) do destroy(childId) end
+    for _, handler in ipairs(handlers[id] or {}) do handler.connection:Disconnect() end
+    handlers[id], disabled[id] = nil, nil
+    node.destroyed = true
+    nodeCount -= 1
+end
+makeProxy = function(id)
     local proxy = setmetatable({}, {
         __index = function(_, key)
             local node = nodes[id]
             if key == "Name" then return node.name end
             if key == "ClassName" then return node.className end
             if key == "Parent" then return proxies[node.parent] end
+            if key == "Clone" then return function() return proxies[cloneNode(id)] end end
+            if key == "Destroy" then return function() destroy(id) end end
+            if key == "GetChildren" then return function()
+                local result = {}
+                for _, childId in ipairs(node.children) do table.insert(result, proxies[childId]) end
+                return result
+            end end
             if key == "FindFirstChild" then return function(_, name) return child(id, name) end end
             if key == "WaitForChild" then return function(_, name) return assert(child(id, name), "Missing child: " .. name) end end
             if key == "IsA" then return function(_, name) return node.className == name end end
@@ -158,7 +216,16 @@ local function makeProxy(id)
             if node.properties[key] ~= nil then return API:Get(id, key) end
             return child(id, key)
         end,
-        __newindex = function(_, key, input) API:Set(id, key, input) end,
+        __newindex = function(_, key, input)
+            local node = nodeFor(id)
+            if key == "Name" then
+                assert(type(input) == "string" and string.match(input, "%S"), "Expected non-empty node name")
+                node.name = input
+            elseif key == "Parent" then
+                assert(input == nil or proxyIds[input], "Parent must be a UI node or nil")
+                reparent(id, input and proxyIds[input])
+            else API:Set(id, key, input) end
+        end,
         __metatable = "UI node",
     })
     proxyIds[proxy] = id
@@ -273,6 +340,7 @@ function host.prepare(input)
     nodes, root = input.nodes, input.root
     for id, node in pairs(nodes) do
         proxies[id] = makeProxy(id)
+        nodeCount += 1
         for _, childId in ipairs(node.children) do nodes[childId].parent = id end
     end
 end
@@ -317,9 +385,19 @@ function host.dispose()
 end
 function host.output()
     local ids = {}
-    for id, value in pairs(disabled) do if value then table.insert(ids, id) end end
-    local result = { operations = operations, disabled = ids, logs = logs }
-    operations, logs = {}, {}
+    local function snapshot(id)
+        local node = nodes[id]
+        local children = {}
+        for _, childId in ipairs(node.children) do table.insert(children, snapshot(childId)) end
+        if disabled[id] then table.insert(ids, id) end
+        return {
+            id = id, name = node.name, className = node.className,
+            properties = node.properties, children = children,
+            previewImage = node.previewImage, imageAssetId = node.imageAssetId,
+        }
+    end
+    local result = { root = snapshot(root), disabled = ids, logs = logs }
+    logs = {}
     return result
 end
 -- Print is a host-owned closure, not stdout; messages remain framed JSON.

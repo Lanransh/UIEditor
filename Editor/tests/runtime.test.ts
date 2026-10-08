@@ -334,3 +334,127 @@ return Preview`;
   try { assert.match(frame.logs[0].message, /Ready.*contract/); }
   finally { await session.stop(); }
 });
+
+
+test('runtime templates clone independently, attach, dispatch and destroy without changing the document', async () => {
+  const document = rewardExample();
+  const template = robloxStrategy.createNode('ImageLabel');
+  template.name = 'Template';
+  template.imageAssetId = 'reward-icon';
+  template.previewImage = { name: 'reward.png', dataUrl: 'data:image/png;base64,YQ==' };
+  const button = robloxStrategy.createNode('TextButton');
+  button.name = 'Claim';
+  template.children.push(button, robloxStrategy.createNode('UICorner'));
+  document.root.children.push(template);
+  document.scripts.source = sourceClass(`function UI:OnReady()
+ local root = self:GetRootNode()
+ local template = root.Template
+ template.Visible = false
+ template.Claim.Activated:Connect(function() error("template handler copied") end)
+ self.Items = {}
+ for _, rewardId in ipairs({"online_5", "online_10"}) do
+  local item = template:Clone()
+  assert(item.Parent == nil and #item:GetChildren() == 2)
+  item.Name = rewardId
+  item.Visible = true
+  item.Claim.Text = rewardId
+  item.Parent = root
+  assert(FX.Loader:Here(root, rewardId .. ".Claim") == item.Claim)
+  self.Items[rewardId] = item
+  local connection
+  connection = self:TrackConnection(item.Claim.Activated:Connect(function()
+   self:EmitUIAction("Claim", { RewardId = rewardId })
+   item:Destroy()
+   item:Destroy()
+   assert(item.Parent == nil and not connection.Connected)
+  end))
+ end
+end`);
+  document.scripts.integration = previewClass('');
+  const original = JSON.stringify(document);
+  const { session, frame } = await LuauSession.start(directory, document);
+  try {
+    const first = frame.document.root.children.find(node => node.name === 'online_5')!;
+    const second = frame.document.root.children.find(node => node.name === 'online_10')!;
+    assert.notEqual(first.id, template.id);
+    assert.notEqual(first.children[0].id, second.children[0].id);
+    assert.deepEqual(first.previewImage, template.previewImage);
+    assert.equal(first.imageAssetId, template.imageAssetId);
+    assert.equal(first.children[0].properties.Text, 'online_5');
+    assert.equal(second.children[0].properties.Text, 'online_10');
+    assert.equal(findNode(frame.document.root, button.id)!.properties.Text, button.properties.Text);
+    const claimed = await session.command({ type: 'event', node: first.children[0].id });
+    assert.match(claimed.logs[0].message, /Claim.*online_5/);
+    assert.equal(findNode(claimed.document.root, first.id), undefined);
+    assert.ok(findNode(claimed.document.root, second.id));
+    await assert.rejects(session.command({ type: 'event', node: first.children[0].id }), /无效的按钮/);
+    assert.equal(JSON.stringify(document), original);
+  } finally { await session.stop(); }
+});
+
+
+test('detached clones retain state and connections until reattached; destruction disconnects connections', async () => {
+  const { session, frame } = await start(`function UI:OnReady()
+ local root = self:GetRootNode()
+ local template = root.ClaimButton
+ self.item = template:Clone()
+ self.item.Name = "Detached"
+ self.item.Text = "independent"
+ local connection = self.item.Activated:Connect(function() print("clone-click") end)
+ template.Activated:Connect(function()
+  if not self.item.Parent then
+   self.item.Parent = root
+  elseif not self.removed then
+   self.item.Parent = nil
+   self.removed = true
+  else
+   self.item:Destroy()
+   assert(not connection.Connected)
+   assert(not pcall(function() self.item.Parent = root end))
+  end
+ end)
+end`);
+  const originalButton = buttonId(frame.document);
+  try {
+    assert.equal(frame.document.root.children.some(node => node.name === 'Detached'), false);
+    const attached = await session.command({ type: 'event', node: originalButton });
+    const item = attached.document.root.children.find(node => node.name === 'Detached')!;
+    assert.equal(item.properties.Text, 'independent');
+    assert.equal((await session.command({ type: 'event', node: item.id })).logs[0].message, 'clone-click');
+    const detached = await session.command({ type: 'event', node: originalButton });
+    assert.equal(findNode(detached.document.root, item.id), undefined);
+    const reattached = await session.command({ type: 'event', node: originalButton });
+    assert.equal(findNode(reattached.document.root, item.id)!.properties.Text, 'independent');
+    const destroyed = await session.command({ type: 'event', node: originalButton });
+    assert.equal(findNode(destroyed.document.root, item.id), undefined);
+  } finally { await session.stop(); }
+});
+
+test('invalid runtime topology is rejected without committing a partial frame', async () => {
+  for (const mutation of [
+    'button.Parent = button',
+    'root.Parent = button',
+    'root:Destroy()',
+    'button.Parent = {}',
+    'button.Name = " "',
+  ]) {
+    await assert.rejects(start(`function UI:OnReady()
+ local root = self:GetRootNode()
+ local button = root.ClaimButton
+ ${mutation}
+end`), /Cannot|Parent must|non-empty/);
+  }
+  const { session, frame } = await start(`function UI:OnReady()
+ local root = self:GetRootNode()
+ root.ClaimButton.Activated:Connect(function()
+  local copy = root.ClaimButton:Clone()
+  copy.Name = "Invalid"
+  copy.TextSize = -1
+  copy.Parent = root
+ end)
+end`);
+  const before = JSON.stringify(frame);
+  await assert.rejects(session.command({ type: 'event', node: buttonId(frame.document) }), /属性/);
+  assert.equal(JSON.stringify(frame), before);
+  await assert.rejects(session.command({ type: 'show' }), /结束/);
+});
