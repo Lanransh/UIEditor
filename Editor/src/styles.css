@@ -246,3 +246,5 @@ svg { flex-shrink: 0; }
 .style-library-footer { display: flex; flex-direction: column; gap: 6px; padding: 12px 20px; border-top: 1px solid #dce5e5; color: var(--muted); font-size: 11px; }
 .style-library-path { margin-left: 8px; overflow-wrap: anywhere; }
 @media (max-width: 900px) { .style-library-body { grid-template-columns: 170px 150px minmax(0, 1fr); } }
+
+.template-editing-banner { flex-shrink: 0; padding: 6px 14px; font-size: 12px; color: #087f78; background: #e6f5f2; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

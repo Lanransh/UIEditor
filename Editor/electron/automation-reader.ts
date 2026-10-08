@@ -88,7 +88,7 @@ export class AutomationReader {
     const document = await readDocument(entries[0].path);
     if (document.id.toLowerCase() !== value.documentId.toLowerCase()) throw new Error('界面身份已变化，请重新列出界面。');
     const assets = await new ImageAssetStore(this.runtime, storage.project?.path, this.permanentImages).list();
-    return { document: resolveImageAssets(document, assets.filter(asset => storage.project || asset.library === 'permanent')),
+    return { relativePath: relative(storage.directory, entries[0].path).replaceAll('\\', '/'), document: resolveImageAssets(document, assets.filter(asset => storage.project || asset.library === 'permanent')),
       target: { ...(storage.project ? { projectId: storage.project.manifest.id } : {}), library: storage.library, documentId: document.id } };
   }
   async images(args: Record<string, unknown>) {

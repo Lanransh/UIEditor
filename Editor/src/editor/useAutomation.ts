@@ -1,4 +1,5 @@
 import type { MouseAction } from '../shared/runtime-mouse';
+import { documentLocation } from '../shared/documents';
 import { useEffect, useRef } from 'react';
 import type { DocumentEditor } from './useDocumentEditor';
 import { getNode, nodeTree, findNodes, integer, type AutomationRequest } from '../shared/automation';
@@ -29,8 +30,8 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
       const writable = () => { verify(); if (e.runtime.inspect().sessionId || e.runtime.active || e.busy) throw new Error('当前正在运行或处理操作，请停止后编辑。'); };
       const resolved = () => resolveImageAssets(e.history.inspect().state, e.imageAssets);
       const dirty = () => e.hasDocument && JSON.stringify(resolved()) !== f.saved();
-      const relativePath = () => { const root = e.projectPath.replaceAll('\\', '/') + '/interfaces/', path = f.path()?.replaceAll('\\', '/'); return path?.toLowerCase().startsWith(root.toLowerCase()) ? path.slice(root.length) : null; };
-      const state = () => ({ ...stamp(), projectId: e.projectId, projectName: e.projectName, documentId: e.hasDocument ? e.history.inspect().state.id : null, projectType: e.strategy.mode, state: e.runtime.inspect().sessionId ? 'runtime' : 'edit', dirty: dirty(), relativePath: relativePath() });
+      const location = () => documentLocation(e.projectPath, f.path());
+      const state = () => ({ ...stamp(), projectId: e.projectId, projectName: e.projectName, documentId: e.hasDocument ? e.history.inspect().state.id : null, projectType: e.strategy.mode, state: e.runtime.inspect().sessionId ? 'runtime' : 'edit', dirty: dirty(), relativePath: location()?.relativePath ?? null, library: location()?.library ?? null, mode: f.path() ? 'edit' : 'unsaved' });
       const readDocument = () => {
         if (a.view !== undefined && a.view !== 'design' && a.view !== 'runtime') throw new Error('view 必须是 design 或 runtime。');
         const runtime = e.runtime.inspect();

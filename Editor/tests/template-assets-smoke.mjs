@@ -11,7 +11,7 @@ const runtime = join(root, 'runtime');
 const env = { ...process.env, UI_EDITOR_BACKGROUND: '1', UI_EDITOR_USER_DATA: runtime }; delete env.ELECTRON_RUN_AS_NODE;
 let app, page;
 const errors = [];
-const templatePath = parent => join(parent, 'UIEditorWorkspace', 'template-references', 'TemplateDemo.rbxui.json');
+const templatePath = parent => join(parent, 'UIEditorWorkspace', 'AgentWorkspace', 'styles', 'templates', 'TemplateDemo.rbxui.json');
 let templateFile = templatePath(first);
 const projectFile = parent => join(parent, 'UIEditorWorkspace', 'interfaces', 'TemplateDemo.rbxui.json');
 const textOf = document => document.root.children[0].children[0].properties.Text;
@@ -53,9 +53,9 @@ async function treeSave(target) {
 async function preview(text) {
   await page.getByRole('img', { name: 'TemplateDemo 缩略图', exact: true }).locator('.preview-text-fill').getByText(text, { exact: true }).waitFor();
 }
-async function openCopy() {
+async function openTemplate() {
   await page.getByRole('button', { name: 'UI 资产 TemplateDemo', exact: true }).click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '打开副本', exact: true }).click();
+  await page.getByRole('menuitem', { name: '打开', exact: true }).click();
   await idle();
 }
 async function move(target) {
@@ -107,7 +107,7 @@ try {
   await preview('更新参考');
   const reference = await readFile(templateFile, 'utf8');
   // Existing project folders remain usable without a folder-creation UI.
-  await mkdir(join(first, 'UIEditorWorkspace', 'template-references', '奖励界面'));
+  await mkdir(join(first, 'UIEditorWorkspace', 'AgentWorkspace', 'styles', 'templates', '奖励界面'));
   await preview('更新参考');
   await page.getByRole('button', { name: '选择节点 TextLabel', exact: true }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: '保存…', exact: true }).click();
@@ -122,8 +122,8 @@ try {
     visiblePaths.push(await card.getAttribute('title'));
     await card.locator('.preview-text-fill').getByText('更新参考', { exact: true }).waitFor();
   }
-  assert.deepEqual(visiblePaths.sort(), [templateFile, join(first, 'UIEditorWorkspace', 'template-references', '奖励界面', 'TemplateDemo.rbxui.json')].sort());
-  assert.equal(await readFile(join(first, 'UIEditorWorkspace', 'template-references', '奖励界面', 'TemplateDemo.rbxui.json'), 'utf8'), reference);
+  assert.deepEqual(visiblePaths.sort(), [templateFile, join(first, 'UIEditorWorkspace', 'AgentWorkspace', 'styles', 'templates', '奖励界面', 'TemplateDemo.rbxui.json')].sort());
+  assert.equal(await readFile(join(first, 'UIEditorWorkspace', 'AgentWorkspace', 'styles', 'templates', '奖励界面', 'TemplateDemo.rbxui.json'), 'utf8'), reference);
   const invalidFolder = await page.evaluate(() => window.documents.createTemplateFolder('../escape'));
   assert.equal(invalidFolder.ok, false);
   const duplicateFolder = await page.evaluate(() => window.documents.createTemplateFolder('奖励界面'));
@@ -154,9 +154,9 @@ try {
   assert.equal(await page.getByLabel('界面名称', { exact: true }).count(), 0);
   const rejected = await page.evaluate(path => window.documents.previewAsset(path, 'templates'), projectFile(first));
   assert.equal(rejected.ok, false);
-  await openCopy();
+  await openTemplate();
   await page.waitForFunction(() => document.querySelector('[aria-label="界面名称"]')?.value === 'TemplateDemo');
-  await page.getByText('新界面尚未保存', { exact: true }).waitFor();
+  await page.getByText('界面已保存', { exact: true }).waitFor();
   await page.getByRole('button', { name: '选择节点 TextLabel', exact: true }).click();
   await input('Text', '工程B副本');
   await menu('保存为项目UI'); await page.getByText('界面已保存', { exact: true }).waitFor();
@@ -165,7 +165,7 @@ try {
   await preview('更新参考');
 
   await input('Text', '取消打开');
-  await dialogs(second, 2); await openCopy();
+  await dialogs(second, 2); await openTemplate();
   assert.equal(await page.getByLabel('Text', { exact: true }).inputValue(), '取消打开');
   await dialogs(second, 1); await menu('返回 Hub');
   await page.getByRole('button', { name: '创建工程', exact: true }).waitFor();
@@ -233,7 +233,7 @@ try {
   assert.equal(await readFile(templatePath(first), 'utf8'), reference);
   await assert.rejects(readFile(join(runtime, 'template-references', 'TemplateDemo.rbxui.json')), { code: 'ENOENT' });
   assert.deepEqual(errors, []);
-  console.log('PASS: project-scoped template snapshots, folders and source validation, independent copies, persistence, thumbnails, moves between all libraries, collision safety and active-document save-path tracking.');
+  console.log('PASS: project-scoped template snapshots, folders and source validation, direct template opening and project save-as, persistence, thumbnails, moves between all libraries, collision safety and active-document save-path tracking.');
 } finally {
   if (app) {
     if (page && !page.isClosed()) await page.screenshot({ path: resolve('test-results/template-reference-last-state.png') }).catch(() => {});

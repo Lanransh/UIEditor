@@ -12,10 +12,11 @@ import { LuauSession, RuntimeError } from './runtime';
 import { ToolkitClient } from './toolkit';
 import { AutomationReader } from './automation-reader';
 import { getNode, nodeTree, findNodes, integer } from '../src/shared/automation';
+import { documentLocation } from '../src/shared/documents';
 import type { UIDocument } from '../src/shared/uiDocument';
 import { startBridge } from './automation-bridge';
 import { executeCode, getCodeAdapter } from './code-executor';
-import { openInterface, saveInterface } from './automation-files';
+import { openInterface, saveInterface, fileVersion } from './automation-files';
 import { createCodexMcpSettingsStore } from './codex-mcp-settings.cjs';
 import { ImageAssetStore, permanentImageRoot } from './image-assets';
 import { syncAgentWorkspace } from './agent-workspace';
@@ -96,6 +97,19 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       } finally { if (timer) clearTimeout(timer); previews.delete(preview.webContents); preview.destroy(); }
     }
     let documentPath: string | null = null;
+    let templateVersion: { path: string; version: string } | null = null;
+    function bindFile(file: { path: string; version?: string }) {
+      documentPath = file.path;
+      templateVersion = file.version ? { path: file.path, version: file.version } : null;
+    }
+    async function saveBoundFile(path: string, document: UIDocument) {
+      const project = requireProject(), location = documentLocation(project.path, path);
+      const saved = location?.library === 'templates' && path === documentPath
+        ? (await saveInterface(project.path, location.relativePath, document, false, 'templates', templateVersion?.path === path ? templateVersion.version : undefined)).document
+        : await writeDocument(path, document);
+      bindFile({ path, version: location?.library === 'templates' ? await fileVersion(path) : undefined });
+      return { path, document: saved };
+    }
     let dirty = false;
     let allowClose = false;
     const trusted = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === source;
@@ -118,7 +132,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       const a = request.arguments;
       if (request.name === 'uie.project.list') return reader.listProjects();
       if (request.name === 'uie.document.list' && (a.projectId !== undefined || a.library === 'permanent' || !automationReady)) return reader.listDocuments(a);
-      if (a.target !== undefined) {
+      if (a.target !== undefined && request.name !== 'uie.document.open') {
         const saved = await reader.read(a.target);
         switch (request.name) {
           case 'uie.nodes.get': return { target: saved.target, ...(a.format === 'tree' ? nodeTree(saved.document, a) : { node: getNode(saved.document, a) }) };
@@ -148,6 +162,12 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
         const timer = setTimeout(() => { pending.delete(requestId); reject(new Error('编辑器操作超时。')); }, 12000);
         pending.set(requestId, { resolve, reject, timer }); window.webContents.send('automation:request', { ...request, requestId });
       });
+      if (request.name === 'uie.editor.get_state') {
+        const workspacePath = activeProject!.path, agentWorkspacePath = join(workspacePath, 'AgentWorkspace');
+        const gameDesignPath = join(agentWorkspacePath, 'styles', 'Game-DESIGN.md');
+        const gameDesignExists = await stat(gameDesignPath).then(info => info.isFile(), (error: NodeJS.ErrnoException) => { if (error.code === 'ENOENT') return false; throw error; });
+        return { ...(value as object), workspacePath, agentWorkspacePath, gameDesignPath, gameDesignExists };
+      }
       const cursor = typeof request.arguments.consoleCursor === 'number' ? request.arguments.consoleCursor : 0;
       if (request.name === 'uie.runtime.batch') {
         const batch = value as { diagnostics: object };
@@ -174,14 +194,31 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
           const assets = await new ImageAssetStore(runtime, activeProject.path, permanentImages).list();
           return executeCode(getCodeAdapter(activeProject.manifest.mode), nativeDirectory, argument.document, argument.language, argument.source, assets).catch(error => ({ error: error.message, stage: error.stage ?? 'execution', logs: error.logs ?? [] }));
         }
-        case 'file:open': { if (!activeProject || !automationReady) throw new Error('请先打开工程。'); const result = await openInterface(activeProject.path, argument.relativePath); documentPath = result.path; return result; }
+        case 'file:open': {
+          if (!activeProject || !automationReady) throw new Error('请先打开工程。');
+          let library: 'project' | 'templates' = 'project', path = argument.relativePath;
+          if (argument.target !== undefined) {
+            if (argument.relativePath !== undefined) throw new Error('target 与 relativePath 不能同时提供。');
+            const target = argument.target;
+            if (target.library === 'permanent' || (target.projectId !== undefined && target.projectId.toLowerCase() !== activeProject.manifest.id.toLowerCase())) throw new Error('只允许打开当前工程的项目 UI 或模板。');
+            const saved = await reader.read(target);
+            library = saved.target.library as 'project' | 'templates'; path = saved.relativePath;
+          }
+          if (library === 'templates' && !['edit', 'copy'].includes(argument.mode)) throw new Error('打开模板必须明确 mode=edit 或 copy；修改原件须经用户提出或同意。');
+          const result = await openInterface(activeProject.path, path, library);
+          if (argument.target && result.document.id.toLowerCase() !== argument.target.documentId.toLowerCase()) throw new Error('界面身份已变化，请重新查询。');
+          if (argument.mode === 'copy') { documentPath = null; templateVersion = null; return { document: result.document, path: null }; }
+          bindFile(result); return result;
+        }
         case 'file:list': return reader.listDocuments(argument ?? {});
         case 'file:new': if (!automationReady) throw new Error('请先打开工程。'); documentPath = null; return null;
         case 'file:save': {
           if (!activeProject || !automationReady) throw new Error('请先打开工程。');
+          const location = documentLocation(activeProject.path, documentPath);
+          if (argument.relativePath === undefined && location?.library === 'templates' && documentPath) return saveBoundFile(documentPath, robloxStrategy.validate(argument.document));
           const target = argument.relativePath ?? (documentPath ? relative(join(activeProject.path, 'interfaces'), documentPath) : null);
           const result = await saveInterface(activeProject.path, target, robloxStrategy.validate(argument.document), argument.relativePath !== undefined);
-          documentPath = result.path; return result;
+          bindFile(result); return result;
         }
         case 'screenshot': {
           if (!automationReady) throw new Error('请先打开工程。');
@@ -358,7 +395,11 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       if (!argument || typeof argument !== 'object' || !('library' in argument) || !('path' in argument) || !['templates', 'permanent'].includes(String(argument.library))) throw new Error('UI 资产库无效。');
       const storage = documentStorage(argument.library);
       const file = await openDocumentAsset(storage.root, argument.path, storage.library);
-      stopRuntime(); documentPath = null;
+      if (storage.library === 'templates') {
+        const opened = await openInterface(storage.root, relative(documentAssetDirectory(storage.root, 'templates'), file.path), 'templates');
+        stopRuntime(); bindFile(opened); return opened;
+      }
+      stopRuntime(); documentPath = null; templateVersion = null;
       return file;
     });
     handle('document:move-asset', async argument => {
@@ -366,7 +407,11 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       if (!['project', 'templates', 'permanent'].includes(String(argument.source)) || !['project', 'templates', 'permanent'].includes(String(argument.target))) throw new Error('UI 资产库无效。');
       const source = documentStorage(argument.source), target = documentStorage(argument.target);
       const asset = await moveDocumentAsset(source.root, argument.path, source.library, target.root, target.library);
-      if (documentPath === argument.path) documentPath = asset.path;
+      if (documentPath === argument.path) {
+        documentPath = asset.path;
+        if (templateVersion && templateVersion.path === argument.path) templateVersion.path = asset.path;
+        else if (argument.target === 'templates') templateVersion = { path: asset.path, version: await fileVersion(asset.path) };
+      }
       return asset;
     });
     ipcMain.handle('document:template-folders', async event => {
@@ -387,6 +432,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       const directory = folder === undefined || folder === '' ? documentAssetDirectory(project.path, 'templates') : templateFolderPath(project.path, folder);
       if (folder && !(await listTemplateFolders(project.path)).includes(folder)) throw new Error('模板文件夹不存在，请刷新后重试。');
       const path = join(directory, `${safeFileName(document.name)}.rbxui.json`);
+      if (path === documentPath) return saveBoundFile(path, document);
       const exists = await stat(path).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });
       if (exists) {
         const answer = await dialog.showMessageBox(window, { type: 'question', title: '模板参考已存在', message: '是否覆盖同名模板参考？', detail: path, buttons: ['覆盖', '取消'], defaultId: 1, cancelId: 1 });
@@ -424,14 +470,15 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       const project = requireProject();
       if (assetPath !== undefined) {
         const file = await openDocumentAsset(project.path, assetPath);
-        documentPath = file.path;
+        bindFile(file);
         return file;
       }
       const result = await dialog.showOpenDialog(window, { title: '打开界面', defaultPath: join(project.path, 'interfaces'), properties: ['openFile'], filters: [{ name: 'Roblox UI', extensions: ['rbxui.json'] }] });
       if (result.canceled || !result.filePaths[0]) return null;
-      const path = result.filePaths[0], document = await readDocument(path);
-      documentPath = path;
-      return { path, document };
+      const path = result.filePaths[0], location = documentLocation(project.path, path);
+      const file = location?.library === 'templates'
+        ? await openInterface(project.path, location.relativePath, 'templates') : { path, document: await readDocument(path) };
+      bindFile(file); return file;
     });
     handle('document:save', async argument => {
       const project = requireProject();
@@ -462,9 +509,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
           }
         }
       }
-      const saved = await writeDocument(path, document);
-      documentPath = path;
-      return { path, document: saved };
+      return saveBoundFile(path, document);
     });
     handle('document:image', async () => {
       requireProject();

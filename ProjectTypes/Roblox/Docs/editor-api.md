@@ -47,6 +47,10 @@ library 支持 project（默认）、templates、permanent。永久UI全局读�
 
 `uie.scripts.get({kind?})` 直接读取源码，kind 为 source 或 integration，省略时返回两份。`uie.scripts.set({sessionId,revision,source?,integration?,label?})` 直接修改交互代码和/或接入代码，至少传一份，未传另一份保持原值。一次更新作为一条 App 历史命令。源码沿用文档长度限制；允许保存语法错误，在运行时检查。无需通过执行制作代码才能编辑脚本。
 
-`uie.document.new` 接收 name；open 接收 relativePath；save 不带路径保存当前文件，带 relativePath 新建文件且拒绝覆盖。所有变更工具要求 sessionId/revision。路径相对于当前工程 interfaces，不包含 interfaces 前缀。切换脏文档需先保存或明确 discardChanges=true。
+`uie.editor.get_state` 返回当前文件 library、库内 relativePath、mode（edit 或 unsaved），以及工作区绝对路径 workspacePath、agentWorkspacePath、gameDesignPath 和 gameDesignExists。风格 Markdown 使用文件工具读写，不直接编辑模板 JSON。
+
+`uie.document.new` 接收 name；open 二选一接收 interfaces 内 relativePath，或 `{target:{library,documentId,projectId?},mode?}`。target 仅允许当前工程的 project/templates；打开模板必须明确 mode=edit（原件）或 copy（未保存副本）。修改模板原件必须由用户提出或同意。
+
+save 不带路径保存当前绑定文件（包括模板原件），带 relativePath 在 interfaces 新建文件且拒绝覆盖。模板原件保存检查磁盘版本，发生外部修改、移动或删除时保留编辑内容并报冲突；不要盲目重试。所有变更工具要求 sessionId/revision。切换脏文档需先保存或明确 discardChanges=true。
 
 运行中禁止制作和历史操作。停止后才能修改。普通运行属性变化不会写回设计文档。

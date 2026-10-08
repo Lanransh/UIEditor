@@ -22,6 +22,8 @@ description: 在 UIEditor 的 Roblox 工程中制作、修改和验证可编辑 
 2. 用 uie.document.list({library:"templates"}) 列出工程模板，按 nextOffset 翻页。
    用返回的 UUID 构造 target={library:"templates",documentId:...}，读取 nodes.get/find、
    scripts.get 和 debug.screenshot；这些只读查询不切换当前画布。模板为空时不假装已复用。
+   只有用户明确要求或同意修改模板，才通过 document.open({target,mode:"edit",sessionId,revision})
+   编辑原件；普通制作不覆盖模板。风格规范路径从 get_state.gameDesignPath 取得，使用文件工具读取。
 3. 按用途选择匹配模板，保留风格规定的视觉结构，仅调整需求内容。模板节点 ID 不用于修改
    当前界面；通过 document.new 与 code.execute 的制作 API 创建新设计节点及新 ID。
    修改已有界面先查询稳定节点 ID，保留任务外内容。布局单位明确为 Scale/Offset。
@@ -44,7 +46,7 @@ description: 在 UIEditor 的 Roblox 工程中制作、修改和验证可编辑 
 - 用 debug.get_diagnostics 检查错误；批次已返回诊断且无异常时不重复读取同一份。
 - 截图检查设计态及确有视觉差异的关键运行态，结合风格专项检查验证布局、文字、
   图片和层级。属性断言不能替代截图；没有参考截图时只称属性核对。
-- 停止后通过 document.save 保存到 interfaces 内相对路径，再 document.open 重开核对
+- 停止后通过 document.save 保存项目 UI；经授权编辑模板时不传路径，保存回当前模板原件。再 document.open 重开核对
   节点、图片、文字与脚本。切换脏文档前保存，不静默丢弃或覆盖其他文件。
 - 交付列明占位图节点、用途及动态/静态替换方式。
 - 交付说明模板来源、保存位置、视觉差异、实际检查，以及 Config/State、必需与可选

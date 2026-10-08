@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Project } from '../shared/project';
-import type { DocumentAPI, DocumentLibrary } from '../shared/documents';
+import { documentLocation, type DocumentAPI, type DocumentLibrary } from '../shared/documents';
 import { findNode, updateNode, type PropertyValue, type UIDocument, type UINode } from '../shared/uiDocument';
 import { useEditorHistory } from '../history/useEditorHistory';
 import { useHistoryShortcuts } from '../history/useHistoryShortcuts';
@@ -116,13 +116,19 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
     if (!await consent()) return;
     const result = await window.documents.openTemplate(path, library);
     if (!result.ok) { setError(result.error); return; }
-    reset(strategy.validate(result.value.document), null);
+    reset(strategy.validate(result.value.document), library === 'templates' ? result.value.path : null);
   });
   const saveTemplate = (folder?: string) => run(async () => {
     if (!hasDocument) return;
     const result = await window.documents.saveTemplate(document, folder);
     if (!result.ok) { setError(result.error); return; }
-    if (result.value) setError('');
+    if (result.value) {
+      if (result.value.path === fileState.current.path) {
+        fileState.current = { path: result.value.path, saved: JSON.stringify(result.value.document) };
+        setSaved(fileState.current.saved);
+      }
+      setError('');
+    }
   });
   const moveAsset = (assetPath: string, source: DocumentLibrary, target: DocumentLibrary) => run(async () => {
     const result = await window.documents.moveAsset(assetPath, source, target);
@@ -214,7 +220,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   const editor = { projectId: project.manifest.id, projectName: project.name, projectPath: project.path, strategy, document, inspectionDocument, inspectionBusy: busy || assetsLoading || (runtime.active && !runtime.ready), hasDocument, history, selected, select, editNode, editProperty, execute, add, reparent, pickImage,
     inspectedAssetId, inspectAsset, clearAssetInspection, setAssetConfigurationDirty,
     imageAssets, assetsLoading, refreshImages, configureImage, configureImageRobloxId, importImage, useImage,
-    newDocument, openDocument, openTemplate, saveTemplate, moveAsset, save: (saveAs = false) => run(async () => { await save(saveAs); }),
+    location: documentLocation(project.path, path), newDocument, openDocument, openTemplate, saveTemplate, moveAsset, save: (saveAs = false) => run(async () => { await save(saveAs); }),
     saveProjectUI: () => run(async () => { await save(false, true); }), back, dirty, path, error, busy: busy || runtime.active || assetsLoading, runtime };
   useAutomation(editor, { reset, saved: () => fileState.current.saved, path: () => fileState.current.path, busy: value => { operating.current = value; setBusy(value); }, markSaved: (value, file) => { fileState.current = { path: file, saved: JSON.stringify(value) }; setPath(file); setSaved(fileState.current.saved); } });
   return editor;

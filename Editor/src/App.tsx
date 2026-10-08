@@ -262,6 +262,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
             <button disabled={!editor.runtime.ready} onClick={() => void editor.runtime.hide()}>隐藏</button>
           </>}
         </div>
+        {editor.location?.library === 'templates' && <div className="template-editing-banner" role="status" title={editor.path ?? undefined}>编辑模板 · {editor.location.relativePath}{editor.dirty ? ' · 未保存' : ''}</div>}
         <nav className="workspace-tabs" aria-label="工作区页签">{(['design', 'source', 'integration'] as const).map((tab, index) => <button key={tab} aria-pressed={workspaceTab === tab} disabled={!editor.hasDocument} onClick={() => setWorkspaceTab(tab)}>{['界面', '交互脚本', '接入脚本'][index]}</button>)}</nav>
         <div className="workspace-editor-content">
           {!editor.hasDocument ? <div className="workspace-empty" role="status">请打开一个工程</div> : <>
