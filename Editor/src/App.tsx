@@ -248,7 +248,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
     {editor.error && <div className="editor-error" role="alert">{editor.error}</div>}
     <div className="workspace-content" ref={content}>
     <div className="workspace-body">
-      <aside className="panel" aria-label="节点树"><h2><Layers3 size={16} />节点树</h2>{editor.hasDocument && <NodeTree editor={editor} />}</aside>
+      <aside className="panel" aria-label="节点树">{editor.hasDocument ? <NodeTree editor={editor} /> : <h2><Layers3 size={16} />节点树</h2>}</aside>
       {separator('tree', '调整节点树宽度')}
       <section className="workspace-editor" aria-label="界面工作区">
         <div className="runtime-toolbar">
