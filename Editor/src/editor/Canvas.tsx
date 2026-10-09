@@ -229,7 +229,7 @@ export function DocumentPreview({ document: shown, strategy, selected: selection
     const contentWidth = scroll ? Math.max(rect.width, pixels(canvas!.x, rect.width)) : rect.width;
     const contentHeight = scroll ? Math.max(rect.height, pixels(canvas!.y, rect.height)) : rect.height;
     const scrollPosition = scroll ? p.CanvasPosition as Vector2 : { x: 0, y: 0 };
-    const scrollbar = scrollGeometry(rect.width, rect.height, contentWidth, contentHeight, scroll ? p.ScrollBarThickness as number : 0, scrollPosition.x, scrollPosition.y);
+    const scrollbar = scrollGeometry(rect.width, rect.height, contentWidth, contentHeight, scroll ? p.ScrollBarThickness as number : 0, scrollPosition.x, scrollPosition.y, p.ScrollingDirection as string);
     const childRects = strategy.layout(node, contentWidth, contentHeight);
     const textSize = p.TextScaled ? auxiliary(node, 'UITextSizeConstraint')?.properties : undefined;
     const fontSize = Math.min(textSize ? textSize.MaxTextSize as number : 100, Math.max(textSize ? textSize.MinTextSize as number : 1, p.TextScaled ? Math.min(rect.height * .7, rect.width / Math.max(1, String(p.Text).length) * 1.5) : p.TextSize as number));

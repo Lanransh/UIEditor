@@ -32,7 +32,7 @@ const component = (properties: NodeDefinition['properties']): NodeDefinition => 
 export const nodeDefinitions: Record<string, NodeDefinition> = {
   ScreenGui: { category: 'root', properties: { Enabled: bool(true), DisplayOrder: number(0, undefined, undefined, true) } },
   Frame: object(),
-  ScrollingFrame: object({ CanvasSize: dimensions(400, 400), CanvasPosition: vector(0, 0, 0), ScrollBarThickness: number(8, 0, 100) }),
+  ScrollingFrame: object({ CanvasSize: dimensions(400, 400), CanvasPosition: vector(0, 0, 0), ScrollBarThickness: number(8, 0, 100), ScrollingDirection: enumeration('XY', ['X', 'Y', 'XY']) }),
   CanvasGroup: object({ GroupTransparency: number(0, 0, 1), GroupColor3: color('#ffffff') }),
   TextLabel: object(text), TextButton: object({ ...text, Text: string('按钮') }), TextBox: object({ ...text, PlaceholderText: string('输入文字') }),
   ImageLabel: object(image), ImageButton: object(image),
@@ -106,6 +106,7 @@ export class RobloxProjectStrategy implements ProjectStrategy {
       ids.add(value.id);
       const definition = this.nodes[value.className];
       if (value.className.startsWith('Image') && isRecord(value.properties) && !Object.hasOwn(value.properties, 'TileSize')) value.properties.TileSize = structuredClone(image.TileSize.value);
+      if (value.className === 'ScrollingFrame' && isRecord(value.properties) && !Object.hasOwn(value.properties, 'ScrollingDirection')) value.properties.ScrollingDirection = definition.properties.ScrollingDirection.value;
       if (!exact(value.properties, Object.keys(definition.properties))) throw new Error(`${value.name} 存在缺失或不支持的属性。`);
       for (const [key, property] of Object.entries(definition.properties)) if (!validProperty(value.properties[key], property)) {
         const detail = ['udim', 'udim2'].includes(property.kind) ? ' Scale 必须是有限数字，Offset 必须是整数。' : '';

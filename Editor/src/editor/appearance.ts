@@ -28,13 +28,14 @@ export function imageGradient(p: Record<string, PropertyValue>, width: number, h
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
-export function scrollGeometry(width: number, height: number, canvasWidth: number, canvasHeight: number, thickness: number, x: number, y: number) {
-  let horizontal = canvasWidth > width, vertical = canvasHeight > height;
-  if (vertical && canvasWidth > width - thickness) horizontal = true;
-  if (horizontal && canvasHeight > height - thickness) vertical = true;
+export function scrollGeometry(width: number, height: number, canvasWidth: number, canvasHeight: number, thickness: number, x: number, y: number, direction = 'XY') {
+  const allowX = direction !== 'Y', allowY = direction !== 'X';
+  let horizontal = allowX && canvasWidth > width, vertical = allowY && canvasHeight > height;
+  if (allowX && vertical && canvasWidth > width - thickness) horizontal = true;
+  if (allowY && horizontal && canvasHeight > height - thickness) vertical = true;
   const windowWidth = Math.max(0, width - (vertical ? thickness : 0));
   const windowHeight = Math.max(0, height - (horizontal ? thickness : 0));
-  const maxX = Math.max(0, canvasWidth - windowWidth), maxY = Math.max(0, canvasHeight - windowHeight);
+  const maxX = allowX ? Math.max(0, canvasWidth - windowWidth) : 0, maxY = allowY ? Math.max(0, canvasHeight - windowHeight) : 0;
   const positionX = Math.min(maxX, Math.max(0, Math.trunc(x))), positionY = Math.min(maxY, Math.max(0, Math.trunc(y)));
   const thumbWidth = canvasWidth ? Math.min(windowWidth, Math.max(2 * thickness, windowWidth * windowWidth / canvasWidth)) : 0;
   const thumbHeight = canvasHeight ? Math.min(windowHeight, Math.max(2 * thickness, windowHeight * windowHeight / canvasHeight)) : 0;

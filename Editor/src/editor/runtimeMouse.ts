@@ -24,7 +24,7 @@ export function runtimeGeometry(frame: RuntimeFrame, strategy: ProjectStrategy, 
       const canvas = node.properties.CanvasSize as UDim2 | undefined;
       const w = canvas ? Math.max(r.width, pixels(canvas.x, r.width)) : r.width, h = canvas ? Math.max(r.height, pixels(canvas.y, r.height)) : r.height;
       const pos = node.properties.CanvasPosition as Vector2 | undefined;
-      const scroll = pos ? scrollGeometry(r.width, r.height, w, h, Number(node.properties.ScrollBarThickness), pos.x, pos.y) : { x: 0, y: 0 };
+      const scroll = pos ? scrollGeometry(r.width, r.height, w, h, Number(node.properties.ScrollBarThickness), pos.x, pos.y, node.properties.ScrollingDirection as string) : { x: 0, y: 0 };
       const found = visit(node, w, h, multiply(m, [1, 0, 0, 1, -scroll.x, -scroll.y]));
       if (found) return found;
     }
@@ -125,7 +125,7 @@ export class RuntimeMouse {
     if (current.reason) return { dispatched: false, reason: current.reason };
     const frame = this.frame()!, r = runtimeGeometry(frame, this.strategy, id)!;
     const p = current.node.properties, canvas = p.CanvasSize as UDim2, position = p.CanvasPosition as Vector2;
-    const g = scrollGeometry(r.width, r.height, Math.max(r.width, pixels(canvas.x, r.width)), Math.max(r.height, pixels(canvas.y, r.height)), Number(p.ScrollBarThickness), position.x, position.y);
+    const g = scrollGeometry(r.width, r.height, Math.max(r.width, pixels(canvas.x, r.width)), Math.max(r.height, pixels(canvas.y, r.height)), Number(p.ScrollBarThickness), position.x, position.y, p.ScrollingDirection as string);
     const next = { x: Math.trunc(Math.max(0, Math.min(g.maxX, to?.x ?? position.x + (delta?.x ?? 0)))), y: Math.trunc(Math.max(0, Math.min(g.maxY, to?.y ?? position.y + (delta?.y ?? 0)))) };
     if (next.x !== position.x || next.y !== position.y) await this.send({ type: 'set', node: id, property: 'CanvasPosition', value: next });
     return { dispatched: true, reason: null, position: findNode(this.frame()!.document.root, id)?.properties.CanvasPosition, range: { x: g.maxX, y: g.maxY } };

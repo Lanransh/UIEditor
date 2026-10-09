@@ -147,9 +147,13 @@ ClipsDescendants 按矩形边界裁剪子节点。
 GothamBold 在本机以 Segoe UI 粗体替代。UIStroke 在文本节点上描画文字，在其他节点上画外边框。
 UIGradient 分别插值颜色和透明度，并与背景、文字或图片的颜色及透明度相乘；
 旋转渐变的中心线控制点落在节点边界上。
-ScrollingFrame 通过 CanvasSize 与 CanvasPosition 展示静态滚动区域，位置按原生规则
-归整并限制到窗口范围，遵循 ClipsDescendants。横纵滚动条会因对方占用窗口而联动，
-长度、端帽和位置采用默认纹理展示，绘制在子节点下方；未实现运行时滚动输入。
+ScrollingFrame 通过 CanvasSize 与 CanvasPosition 展示滚动区域，位置按原生规则
+归整并限制到窗口范围，遵循 ClipsDescendants。ScrollingDirection 支持 X、Y、XY，
+默认 XY；旧文件缺少该属性时加载补入 XY，文件版本保持 3。静态预览和运行时滚动
+均限制到允许的方向，禁用方向的滚动条不显示；设为 Y 可只保留纵向滚动条。
+横纵滚动条会因对方占用窗口而联动，长度、端帽和位置采用默认纹理展示，
+绘制在子节点下方。属性面板、MCP 制作、运行脚本和 Roblox 导出共用方向枚举；
+运行时支持鼠标滚轮、滚动条拖动与 MCP 滚动操作。
 这些差异不能作为 Roblox 的精确排版或颜色保证，后续需在 Studio 和设备上验证。
 已通过 Studio 对比修复上述渐变、描边、图片、滚动条与网格组合差异；本轮未处理
 字体排版、自动字号和 CanvasGroup 复杂混色，也不宣称所有组合逐像素一致。测试范围和证据见
