@@ -365,7 +365,7 @@ function host.initialize(input)
         for _, name in ipairs(choices) do items[name] = value("EnumItem", { Name = name, EnumType = property }) end
         Enum[property] = table.freeze(items)
     end
-    for kind, names in pairs({ UserInputType = { "MouseButton1", "MouseButton2", "MouseButton3", "MouseMovement", "MouseWheel" }, UserInputState = { "Begin", "Change", "End", "Cancel" } }) do
+    for kind, names in pairs({ UserInputType = { "MouseButton1", "MouseButton2", "MouseButton3", "MouseMovement", "MouseWheel", "Touch" }, UserInputState = { "Begin", "Change", "End", "Cancel" } }) do
         local items = {}
         for _, name in ipairs(names) do items[name] = value("EnumItem", { Name = name, EnumType = kind }) end
         Enum[kind] = table.freeze(items)
@@ -418,7 +418,7 @@ function host.command(input)
             local button = ({ [0] = "MouseButton1", [1] = "MouseButton3", [2] = "MouseButton2" })[input.button]
             local state = input.cancelled and "Cancel" or event == "InputBegan" and "Begin" or event == "InputEnded" and "End" or "Change"
             fire(input.node, event, table.freeze({
-                UserInputType = Enum.UserInputType[input.wheel and "MouseWheel" or button or "MouseMovement"], UserInputState = Enum.UserInputState[state],
+                UserInputType = Enum.UserInputType[input.touch and "Touch" or input.wheel and "MouseWheel" or button or "MouseMovement"], UserInputState = Enum.UserInputState[state],
                 Position = table.freeze({ X = input.x, Y = input.y, Z = input.wheel and -math.sign(input.dy) or 0 }),
                 Delta = table.freeze({ X = input.wheel and 0 or input.dx, Y = input.wheel and 0 or input.dy, Z = input.wheel and -math.sign(input.dy) or 0 }),
             }))

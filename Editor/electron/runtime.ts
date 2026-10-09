@@ -83,7 +83,8 @@ export class LuauSession {
         const target = typeof input.node === 'string' && findNode(this.document.root, input.node);
         if (!target || robloxStrategy.nodes[target.className].category !== 'object' || !mouseEvents.includes(input.event as any)
           || ['x', 'y', 'dx', 'dy'].some(key => typeof input[key] !== 'number' || !Number.isFinite(input[key]))
-          || ![-1, 0, 1, 2].includes(input.button as number) || (input.cancelled !== undefined && typeof input.cancelled !== 'boolean') || (input.wheel !== undefined && typeof input.wheel !== 'boolean')) throw new Error('无效的鼠标输入。');
+          || ![-1, 0, 1, 2].includes(input.button as number) || (input.cancelled !== undefined && typeof input.cancelled !== 'boolean') || (input.wheel !== undefined && typeof input.wheel !== 'boolean') || (input.touch !== undefined && typeof input.touch !== 'boolean')
+          || (input.touch === true && (!['InputBegan', 'InputChanged', 'InputEnded'].includes(String(input.event)) || input.wheel === true))) throw new Error('无效的鼠标输入。');
         const shown = (node: UINode, visible: boolean): boolean => {
           visible = visible && (node.className === 'ScreenGui' ? node.properties.Enabled === true : node.properties.Visible !== false);
           return node.id === target.id ? visible : node.children.some(child => shown(child, visible));

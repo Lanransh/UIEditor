@@ -5,6 +5,7 @@ import { createInterface } from 'node:readline';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { createProject } from '../electron/projects';
+import { robloxStrategy } from '../src/editor/roblox';
 import { mouseFixture } from './runtime-mouse-fixture';
 
 await mkdir(resolve('test-results'), { recursive: true });
@@ -33,6 +34,11 @@ try {
   await createProject(parent);
   const project = join(parent, 'UIEditorWorkspace');
   const fixture = mouseFixture();
+  const childButton = robloxStrategy.createNode('TextButton');
+  fixture.child.className = childButton.className;
+  fixture.child.properties = { ...childButton.properties, ...fixture.child.properties };
+  fixture.document.scripts.source = fixture.document.scripts.source.replace('    local b = root.Button', `    local b = root.Button
+    self:TrackConnection(root.List.Content.Activated:Connect(function() b.Text = "child-click" end))`);
   await writeFile(join(project, 'interfaces/mouse.rbxui.json'), JSON.stringify(fixture.document));
   const env: Record<string, string> = { ...Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)), UI_EDITOR_BACKGROUND: '1', UI_EDITOR_USER_DATA: runtime, UI_EDITOR_OPEN_WORKSPACE: project }; delete env.ELECTRON_RUN_AS_NODE;
   app = await electron.launch({ args: ['.'], env });
@@ -84,6 +90,28 @@ try {
   await page.mouse.move(dragBox.x+dragBox.width-5, dragBox.y+dragBox.height/2, { steps: 3 }); await page.mouse.up();
   await page.waitForFunction(id => document.querySelector(`[data-node-id="${id}"]`)?.textContent === 'up', fixture.button.id);
   assert.equal(await artboard.getAttribute('style'), fitted);
+  // Mobile uses the same canvas and session, with single-finger content dragging.
+  await mutate('uie.runtime.scroll', { id: fixture.scroll.id, to: { y: 0 } });
+  await page.getByRole('button', { name: '移动端', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('.runtime-device-modes button[aria-pressed="true"]')?.textContent === '移动端');
+  assert.equal(await artboard.getAttribute('style'), fitted);
+  await button.hover();
+  assert.equal(await button.textContent(), 'leave', 'Switching to touch must clear hover');
+  await button.click();
+  await page.waitForFunction(id => document.querySelector(`[data-node-id="${id}"]`)?.textContent === 'click', fixture.button.id);
+  await content.hover(); await page.mouse.wheel(0, 100);
+  assert.equal((await call('uie.nodes.get', { id: fixture.scroll.id, view: 'runtime' })).node.properties.CanvasPosition.y, 0);
+  const touchBox = (await content.boundingBox())!;
+  await page.mouse.move(touchBox.x+touchBox.width/2, touchBox.y+touchBox.height-5);
+  await page.mouse.down(); await page.mouse.move(touchBox.x+touchBox.width/2, touchBox.y+5, { steps: 4 }); await page.mouse.up();
+  await page.waitForFunction(id => Number(document.querySelector(`[data-node-id="${id}"] [data-scroll-axis="y"]`)?.getAttribute('data-position')) > 0, fixture.scroll.id);
+  assert.equal(await button.textContent(), 'click', 'Dragging a child button must not activate it');
+  await mutate('uie.runtime.scroll', { id: fixture.scroll.id, to: { y: 0 } });
+  await content.click();
+  await page.waitForFunction(id => document.querySelector(`[data-node-id="${id}"]`)?.textContent === 'child-click', fixture.button.id);
+  await page.screenshot({ path: join(root, 'runtime-toolbar.png') });
+  await page.getByRole('button', { name: 'PC', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('.runtime-device-modes button[aria-pressed="true"]')?.textContent === 'PC');
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1500, 950));
   await page.waitForFunction(previous => document.querySelector('.ui-artboard')?.getAttribute('style') !== previous, fitted);
   const size = await viewport.boundingBox();
@@ -141,5 +169,10 @@ try {
   console.error(JSON.stringify(diagnostics && { ...diagnostics, logs: diagnostics.logs.slice(-12) }));
   throw error;
 } finally {
-  if (app) await app.close(); lines.close(); mcp.kill(); for (const item of pending.values()) clearTimeout(item.timer);
+  if (app) {
+    // The isolated fixture has unsaved script edits; bypass the interactive close prompt.
+    await app.evaluate(({ app }) => app.exit(0)).catch(() => {});
+    await app.close();
+  }
+  lines.close(); mcp.kill(); for (const item of pending.values()) clearTimeout(item.timer);
 }

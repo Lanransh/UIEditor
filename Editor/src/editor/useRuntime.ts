@@ -4,11 +4,12 @@ import { robloxStrategy } from './roblox';
 import type { MouseAction, Point } from '../shared/runtime-mouse';
 import { useEffect, useRef, useState } from 'react';
 import type { UIDocument, PropertyValue } from '../shared/uiDocument';
-import { applyRuntimePatch, type RuntimeAPI, type RuntimeCommand, type RuntimeFrame, type RuntimeLog } from '../shared/runtime';
+import { applyRuntimePatch, type RuntimeAPI, type RuntimeCommand, type RuntimeFrame, type RuntimeLog, type RuntimeInputMode } from '../shared/runtime';
 
 declare global { interface Window { runtime: RuntimeAPI } }
 export function useRuntime(document: UIDocument) {
   const [active, setActive] = useState(false);
+  const [inputMode, setInputMode] = useState<RuntimeInputMode>('pc');
   const [frame, setFrame] = useState<RuntimeFrame | null>(null);
   const [logs, setLogs] = useState<RuntimeLog[]>([]);
   const session = useRef<string | null>(null);
@@ -102,7 +103,7 @@ export function useRuntime(document: UIDocument) {
     setActive(false); frameChanged(null);
     append([...(event.logs ?? []), { kind: 'error', message: event.error }]);
   }), []);
-  return { active, ready: !!frame, frame, logs, start: (source = document) => start(source), stop, reset: () => start(snapshot.current ?? document), show: () => command({ type: 'show' }), hide: () => enqueue(async () => { await mouse.current!.cancel(); return await command({ type: 'hide' }); }), activate: (node: string) => enqueue(async () => { const result = await command({ type: 'event', node }); if (!result?.ok) throw new Error(result?.error ?? '运行会话已变化。'); append([{ kind: 'input', message: `click ${node}` }]); return result; }), setProperty: (node: string, property: string, value: PropertyValue) => command({ type: 'set', node, property, value }), mouse: (input: MouseAction) => enqueue(async () => {
+  return { active, inputMode, setInputMode: (mode: RuntimeInputMode) => enqueue(async () => { await mouse.current!.setMode(mode); setInputMode(mode); }), ready: !!frame, frame, logs, start: (source = document) => start(source), stop, reset: () => start(snapshot.current ?? document), show: () => command({ type: 'show' }), hide: () => enqueue(async () => { await mouse.current!.cancel(); return await command({ type: 'hide' }); }), activate: (node: string) => enqueue(async () => { const result = await command({ type: 'event', node }); if (!result?.ok) throw new Error(result?.error ?? '运行会话已变化。'); append([{ kind: 'input', message: `click ${node}` }]); return result; }), setProperty: (node: string, property: string, value: PropertyValue) => command({ type: 'set', node, property, value }), mouse: (input: MouseAction) => enqueue(async () => {
     const result = await mouse.current!.perform(input);
     append([{ kind: 'input', message: JSON.stringify({ ...input, ...result }) }]);
     return result;

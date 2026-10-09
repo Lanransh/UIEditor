@@ -30,6 +30,11 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
   const mouseGesture = useRef<{ pointerId: number; buttonId: string | null; button: number; startX: number; startY: number; moved: boolean; scroll?: { id: string; axis: 'x' | 'y'; position: number; ratio: number; start: number; matrix: NonNullable<ReturnType<typeof runtimeGeometry>>['matrix'] } } | null>(null);
   const suppressClick = useRef(false);
   useEffect(() => {
+    const active = mouseGesture.current;
+    mouseGesture.current = null; suppressClick.current = true;
+    if (active && viewport.current?.hasPointerCapture(active.pointerId)) viewport.current.releasePointerCapture(active.pointerId);
+  }, [editor.runtime.inputMode]);
+  useEffect(() => {
     const start = () => setCapturing(true), end = () => setCapturing(false);
     window.addEventListener('uie:screenshot-start', start); window.addEventListener('uie:screenshot-end', end);
     return () => { window.removeEventListener('uie:screenshot-start', start); window.removeEventListener('uie:screenshot-end', end); };
@@ -68,12 +73,12 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
     return { x: (event.clientX - rect.left - pan.x) / zoom, y: (event.clientY - rect.top - pan.y) / zoom };
   }
   function runtimeDown(event: PointerEvent) {
-    if (!editor.runtime.ready || mouseGesture.current || ![0, 1, 2].includes(event.button)) return;
+    if (!editor.runtime.ready || mouseGesture.current || ![0, 1, 2].includes(event.button) || (editor.runtime.inputMode === 'mobile' && event.button !== 0)) return;
     event.preventDefault();
     const id = nodeId(event.target), bar = (event.target as HTMLElement).closest<HTMLElement>('[data-scroll-axis]');
     suppressClick.current = false;
     const active: NonNullable<(typeof mouseGesture)['current']> = { pointerId: event.pointerId, buttonId: (event.target as HTMLElement).closest<HTMLElement>('[data-class-name="TextButton"], [data-class-name="ImageButton"]')?.dataset.nodeId ?? null, button: event.button, startX: event.clientX, startY: event.clientY, moved: false };
-    if (bar && id && event.button === 0) {
+    if (bar && id && event.button === 0 && editor.runtime.inputMode === 'pc') {
       const axis = bar.dataset.scrollAxis as 'x' | 'y';
       const { matrix } = runtimeGeometry(editor.runtime.frame!, editor.strategy, id)!;
       active.scroll = { id, axis, matrix, start: localMousePoint(matrix, point(event))[axis], position: Number(bar.dataset.position), ratio: Number(bar.dataset.max) / Math.max(.001, Number(bar.dataset.travel)) };
@@ -192,7 +197,7 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
           onNodePointerDown={(event, node) => { if (editor.runtime.active) return; start(event, space || event.button === 1 ? 'pan' : 'move', space || event.button === 1 ? undefined : node); }}
           onResize={(event, node) => start(event, 'resize', node)} />
       </div>
-      {!capturing && <div className="canvas-hint">{editor.runtime.active ? '运行模式 · 鼠标交互 · 自动适应窗口' : '空白处拖动 / 空格或中键平移 · Ctrl+滚轮缩放 · 静态设计'}</div>}
+      {!capturing && <div className="canvas-hint">{editor.runtime.active ? editor.runtime.inputMode === 'mobile' ? '移动端模式 · 左键模拟单指点按 / 拖动内容 · 自动适应窗口' : 'PC 模式 · 滚轮 / 拖动滚动条 · 自动适应窗口' : '空白处拖动 / 空格或中键平移 · Ctrl+滚轮缩放 · 静态设计'}</div>}
     </div>
   </section>;
 }

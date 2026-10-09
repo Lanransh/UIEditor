@@ -18,7 +18,7 @@ cd /d "%EDITOR_DIR%"
 if errorlevel 1 goto :error
 echo Installing dependencies from package-lock.json...
 call npm ci --no-audit
-if errorlevel 1 goto :error
+if not "%ERRORLEVEL%"=="0" goto :error
 echo Preparing Electron runtime...
 call node node_modules\electron\install.js
 if errorlevel 1 goto :error

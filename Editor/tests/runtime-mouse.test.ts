@@ -149,3 +149,52 @@ test('runtime property deltas preserve untouched nodes and reject invalid refere
   assert.throws(() => applyRuntimePatch(document, { [scroll.id]: { children: [] } }), /增量/);
   assert.throws(() => applyRuntimePatch(document, { [scroll.id]: { properties: { Unsupported: 1 } } }), /增量/);
 });
+
+test('mobile input suppresses mouse events, scrolls content and cancels before mode changes', async () => {
+  const { document, button, scroll, child } = mouseFixture();
+  document.scripts.source = document.scripts.source.replace('    local b = root.Button', `    local b = root.Button
+    for _, event in ipairs({"InputBegan", "InputChanged", "InputEnded"}) do
+        self:TrackConnection(root.List.Content[event]:Connect(function(input)
+            print("touch", event, input.UserInputType.Name, input.UserInputState.Name)
+        end))
+    end`);
+  const saved = JSON.stringify(document);
+  const started = await LuauSession.start(resolve('native-bin'), document);
+  let frame = started.frame;
+  const logs: string[] = [];
+  const mouse = new RuntimeMouse(() => frame, async command => { frame = await started.session.command(command); logs.push(...frame.logs.map(log => log.message)); }, robloxStrategy);
+  const position = () => findNode(frame.document.root, scroll.id)!.properties.CanvasPosition;
+  try {
+    const from = mouse.point(child.id), to = { x: from.x, y: from.y-80 };
+    await mouse.pointer('down', child.id, from); await mouse.pointer('move', child.id, to); await mouse.pointer('up', child.id, to);
+    assert.deepEqual(position(), { x: 0, y: 0 }, 'PC content drag must not scroll');
+    await mouse.hover(button.id);
+    await mouse.setMode('mobile');
+    assert.equal(mouse.inspect().hoveredId, null);
+    const beforeHover = logs.length;
+    await mouse.hover(button.id); await mouse.pointer('move', button.id, mouse.point(button.id));
+    assert.equal(logs.length, beforeHover, 'Mobile idle movement must not produce hover or input events');
+    await mouse.wheel(child.id, { x: 0, y: 100 });
+    assert.deepEqual(position(), { x: 0, y: 0 });
+    await mouse.pointer('down', child.id, from);
+    await mouse.pointer('move', child.id, to);
+    assert.deepEqual(position(), { x: 0, y: 80 });
+    assert.ok(logs.includes('touch	InputBegan	Touch	Begin'));
+    assert.ok(logs.includes('touch	InputChanged	Touch	Change'));
+    assert.ok(!logs.includes('wheel'), 'Touch scrolling must not notify wheel listeners');
+    await mouse.setMode('pc');
+    assert.ok(logs.includes('touch	InputEnded	Touch	Cancel'));
+    assert.equal(mouse.inspect().pressedId, null);
+    await mouse.wheel(child.id, { x: 0, y: 20 });
+    assert.deepEqual(position(), { x: 0, y: 100 });
+    await mouse.setMode('mobile');
+    await mouse.perform({ action: 'drag', id: child.id, from: { x: .5, y: .5 }, to: { x: .5, y: 0 } });
+    assert.deepEqual(position(), { x: 0, y: 140 });
+    assert.ok(logs.includes('touch	InputEnded	Touch	End'));
+    frame = await started.session.command({ type: 'set', node: scroll.id, property: 'ScrollingDirection', value: 'X' });
+    await mouse.perform({ action: 'drag', id: child.id, from: { x: .5, y: .5 }, to: { x: .5, y: 0 } });
+    assert.deepEqual(position(), { x: 0, y: 0 }, 'Touch drag respects the supported scroll axis');
+    assert.equal(JSON.stringify(document), saved);
+    await assert.rejects(started.session.command({ type: 'mouse', node: button.id, event: 'MouseMoved', x: 0, y: 0, dx: 0, dy: 0, button: 0, touch: true }), /鼠标/);
+  } finally { await started.session.stop(); }
+});

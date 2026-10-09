@@ -1,5 +1,5 @@
 import { findNode, findParent, type UINode, type UDim2, type Vector2 } from '../shared/uiDocument';
-import type { RuntimeCommand, RuntimeFrame, MouseEventName } from '../shared/runtime';
+import type { RuntimeCommand, RuntimeFrame, MouseEventName, RuntimeInputMode } from '../shared/runtime';
 import { type MouseAction, type Point, validateMouseAction } from '../shared/runtime-mouse';
 import type { ProjectStrategy } from './strategy';
 import { pixels } from './layout';
@@ -32,9 +32,11 @@ export function runtimeGeometry(frame: RuntimeFrame, strategy: ProjectStrategy, 
   return visit(frame.document.root, 1280, 720, [1, 0, 0, 1, 0, 0]);
 }
 export class RuntimeMouse {
+  private mode: RuntimeInputMode = 'pc';
   private hovered: string | null = null;
-  private pressed: { id: string; button: number; point: Point } | null = null;
+  private pressed: { id: string; button: number; point: Point; scroll?: { id: string; matrix: Matrix; start: Point; position: Vector2; moved: boolean } } | null = null;
   constructor(private frame: () => RuntimeFrame | null, private send: (command: RuntimeCommand) => Promise<unknown>, private strategy: ProjectStrategy) {}
+  async setMode(mode: RuntimeInputMode) { await this.cancel(); this.mode = mode; }
   clear() { this.hovered = null; this.pressed = null; }
   inspect() {
     const frame = this.frame();
@@ -60,7 +62,7 @@ export class RuntimeMouse {
     if (!['MouseLeave', 'InputEnded'].includes(event) && !this.available(id)) return;
     const listeners = this.frame()!.listeners;
     if (listeners && !listeners[id]?.includes(event)) return;
-    await this.send({ type: 'mouse', node: id, event, x: point.x, y: point.y, dx: delta.x, dy: delta.y, button, cancelled, wheel });
+    await this.send({ type: 'mouse', node: id, event, x: point.x, y: point.y, dx: delta.x, dy: delta.y, button, cancelled, wheel, touch: this.mode === 'mobile' });
   }
   point(id: string, local: Point = { x: .5, y: .5 }) {
     const frame = this.frame();
@@ -70,6 +72,7 @@ export class RuntimeMouse {
     return transform(r.matrix, { x: r.width * local.x, y: r.height * local.y });
   }
   async hover(id: string | null, point?: Point) {
+    if (this.mode === 'mobile') return { dispatched: false, reason: 'touch-mode' };
     const reason = id ? this.target(id).reason : null;
     if (reason) id = null;
     const previous = this.hovered;
@@ -82,22 +85,36 @@ export class RuntimeMouse {
   }
   async pointer(action: 'down' | 'move' | 'up' | 'cancel', id: string | null, point: Point, button = 0) {
     if (action === 'down') {
-      if (!id) return;
+      if (!id || (this.mode === 'mobile' && button !== 0)) return;
       const reason = this.target(id).reason;
       if (reason) return;
       await this.hover(id, point);
       if (!this.available(id)) return;
       this.pressed = { id, button, point };
+      if (this.mode === 'mobile') {
+        let node = findNode(this.frame()!.document.root, id);
+        while (node && node.className !== 'ScrollingFrame') node = findParent(this.frame()!.document.root, node.id) ?? undefined;
+        if (node && !this.target(node.id).reason) {
+          const { matrix } = runtimeGeometry(this.frame()!, this.strategy, node.id)!;
+          this.pressed.scroll = { id: node.id, matrix, start: localMousePoint(matrix, point), position: { ...node.properties.CanvasPosition as Vector2 }, moved: false };
+        }
+      }
       await this.emit(id, 'InputBegan', point, button);
     } else if (action === 'move') {
       const captured = this.pressed;
+      if (this.mode === 'mobile' && !captured) return;
       if (!captured) await this.hover(id, point);
       const target = captured?.id ?? id;
       if (target) {
         if (!this.available(target)) { await this.cancel(); return; }
-        await this.emit(target, 'MouseMoved', point);
+        if (this.mode === 'pc') await this.emit(target, 'MouseMoved', point);
         await this.emit(target, 'InputChanged', point, -1, captured ? { x: point.x-captured.point.x, y: point.y-captured.point.y } : { x: 0, y: 0 });
         if (captured) captured.point = point;
+        if (captured?.scroll) {
+          const scroll = captured.scroll, local = localMousePoint(scroll.matrix, point);
+          scroll.moved ||= Math.hypot(local.x-scroll.start.x, local.y-scroll.start.y) > 6;
+          if (scroll.moved) await this.scroll(scroll.id, { x: scroll.position.x+scroll.start.x-local.x, y: scroll.position.y+scroll.start.y-local.y });
+        }
       }
     } else {
       const captured = this.pressed; this.pressed = null;
@@ -143,6 +160,7 @@ export class RuntimeMouse {
     return false;
   }
   async wheel(id: string, delta: Point) {
+    if (this.mode === 'mobile') return;
     const { node, reason } = this.target(id);
     if (reason) return;
     let scroll: UINode | undefined = node;

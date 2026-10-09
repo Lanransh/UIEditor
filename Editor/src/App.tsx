@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { AlertTriangle, ArrowLeft, Clock3, Folder, FolderOpen, FolderPlus, Layers3, Palette, Settings, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Clock3, Folder, FolderOpen, FolderPlus, Layers3, Palette, Settings, Trash2, Play, Square, RotateCcw, Eye, EyeOff, Monitor, Smartphone } from 'lucide-react';
 import type { Project, ProjectAPI, RecentProjectView, Result } from './shared/project';
 import { useDocumentEditor } from './editor/useDocumentEditor';
 import { NodeTree, NodeProperties } from './editor/NodePanels';
@@ -251,16 +251,24 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
       <aside className="panel" aria-label="节点树">{editor.hasDocument ? <NodeTree editor={editor} /> : <h2><Layers3 size={16} />节点树</h2>}</aside>
       {separator('tree', '调整节点树宽度')}
       <section className="workspace-editor" aria-label="界面工作区">
-        <div className="runtime-toolbar">
-          <button disabled={!editor.hasDocument || (!editor.runtime.active && editor.busy)} onClick={() => {
-            if (editor.runtime.active) void editor.runtime.stop();
-            else { setWorkspaceTab('design'); void editor.runtime.start(); }
-          }}>{editor.runtime.active ? '停止' : '运行'}</button>
-          {editor.runtime.active && <>
-            <button disabled={!editor.runtime.ready} onClick={() => void editor.runtime.reset()}>重置</button>
-            <button disabled={!editor.runtime.ready} onClick={() => void editor.runtime.show()}>打开</button>
-            <button disabled={!editor.runtime.ready} onClick={() => void editor.runtime.hide()}>隐藏</button>
-          </>}
+        <div className="runtime-toolbar" aria-label="运行控制">
+          <div className="runtime-controls">
+            <button className={editor.runtime.active ? 'runtime-stop' : 'runtime-start'} disabled={!editor.hasDocument || (!editor.runtime.active && editor.busy)} onClick={() => {
+              if (editor.runtime.active) void editor.runtime.stop();
+              else { setWorkspaceTab('design'); void editor.runtime.start(); }
+            }}>{editor.runtime.active ? <Square size={12} aria-hidden="true" /> : <Play size={12} aria-hidden="true" />}{editor.runtime.active ? '停止' : '运行'}</button>
+            {editor.runtime.active && <button title="重新开始，恢复初始状态" disabled={!editor.runtime.ready} onClick={() => void editor.runtime.reset()}><RotateCcw size={12} aria-hidden="true" />重置</button>}
+          </div>
+          {editor.runtime.active && <div className="runtime-preview-controls">
+            <div className="runtime-device-modes" role="group" aria-label="运行设备模式">
+              <button aria-pressed={editor.runtime.inputMode === 'pc'} disabled={!editor.runtime.ready} onClick={() => void editor.runtime.setInputMode('pc')}><Monitor size={12} aria-hidden="true" />PC</button>
+              <button aria-pressed={editor.runtime.inputMode === 'mobile'} disabled={!editor.runtime.ready} onClick={() => void editor.runtime.setInputMode('mobile')}><Smartphone size={12} aria-hidden="true" />移动端</button>
+            </div>
+            <div className="runtime-visibility-controls">
+              <button title="显示当前界面" disabled={!editor.runtime.ready} onClick={() => void editor.runtime.show()}><Eye size={12} aria-hidden="true" />打开</button>
+              <button title="隐藏当前界面，保留运行状态" disabled={!editor.runtime.ready} onClick={() => void editor.runtime.hide()}><EyeOff size={12} aria-hidden="true" />隐藏</button>
+            </div>
+          </div>}
         </div>
         {editor.location?.library === 'templates' && <div className="template-editing-banner" role="status" title={editor.path ?? undefined}>编辑模板 · {editor.location.relativePath}{editor.dirty ? ' · 未保存' : ''}</div>}
         <nav className="workspace-tabs" aria-label="工作区页签">{(['design', 'source', 'integration'] as const).map((tab, index) => <button key={tab} aria-pressed={workspaceTab === tab} disabled={!editor.hasDocument} onClick={() => setWorkspaceTab(tab)}>{['界面', '交互脚本', '接入脚本'][index]}</button>)}</nav>
