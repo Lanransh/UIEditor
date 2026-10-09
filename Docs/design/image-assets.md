@@ -37,7 +37,7 @@
 
 `uie.assets.search` 查询名称、标签、库并分页，返回 robloxId；`uie.assets.get` 返回详情与图片预览；`uie.assets.configure` 保存名称、标签和唯一 robloxId，省略字段保留原值，不支持 projectRobloxId 参数。`uie.assets.import` 接收当前 sessionId/revision、library（project/permanent）和本地图片绝对路径 filePath，由主进程读取并校验 PNG/JPEG/WebP/GIF、单张 8 MiB 上限及普通文件类型；不接受跨工程写入、远程链接或嵌入数据，不上传。无需打开界面即可导入，运行时禁止；成功立即保存资产库并返回无图片数据的资产摘要和新会话，不进入文档历史。先查询并复用已有资产，缺少时导入，再重读状态，通过 `ui.assets.apply(nodeId, assetId)` 应用到节点，随 code.execute 整笔支持撤销、dry-run 与失败回滚。仅设置 previewImage 不会登记到图片资产库。制作 VM 不开放文件与网络。资产导入和属性变化使旧 MCP 编辑会话失效，需重新读取状态。
 
-图片属性提供「上传到 Roblox」；已有 ID 时按钮明确标注「替换 ID」，未保存配置须先保存。点击后由主进程读取资产内容，使用 Toolkit 已配置的资源所有者与 API Key 上传，不在 UIEditor 管理云端凭据。通过 `/discover.uiEditorImageUpload === 1` 检查能力，旧版提示更新并重启，不影响原有 UI 导入。
+图片属性提供「上传到 Roblox」；已有 ID 时按钮明确标注「替换 ID」，未保存配置须先保存。点击后由主进程读取资产内容，使用 Toolkit 已配置的资源所有者与 API Key 上传，不在 UIEditor 管理云端凭据。导入 Roblox 前也会列出未配置 ID 的图片，支持单张或逐张批量上传，详见 [Roblox 一次性导入](roblox-import.md)。通过 `/discover.uiEditorImageUpload === 1` 检查能力，旧版提示更新并重启，不影响原有 UI 导入。
 
 主进程取当前 `UIEditorWorkspace` 同级 `GameKitWorkspace` 的真实路径，按 Toolkit 的路径规范化 SHA-256 前 16 位工程 ID 匹配已运行且有 PlaceId 的工程；Windows 忽略路径大小写。明确匹配时直接上传，不要求选择工程；找不到匹配时才显示工程选择，不因只有一个其他工程或名称相同而自动上传。
 

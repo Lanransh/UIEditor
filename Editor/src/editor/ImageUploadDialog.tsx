@@ -1,22 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ImageUploadTask, ToolkitTarget } from '../shared/toolkit';
-import type { ImageAsset } from '../shared/imageAssets';
+import type { ImageUploadSource, ImageUploadTask, ToolkitTarget } from '../shared/toolkit';
 
 const connectionError = /无法连接|连接已失效|没有可用工程|Toolkit HTTP (401|403)/;
 
-export function ImageUploadDialog({ asset, saveId, onClose }: {
-  asset: ImageAsset; saveId(id: string): Promise<void>; onClose(): void;
+export function ImageUploadDialog({ image, saveId, onClose, initialTargetId = '', onTargetSelected, onUploaded, batchProgress }: {
+  image: ImageUploadSource; saveId(id: string): Promise<void>; onClose(): void;
+  initialTargetId?: string; onTargetSelected?(id: string): void; onUploaded?(): void; batchProgress?: { current: number; total: number };
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const alive = useRef(true), inFlight = useRef(false);
   const [targets, setTargets] = useState<ToolkitTarget[]>([]);
-  const [targetId, setTargetId] = useState('');
+  const [targetId, setTargetId] = useState(initialTargetId);
   const [needsSelection, setNeedsSelection] = useState(false);
   const [task, setTask] = useState<ImageUploadTask | null>(null);
   const [message, setMessage] = useState('正在识别同目录 Toolkit 工程…');
   const [error, setError] = useState('');
   const [reconnecting, setReconnecting] = useState(false);
   const [busy, setBusy] = useState(false), [saved, setSaved] = useState(false);
+  const completed = useRef(false);
   async function run(action: () => Promise<void>) {
     if (inFlight.current) return;
     inFlight.current = true; setBusy(true); setError('');
@@ -32,7 +33,10 @@ export function ImageUploadDialog({ asset, saveId, onClose }: {
   }
   async function persist(id: string) {
     await saveId(id);
-    if (alive.current) { setSaved(true); setMessage('上传成功，ID 已自动保存；目标游戏加载权限尚未验证。'); }
+    if (alive.current) {
+      setSaved(true); setMessage('上传成功，ID 已自动保存；目标游戏加载权限尚未验证。');
+      if (!completed.current) { completed.current = true; onUploaded?.(); }
+    }
   }
   async function accept(value: ImageUploadTask) {
     if (!alive.current) return;
@@ -41,7 +45,7 @@ export function ImageUploadDialog({ asset, saveId, onClose }: {
     if (value.status === 'succeeded') await persist(value.robloxId!);
   }
   async function submit(id: string) {
-    const result = await window.toolkit.uploadImage(id, asset.id);
+    const result = await window.toolkit.uploadImage(id, image);
     if (!result.ok) throw new Error(result.error);
     await accept(result.value);
   }
@@ -52,7 +56,7 @@ export function ImageUploadDialog({ asset, saveId, onClose }: {
     setTargets(result.value.targets);
     const id = targetId || result.value.automaticTargetId;
     if (id && !result.value.targets.some(target => target.id === id)) throw new Error('目标工程连接已失效，等待工程重新连接。');
-    setTargetId(id); setNeedsSelection(!id);
+    setTargetId(id); onTargetSelected?.(id); setNeedsSelection(!id);
     if (!result.value.targets.length) throw new Error('没有可用工程，请在 Toolkit 打开游戏工程并配置 PlaceId。');
     setReconnecting(false);
     if (task) {
@@ -93,11 +97,12 @@ export function ImageUploadDialog({ asset, saveId, onClose }: {
   }, [task, targetId, error]);
   const waiting = !!task && ['processing', 'waiting_review'].includes(task.status);
   return <dialog ref={dialog} className="new-interface-dialog" aria-labelledby="image-upload-title"
-    onCancel={event => { if (busy) event.preventDefault(); else onClose(); }}>
+    onCancel={event => { event.stopPropagation(); if (busy) event.preventDefault(); else onClose(); }}>
     <h2 id="image-upload-title">上传图片到 Roblox</h2>
-    <p>图片：{asset.name}。使用 Toolkit 工程的上传配置，单张最多 8 MiB；动画只上传第一帧。</p>
+    <p>图片：{image.name}。使用 Toolkit 工程的上传配置，单张最多 8 MiB；动画只上传第一帧。</p>
+    {batchProgress && <p>批量上传 {batchProgress.current}/{batchProgress.total}</p>}
     {needsSelection && !task ? <label>目标游戏工程<select aria-label="图片上传目标工程" value={targetId}
-      disabled={busy || !!task} onChange={event => setTargetId(event.target.value)}>
+      disabled={busy || !!task} onChange={event => { setTargetId(event.target.value); onTargetSelected?.(event.target.value); }}>
       <option value="">选择工程</option>{targets.map(target => <option key={target.id} value={target.id}>{target.name} · PlaceId {target.placeId}</option>)}
     </select></label> : targetId && <p>目标工程：{targets.find(target => target.id === targetId)?.name}</p>}
     <p role="status">{message}</p>

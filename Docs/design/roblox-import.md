@@ -2,7 +2,7 @@
 
 ## 使用流程
 
-在 StudioGameToolkit 打开包含 `Game/default.project.json` 的目标工程，在项目设置填写 PlaceId；Studio 打开同一地图，使用更新后的 Toolkit 插件。UIEditor 的「文件 → 导入 Roblox」选择工程，提交当前编辑快照，不要求先保存。导入不写入文档历史，也不使用运行副本。
+在 StudioGameToolkit 打开包含 `Game/default.project.json` 的目标工程，在项目设置填写 PlaceId；Studio 打开同一地图，使用更新后的 Toolkit 插件。UIEditor 的「文件 → 导入 Roblox」先检查当前界面图片。若有仅本地预览、缺少 Roblox ID 的图片，导入暂停并显示图片清单，列出图片名称与节点路径；可单张上传，也可全部按顺序上传。上传成功后，图片资产的 ID 保存到资产库，内联预览图的 ID 保存到对应节点并进入文档历史。失败、审核未完成或 ID 未保存的图片继续阻止导入。所有图片就绪后再发现并选择目标工程，用户点击导入后提交当前编辑快照，不要求先保存。导入操作本身不写入文档历史，也不使用运行副本。
 
 UIEditor 主进程连接固定本机桥接 `127.0.0.1:34871`。工程令牌只留在主进程，渲染进程只得到工程名称、ID 和 PlaceId。更新 Toolkit 后需重启后台；Toolkit 自动更新插件后需重新打开 Studio。
 
@@ -58,7 +58,7 @@ return Business
 
 ## 校验与重复更新
 
-导入拒绝同级重名、非法节点名、非整数 Offset、只有本地预览的图片和无效资源引用。Scale/Offset 保留，颜色/向量转换为 Rojo 类型；渐变转换为 ColorSequence/NumberSequence；静态模型补齐 BorderSizePixel=0、IgnoreGuiInset=true、ResetOnSpawn=false。预览 Data URL 不导入，不自动上传图片。
+导入拒绝同级重名、非法节点名、非整数 Offset、只有本地预览的图片和无效资源引用。UIEditor 导入对话框在提交前处理缺少 Roblox ID 的预览图；图片上传仍需用户显式发起，批量上传逐张等待成功并保存 ID。Scale/Offset 保留，颜色/向量转换为 Rojo 类型；渐变转换为 ColorSequence/NumberSequence；静态模型补齐 BorderSizePixel=0、IgnoreGuiInset=true、ResetOnSpawn=false。预览 Data URL 不导入 Roblox 包。
 
 Toolkit 校验包结构、节点数量与深度、类继承关系和目标映射，再构建 UI 与类模块。交互模块直接平铺在 Generated 下，以模块元数据记录文档归属。脚本只更新同一文档的生成模块，保留其他界面和手工文件；重新导入会迁移旧界面子目录并移除旧模拟模块，旧目录中存在手工文件时拒绝迁移；不同界面不能使用重复类名；不覆盖游戏框架、业务类或入口。同名 ScreenGui 直接完整替换，包括仍由游戏 Rojo 管理或属于其他来源的界面；旧实例保留用于 Studio 撤销。非 ScreenGui 或多个匹配目标仍拒绝覆盖；StarterGui 必须保留未知实例。导入不改写游戏 UI 源文件或 Rojo 映射，之后同步旧源文件仍可能恢复旧 UI。已有文档导入后保持根名稳定。
 

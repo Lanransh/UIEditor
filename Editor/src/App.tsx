@@ -244,7 +244,9 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
       </details>
     </header>
     {creatingInterface && <NewInterfaceDialog onCancel={() => setCreatingInterface(false)} onCreate={name => { setCreatingInterface(false); void editor.newDocument(name); }} />}
-    {importingRoblox && <RobloxImportDialog document={editor.document} onClose={() => setImportingRoblox(false)} />}
+    {importingRoblox && <RobloxImportDialog document={editor.document} imageAssets={editor.imageAssets}
+      saveAssetId={async (id, robloxId) => { await editor.configureImageRobloxId(id, robloxId); }}
+      assignNodeIds={editor.assignRobloxImageId} onClose={() => setImportingRoblox(false)} />}
     {editor.error && <div className="editor-error" role="alert">{editor.error}</div>}
     <div className="workspace-content" ref={content}>
     <div className="workspace-body">

@@ -8,7 +8,7 @@ import { projectStrategy } from './roblox';
 import { deleteNode, documentCommand, duplicateNode, insertNode, pasteNode, reparentNode } from './commands';
 import { useRuntime } from './useRuntime';
 import { useAutomation } from './useAutomation';
-import { applyImageAsset, resolveImageAssets, type ImageAsset, type ImageAssetUpdate, type ImageLibrary } from '../shared/imageAssets';
+import { applyImageAsset, normalizeRobloxId, resolveImageAssets, type ImageAsset, type ImageAssetUpdate, type ImageLibrary } from '../shared/imageAssets';
 
 declare global { interface Window { documents: DocumentAPI } }
 
@@ -73,6 +73,22 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
         void runtime.setProperty(id, property, value);
       } catch (cause) { setError(cause instanceof Error ? cause.message : '编辑失败'); }
     } else editNode(id, node => property === 'Name' ? { ...node, name: value as string } : { ...node, properties: { ...node.properties, [property]: value } }, property === 'Name' ? '节点改名' : '修改属性');
+  }
+  function assignRobloxImageId(nodeIds: string[], robloxId: string) {
+    if (!hasDocument || operating.current || runtime.active) throw new Error('当前不能更新图片节点。');
+    const imageId = normalizeRobloxId(robloxId);
+    if (!imageId) throw new Error('上传资源 ID 无效。');
+    try {
+      history.execute(documentCommand('保存 Roblox 图片 ID', value => {
+        let root = value.root;
+        for (const id of nodeIds) root = updateNode(root, id, node => ({ ...node, properties: { ...node.properties, Image: imageId } }));
+        return { ...value, root };
+      }, strategy));
+      setError('');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '图片 ID 保存失败');
+      throw cause;
+    }
   }
   async function save(saveAs = false, projectUI = false): Promise<boolean> {
     if (!hasDocument) return false;
@@ -225,7 +241,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   }
   const editor = { projectId: project.manifest.id, projectName: project.name, projectPath: project.path, strategy, document, inspectionDocument, inspectionBusy: busy || assetsLoading || (runtime.active && !runtime.ready), hasDocument, history, selected, select, editNode, editProperty, execute, add, reparent, pickImage,
     inspectedAssetId, inspectAsset, clearAssetInspection, setAssetConfigurationDirty,
-    imageAssets, inspectImages: () => liveImageAssets.current, assetsLoading, refreshImages, configureImage, configureImageRobloxId, importImage, useImage,
+    imageAssets, inspectImages: () => liveImageAssets.current, assetsLoading, refreshImages, configureImage, configureImageRobloxId, assignRobloxImageId, importImage, useImage,
     location: documentLocation(project.path, path), newDocument, openDocument, openTemplate, saveTemplate, moveAsset, save: (saveAs = false) => run(async () => { await save(saveAs); }),
     saveProjectUI: () => run(async () => { await save(false, true); }), back, dirty, path, error, busy: busy || runtime.active || assetsLoading, runtime };
   useAutomation(editor, { reset, saved: () => fileState.current.saved, path: () => fileState.current.path, busy: value => { operating.current = value; setBusy(value); }, markSaved: (value, file) => { fileState.current = { path: file, saved: JSON.stringify(value) }; setPath(file); setSaved(fileState.current.saved); } });

@@ -2,7 +2,7 @@ import { uiEditorCompSource } from '../src/shared/uiCompClass';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { robloxStrategy as strategy } from '../src/editor/roblox';
-import { createRobloxImportPackage } from '../src/shared/robloxImport';
+import { createRobloxImportPackage, findUnconfiguredRobloxImages } from '../src/shared/robloxImport';
 
 test('import preserves node paths, scripts, scale/offset and gradient sequences without changing the document', () => {
   const document = strategy.createDocument('Rewards'); document.root.name = 'RewardsUI';
@@ -35,6 +35,24 @@ test('import rejects ambiguous paths, local-only pictures and fractional offsets
   assert.throws(() => createRobloxImportPackage(document), /本地预览/);
   document.root.children[0].properties.Image = 'rbxassetid://123';
   assert.equal(JSON.stringify(createRobloxImportPackage(document)).includes('data:image'), false);
+});
+
+test('image preflight groups repeated asset and inline previews and reports node paths', () => {
+  const document = strategy.createDocument('Rewards'); document.root.name = 'RewardsUI';
+  const previewImage = { name: 'training.png', dataUrl: 'data:image/png;base64,AAAA' };
+  const first = strategy.createNode('ImageLabel'); first.name = 'TrainingIcon'; first.imageAssetId = 'training'; first.previewImage = previewImage;
+  const repeated = strategy.createNode('ImageButton'); repeated.name = 'TrainingButton'; repeated.imageAssetId = 'training'; repeated.previewImage = previewImage;
+  const inline = strategy.createNode('ImageLabel'); inline.name = 'InlineIcon'; inline.previewImage = previewImage;
+  document.root.children.push(first, repeated, inline);
+  const assets = [{ id: 'training', platform: 'roblox' as const, library: 'project' as const, name: 'TrainingIcon', tags: '', previewImage, robloxId: '', usage: 'image' as const }];
+  const missing = findUnconfiguredRobloxImages(document, assets);
+  assert.equal(missing.length, 2);
+  assert.deepEqual(missing[0].nodePaths, ['RewardsUI.TrainingIcon', 'RewardsUI.TrainingButton']);
+  assert.equal(missing[0].assetId, 'training');
+  assert.deepEqual(missing[1].nodePaths, ['RewardsUI.InlineIcon']);
+  assert.equal(missing[1].assetId, undefined);
+  first.properties.Image = 'rbxassetid://123';
+  assert.equal(findUnconfiguredRobloxImages(document, assets)[0].nodePaths.length, 1);
 });
 
 test('import enables automatic localization on root and visual descendants only', () => {

@@ -357,10 +357,15 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     handle('toolkit:discover', async () => toolkit.discover());
     handle('toolkit:image-targets', async () => toolkit.imageTargets(requireProject().path));
     handle('toolkit:image-upload', async argument => {
-      const value = argument as { targetId: string; assetId: string };
-      const asset = (await imageStore().list()).find(asset => asset.id === value.assetId);
-      if (!asset) throw new Error('图片资产不存在。');
-      return toolkit.uploadImage(value.targetId, asset.name, asset.previewImage.dataUrl);
+      const value = argument as { targetId: string; image: { assetId?: string; name: string; dataUrl?: string } };
+      if (!value || typeof value.targetId !== 'string' || !value.image || typeof value.image !== 'object') throw new Error('图片上传参数无效。');
+      if (value.image.assetId !== undefined) {
+        const asset = (await imageStore().list()).find(asset => asset.id === value.image.assetId);
+        if (!asset) throw new Error('图片资产不存在。');
+        return toolkit.uploadImage(value.targetId, asset.name, asset.previewImage.dataUrl);
+      }
+      if (typeof value.image.dataUrl !== 'string') throw new Error('图片内容无效。');
+      return toolkit.uploadImage(value.targetId, value.image.name, value.image.dataUrl);
     });
     handle('toolkit:image-task', async argument => {
       requireProject();

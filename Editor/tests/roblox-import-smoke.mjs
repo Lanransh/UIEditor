@@ -20,12 +20,27 @@ try {
   }, url);
   const page = await created; page.setDefaultTimeout(10000);
   const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.getByRole('button', { name: '全部上传（2）' }).waitFor();
+  assert.equal(await page.getByRole('button', { name: '导入 UI 和脚本' }).count(), 0);
+  await page.getByRole('button', { name: '上传 TrainingIcon' }).click();
+  await page.getByRole('status').getByText('上传成功，ID 已自动保存；目标游戏加载权限尚未验证。', { exact: true }).waitFor();
+  assert.deepEqual(await page.evaluate(() => window.importQA.uploaded), ['TrainingIcon']);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: '全部上传（1）' }).click();
+  await page.locator('select[aria-label="目标游戏工程"]').waitFor();
+  await page.waitForFunction(() => window.importQA.uploaded.length === 2);
+  assert.deepEqual(await page.evaluate(() => window.importQA.uploaded), ['TrainingIcon', 'MoneyIcon']);
   await page.getByRole('button', { name: '导入 UI 和脚本' }).waitFor();
   await page.waitForFunction(() => document.querySelector('select').value === 'game');
   await page.getByRole('button', { name: '导入 UI 和脚本' }).click();
   await page.getByRole('status').getByText('等待 Studio 回执', { exact: true }).waitFor();
   assert.equal(await page.evaluate(() => window.importQA.submitted), 1);
   assert.equal(await page.getByRole('button', { name: '关闭', exact: true }).count(), 0);
+  await page.evaluate(() => { window.importQA.targetAvailable = false; });
+  await page.getByRole('button', { name: '刷新连接' }).click();
+  await page.getByRole('alert').getByText('目标工程连接已失效，请重新连接原工程。', { exact: true }).waitFor();
+  await page.evaluate(() => { window.importQA.targetAvailable = true; });
+  await page.getByRole('button', { name: '刷新连接' }).click();
   await page.evaluate(() => { window.importQA.failTask = true; });
   await page.getByRole('alert').getByText('连接已失效', { exact: true }).waitFor();
   await page.evaluate(() => { window.importQA.failTask = false; window.importQA.succeed(); });
@@ -35,11 +50,13 @@ try {
   await page.getByText('已关闭', { exact: true }).waitFor();
   await page.reload();
   await page.waitForFunction(() => !!window.importQA);
+  await page.getByRole('button', { name: '全部上传（2）' }).click();
+  await page.locator('select[aria-label="目标游戏工程"]').waitFor();
   await page.evaluate(() => { window.importQA.failDiscovery = true; });
   await page.getByRole('button', { name: '刷新连接' }).click();
   await page.getByRole('alert').getByText('后台未启动', { exact: true }).waitFor();
   assert.deepEqual(errors, []);
-  console.log('Roblox import dialog: target selection, submission, receipt, connection failure and close passed');
+  console.log('Roblox import dialog: image preflight, single and batch upload, target selection, submission, receipt, connection failure and close passed');
 } finally {
   if (app) { await app.evaluate(({ app }) => app.exit()).catch(() => {}); await app.close(); }
   await server.close();

@@ -118,7 +118,7 @@ export function ImageAssetProperties({ editor, asset }: { editor: DocumentEditor
         {message && <p role="status">{message}</p>}
       </div>
     </fieldset>
-    {uploadOpen && <ImageUploadDialog asset={asset} onClose={() => setUploadOpen(false)} saveId={async id => {
+    {uploadOpen && <ImageUploadDialog image={{ assetId: asset.id, name: asset.name }} onClose={() => setUploadOpen(false)} saveId={async id => {
       await editor.configureImageRobloxId(asset.id, id);
       setRobloxId(id); setMessage('上传成功，ID 已自动保存。');
     }} />}

@@ -202,8 +202,19 @@ svg { flex-shrink: 0; }
 .script-code { position: relative; }
 .script-code > .monaco-editor { position: absolute; inset: 0; }
 .new-interface-dialog { width: 460px; border: 1px solid #cedbda; border-radius: 8px; padding: 24px; color: #263a3a; }
+.roblox-import-dialog { width: min(660px, calc(100vw - 48px)); max-height: calc(100vh - 40px); overflow: auto; }
 .new-interface-dialog::backdrop { background: #263a3a55; }
 .new-interface-dialog h2 { margin: 0 0 20px; font-size: 18px; }
+.roblox-import-images h3 { margin: 0 0 8px; font-size: 15px; }
+.roblox-import-images > p { margin: 0 0 12px; }
+.roblox-import-missing-list { display: flex; flex-direction: column; gap: 8px; max-height: 340px; overflow: auto; }
+.roblox-import-missing-image { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 8px; border: 1px solid #d4dedf; border-radius: 6px; }
+.roblox-import-missing-image img { width: 52px; height: 52px; flex: 0 0 52px; object-fit: contain; background: repeating-conic-gradient(#e5eceb 0% 25%, #f6f8f8 0% 50%) 50% / 12px 12px; }
+.roblox-import-missing-image div { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 3px; }
+.roblox-import-missing-image strong, .roblox-import-missing-image small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.roblox-import-missing-image small { color: #62716e; }
+.roblox-import-missing-image span { color: #a45a2a; font-size: 11px; }
+.roblox-import-missing-image button { border: 1px solid #cedbda; border-radius: 4px; background: white; color: inherit; padding: 6px 12px; }
 .new-interface-dialog label { display: flex; flex-direction: column; gap: 8px; }
 .new-interface-dialog input { padding: 8px; border: 1px solid #cedbda; border-radius: 4px; }
 .template-source-options { margin: 0; padding: 0; border: 0; min-width: 0; }

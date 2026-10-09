@@ -212,7 +212,7 @@ try {
     });
     const snapshot = { taskId: 'a'.repeat(32), status: 'processing', message: '处理中', pollAfterMs: 3000 };
     ipcMain.handle('toolkit:image-upload', (_, value) => {
-      if (value.assetId !== 'builtin:roblox:stud' || ![id, 'other'].includes(value.targetId)) throw new Error('Wrong upload request');
+      if (value.image?.assetId !== 'builtin:roblox:stud' || ![id, 'other'].includes(value.targetId)) throw new Error('Wrong upload request');
       globalThis.uploadQA.submissions++; globalThis.uploadQA.queries = 0;
       return { ok: true, value: snapshot };
     });

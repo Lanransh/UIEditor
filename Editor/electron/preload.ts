@@ -73,7 +73,7 @@ contextBridge.exposeInMainWorld('automation', {
 
 contextBridge.exposeInMainWorld('toolkit', {
   imageTargets: () => ipcRenderer.invoke('toolkit:image-targets'),
-  uploadImage: (targetId: string, assetId: string) => ipcRenderer.invoke('toolkit:image-upload', { targetId, assetId }),
+  uploadImage: (targetId: string, image: import('../src/shared/toolkit').ImageUploadSource) => ipcRenderer.invoke('toolkit:image-upload', { targetId, image }),
   imageTask: (targetId: string, taskId: string) => ipcRenderer.invoke('toolkit:image-task', { targetId, taskId }),
   discover: () => ipcRenderer.invoke('toolkit:discover'),
   submit: (targetId: string, document: unknown) => ipcRenderer.invoke('toolkit:submit', { targetId, document }),

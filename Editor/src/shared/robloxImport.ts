@@ -1,6 +1,7 @@
 import { uiEditorCompSource } from './uiCompClass';
 import { nodeDefinitions, robloxStrategy } from '../editor/roblox';
-import type { JSONValue, PropertyValue, UDim, UDim2, UINode, Vector2 } from './uiDocument';
+import type { JSONValue, PropertyValue, UDim, UDim2, UIDocument, UINode, Vector2 } from './uiDocument';
+import type { ImageAsset } from './imageAssets';
 
 export interface RobloxImportPackage {
   format: 'ui-editor-import'; version: 1; documentId: string;
@@ -9,6 +10,30 @@ export interface RobloxImportPackage {
 export interface RobloxModel {
   name: string; className: string; properties: Record<string, JSONValue>;
   attributes: Record<string, JSONValue>; children: RobloxModel[];
+}
+export interface UnconfiguredRobloxImage {
+  key: string; name: string; dataUrl: string; assetId?: string; nodeIds: string[]; nodePaths: string[];
+}
+export function findUnconfiguredRobloxImages(document: UIDocument, assets: ImageAsset[]): UnconfiguredRobloxImage[] {
+  const assetIndex = new Map(assets.map(asset => [asset.id, asset]));
+  const images = new Map<string, UnconfiguredRobloxImage>();
+  function visit(node: UINode, path: string) {
+    if (node.className.startsWith('Image') && node.previewImage && !node.properties.Image) {
+      const asset = node.imageAssetId ? assetIndex.get(node.imageAssetId) : undefined;
+      const groupKey = node.imageAssetId ? `asset:${node.imageAssetId}` : `preview:${node.previewImage.dataUrl}`;
+      let image = images.get(groupKey);
+      if (!image) {
+        const preview = asset?.previewImage ?? node.previewImage;
+        image = { key: node.imageAssetId ? `asset:${node.imageAssetId}` : `preview:${node.id}`, name: asset?.name ?? preview.name, dataUrl: preview.dataUrl,
+          ...(asset ? { assetId: asset.id } : {}), nodeIds: [], nodePaths: [] };
+        images.set(groupKey, image);
+      }
+      image.nodeIds.push(node.id); image.nodePaths.push(path);
+    }
+    node.children.forEach(child => visit(child, `${path}.${child.name}`));
+  }
+  visit(document.root, document.root.name);
+  return [...images.values()];
 }
 const rgb = (value: string) => [1, 3, 5].map(index => parseInt(value.slice(index, index + 2), 16) / 255);
 function udim(value: UDim, path: string): number[] {

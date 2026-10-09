@@ -9,6 +9,7 @@ export interface ImageUploadTask {
   pollAfterMs: number;
   robloxId?: string;
 }
+export type ImageUploadSource = { assetId: string; name: string } | { name: string; dataUrl: string };
 export interface ImageUploadTargets { targets: ToolkitTarget[]; automaticTargetId: string }
 export interface RobloxImportTask {
   id: string; deliveryId: string; name: string;
@@ -17,7 +18,7 @@ export interface RobloxImportTask {
 }
 export interface ToolkitAPI {
   imageTargets(): Promise<Result<ImageUploadTargets>>;
-  uploadImage(targetId: string, assetId: string): Promise<Result<ImageUploadTask>>;
+  uploadImage(targetId: string, image: ImageUploadSource): Promise<Result<ImageUploadTask>>;
   imageTask(targetId: string, taskId: string): Promise<Result<ImageUploadTask>>;
   discover(): Promise<Result<ToolkitTarget[]>>;
   submit(targetId: string, document: UIDocument): Promise<Result<RobloxImportTask>>;

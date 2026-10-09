@@ -46,6 +46,6 @@ const asset: ImageAsset = { id: 'icon', platform: 'roblox', library: 'project', 
 function Fixture() {
   const [open, setOpen] = useState(true);
   return <><button onClick={() => setOpen(false)}>卸载测试弹窗</button>{open ?
-    <ImageUploadDialog asset={asset} saveId={async id => { state.saved = id; }} onClose={() => setOpen(false)} /> : <p>已关闭</p>}</>;
+    <ImageUploadDialog image={{ assetId: asset.id, name: asset.name }} saveId={async id => { state.saved = id; }} onClose={() => setOpen(false)} /> : <p>已关闭</p>}</>;
 }
 createRoot(document.getElementById('root')!).render(<Fixture />);
