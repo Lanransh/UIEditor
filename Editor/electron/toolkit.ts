@@ -40,7 +40,7 @@ export class ToolkitClient {
       headers: { ...(payload === undefined ? {} : { 'Content-Type': 'application/json' }),
         ...(target ? { Authorization: `Bearer ${target.token}`, 'X-SGT-Place-Id': target.placeId } : {}) },
       body: payload === undefined ? undefined : JSON.stringify(payload),
-    }).catch(() => { this.retryConnection(); throw new Error('无法连接 StudioGameToolkit，请打开目标游戏工程并确认后台与 Rojo 已启动。'); });
+    }).catch(() => { this.retryConnection(); throw new Error('无法连接 StudioGameToolkit，请打开目标游戏工程并确认后台已启动，并在 Studio 安装 Toolkit 插件。'); });
     const content = await response.text();
     if (content.length > 256 * 1024) throw new Error('Toolkit 响应过大。');
     const value = JSON.parse(content);
@@ -59,9 +59,9 @@ export class ToolkitClient {
     return this.discovery;
   }
   private async discoverTargets(): Promise<ToolkitTarget[]> {
-    const value = await this.exchange('/discover') as { uiEditorImport?: unknown; uiEditorImageUpload?: unknown; projects?: unknown };
+    const value = await this.exchange('/discover') as { protocol?: unknown; uiEditorImport?: unknown; uiEditorImageUpload?: unknown; projects?: unknown };
     this.imageUploadSupported = value.uiEditorImageUpload === 1;
-    if (value.uiEditorImport !== 1 || !Array.isArray(value.projects)) throw new Error('请更新并重启 StudioGameToolkit，当前服务不支持 UIEditor 导入。');
+    if (value.protocol !== 3 || value.uiEditorImport !== 1 || !Array.isArray(value.projects)) throw new Error('请更新并重启 StudioGameToolkit，当前服务不支持 UIEditor 导入。');
     const targets = value.projects as TargetConnection[];
     if (targets.some(target => !target || typeof target.id !== 'string' || typeof target.name !== 'string' || typeof target.token !== 'string' || typeof target.placeId !== 'string')) throw new Error('Toolkit 工程信息无效。');
     this.targets = new Map(targets.filter(target => /^[1-9][0-9]*$/.test(target.placeId)).map(target => [target.id, target]));
