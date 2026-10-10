@@ -3,6 +3,7 @@ import { createServer } from 'vite';
 import { mkdir, mkdtemp } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
+import { setTimeout as delay } from 'node:timers/promises';
 
 const output = resolve('test-results/roblox-import'); await mkdir(output, { recursive: true });
 const server = await createServer({ server: { port: 0 } }); await server.listen();
@@ -12,7 +13,12 @@ const env = { ...process.env, UI_EDITOR_BACKGROUND: '1', UI_EDITOR_USER_DATA: aw
 let app;
 try {
   app = await electron.launch({ args: ['.'], env });
-  await app.firstWindow();
+  let terminalErrors = '';
+  app.process().stderr.on('data', chunk => { terminalErrors += chunk.toString(); });
+  const mainPage = await app.firstWindow();
+  await mainPage.evaluate(() => console.error('[Roblox Import] 测试启动终端错误转发'));
+  for (let attempt = 0; attempt < 50 && !terminalErrors.includes('[Roblox Import] 测试启动终端错误转发'); attempt++) await delay(100);
+  assert.ok(terminalErrors.includes('[Roblox Import] 测试启动终端错误转发'));
   const created = app.waitForEvent('window');
   await app.evaluate(async ({ BrowserWindow }, url) => {
     const window = new BrowserWindow({ show: false, width: 900, height: 700, webPreferences: { sandbox: true } });
@@ -20,6 +26,7 @@ try {
   }, url);
   const page = await created; page.setDefaultTimeout(10000);
   const errors = []; page.on('pageerror', error => errors.push(error.message));
+  const importErrors = []; page.on('console', message => { if (message.type() === 'error' && message.text().startsWith('[Roblox Import]')) importErrors.push(message.text()); });
   await page.getByRole('button', { name: '全部上传（2）' }).waitFor();
   assert.equal(await page.getByRole('button', { name: '导入 UI 和脚本' }).count(), 0);
   await page.getByRole('button', { name: '上传 TrainingIcon' }).click();
@@ -32,6 +39,12 @@ try {
   assert.deepEqual(await page.evaluate(() => window.importQA.uploaded), ['TrainingIcon', 'MoneyIcon']);
   await page.getByRole('button', { name: '导入 UI 和脚本' }).waitFor();
   await page.waitForFunction(() => document.querySelector('select').value === 'game');
+  await page.evaluate(() => { window.importQA.failSubmit = true; });
+  await page.getByRole('button', { name: '导入 UI 和脚本' }).click();
+  await page.getByRole('alert').getByText('导入失败：测试提交错误', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('alert').evaluate(element => getComputedStyle(element).color), 'rgb(198, 40, 40)');
+  assert.ok(importErrors.some(message => message.includes('RewardsUI') && message.includes('导入失败：测试提交错误')));
+  await page.evaluate(() => { window.importQA.failSubmit = false; });
   await page.getByRole('button', { name: '导入 UI 和脚本' }).click();
   await page.getByRole('status').getByText('等待 Studio 回执', { exact: true }).waitFor();
   assert.equal(await page.evaluate(() => window.importQA.submitted), 1);
@@ -43,6 +56,14 @@ try {
   await page.getByRole('button', { name: '刷新连接' }).click();
   await page.evaluate(() => { window.importQA.failTask = true; });
   await page.getByRole('alert').getByText('连接已失效', { exact: true }).waitFor();
+  await delay(2200);
+  assert.equal(importErrors.filter(message => message.endsWith('；连接已失效')).length, 1);
+  await page.evaluate(() => { window.importQA.failTask = false; window.importQA.failReceipt(); });
+  await page.getByRole('alert').getByText('Studio 导入失败：测试回执', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('alert').evaluate(element => getComputedStyle(element).color), 'rgb(198, 40, 40)');
+  assert.ok(importErrors.some(message => message.includes('Studio 导入失败：测试回执')));
+  await page.getByRole('button', { name: '重新投递 UI' }).click();
+  await page.getByRole('status').getByText('等待 Studio 回执', { exact: true }).waitFor();
   await page.evaluate(() => { window.importQA.failTask = false; window.importQA.succeed(); });
   await page.getByRole('status').getByText('UI 已导入 Studio', { exact: true }).waitFor();
   await page.screenshot({ path: resolve(output, 'succeeded.png') });
@@ -56,7 +77,7 @@ try {
   await page.getByRole('button', { name: '刷新连接' }).click();
   await page.getByRole('alert').getByText('后台未启动', { exact: true }).waitFor();
   assert.deepEqual(errors, []);
-  console.log('Roblox import dialog: image preflight, single and batch upload, target selection, submission, receipt, connection failure and close passed');
+  console.log('Roblox import dialog: image preflight, submission and receipt failures in red with console logs, retry, connection failure and close passed');
 } finally {
   if (app) { await app.evaluate(({ app }) => app.exit()).catch(() => {}); await app.close(); }
   await server.close();

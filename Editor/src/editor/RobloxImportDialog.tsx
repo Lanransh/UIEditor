@@ -26,6 +26,10 @@ export function RobloxImportDialog({ document, imageAssets, saveAssetId, assignN
   const inFlight = useRef(false);
   const missingImages = findUnconfiguredRobloxImages(document, imageAssets);
   const imagesReady = missingImages.length === 0;
+  const failure = error || (task?.status === 'failed' ? task.message : '');
+  useEffect(() => {
+    if (failure) console.error(`[Roblox Import] 界面：${snapshot?.root.name ?? document.root.name}；目标：${targetId || '未选择'}；${failure}`);
+  }, [failure]);
 
   async function run(action: () => Promise<void>) {
     if (inFlight.current) return;
@@ -107,8 +111,8 @@ export function RobloxImportDialog({ document, imageAssets, saveAssetId, assignN
         <option value="">选择工程</option>{targets.map(target => <option key={target.id} value={target.id}>{target.name} · PlaceId {target.placeId}</option>)}
       </select></label>
       <p>交互类继承公共 CUIEditorUICompClass，公共类继承 FCUICompClass。生成脚本放在 Client/UI/Generated，游戏业务类与启动入口保持独立。</p>
-      {task && <div className="new-interface-classes" role="status"><span>{task.message}</span><span>交互类：{task.sourceClass}</span><span>脚本：{task.scriptPath}</span></div>}
-      {error && <p role="alert">{error}</p>}
+      {task && <div className="new-interface-classes" role="status">{task.status !== 'failed' && <span>{task.message}</span>}<span>交互类：{task.sourceClass}</span><span>脚本：{task.scriptPath}</span></div>}
+      {failure && <p className="roblox-import-error" role="alert">{failure}</p>}
       <div className="new-interface-actions">
         <button disabled={busy} onClick={() => void run(discover)}>刷新连接</button>
         {(waiting || task?.status === 'failed') && <button disabled={busy} onClick={() => void run(() => control('retry'))}>重新投递 UI</button>}

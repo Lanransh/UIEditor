@@ -1,4 +1,18 @@
 {
   "version": 2,
-  "assets": []
+  "assets": [
+    {
+      "id": "builtin:roblox:placeholder",
+      "platform": "roblox",
+      "library": "permanent",
+      "name": "问号占位图",
+      "tags": "placeholder 占位 问号 未配置",
+      "usage": "placeholder",
+      "previewImage": {
+        "name": "Placeholder.png",
+        "dataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAMkSURBVHhe7dyxahRRFIdxH9GnsLXQF1CwEsFKxEbBKmATsAk2kka0EAURhDRqE5v4CGP+koHNcHZzNzbO+b7i12hmU5xv78zc2c2N099nk7gMAM4A4AwAzgDgDADOAOAMAM4A4AwAzgDgDADOAOAMAM4A4AwAzgDgDADOAOAMAM4A4AwAzgDgDADOAOAMAM4A4AwAzgDgDADOAOAMAM4A4AwAzgDgDADOAOAMAM4A4AwADhPA91+n04evX6aj9++mgzdHl+Tf8n/5merYzloHcPzp4/Tk1cF068H96ead20PuPn40PX99OH37+aN8zW7aBZB3cd7V1XD3lXi6rwrtAqgG+a8+n5yUv6sDAxjUNQIDGJTriI6nAwPYQ64tqt+5Zgawp26rACqAe8+e/r3Fm+//H758Uf7cLrm1rH7vWrUPILdyu4aW+/3c+y+P2yYBVa+zVm0DyLt7dDMny/roZlFWkeo11qplANdZprMdvBx2xQD+c9fdws1x1cCXDKCxauBLBtBUdvqqgS/l2qI6fq0M4MLoNUC3zSADuJClvRr4UrdnAgZw7vD4bTnspdwqVsevGT6A0XN/5DRRvcaaoQPYZ/jdrv5n2AD2GX50/YgYMoDRK/5Ztwu/TbgAsk1cDXmbzsMPVAD7Lvvdhx+oAEYf++Z2jzD8wAQwet5PJN0/Cr4JE8DIu582/EAEMPqolzb8QASQ7/1VA9/UcZdvBCKAka+KVccRGMC5rtu8IxABXPW0zwCau+oawACay9V9NfhNxDuAQAQQOQ3M3wiqdH3adxVMAKoZABwugCz12fSZl/48Hqae/wMTQIa865O/7gQ2luGPPAzKilAd3xkigHxFvBp4hXY3gAigGvQ2tFXAABYMoKFq0Ntkw6h6ja68BljwGqAh7wK2QwQQiWDXXwWjLf0zTAAzdwIvwwWgywwAzgDgDADOAOAMAM4A4AwAzgDgDADOAOAMAM4A4AwAzgDgDADOAOAMAM4A4AwAzgDgDADOAOAMAM4A4AwAzgDgDADOAOAMAM4A4AwAzgDgDADOAOAMAM4A4AwAzgDgDADtbPoD9wjdHlyZdP0AAAAASUVORK5CYII="
+      },
+      "robloxId": "rbxassetid://86795093617566"
+    }
+  ]
 }

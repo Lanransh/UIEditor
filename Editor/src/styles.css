@@ -203,6 +203,7 @@ svg { flex-shrink: 0; }
 .script-code > .monaco-editor { position: absolute; inset: 0; }
 .new-interface-dialog { width: 460px; border: 1px solid #cedbda; border-radius: 8px; padding: 24px; color: #263a3a; }
 .roblox-import-dialog { width: min(660px, calc(100vw - 48px)); max-height: calc(100vh - 40px); overflow: auto; }
+.roblox-import-dialog .roblox-import-error { color: #c62828; white-space: pre-wrap; overflow-wrap: anywhere; }
 .new-interface-dialog::backdrop { background: #263a3a55; }
 .new-interface-dialog h2 { margin: 0 0 20px; font-size: 18px; }
 .roblox-import-images h3 { margin: 0 0 8px; font-size: 15px; }

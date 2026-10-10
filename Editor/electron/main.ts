@@ -122,7 +122,11 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     let automationReady = false;
     const pending = new Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
     const consoleLogs: { cursor: number; level: string; message: string }[] = []; let consoleCursor = 0;
-    window.webContents.on('console-message', (_event, level, message) => { consoleLogs.push({ cursor: ++consoleCursor, level: String(level), message: message.slice(0, 4096) }); if (consoleLogs.length > 500) consoleLogs.shift(); });
+    window.webContents.on('console-message', (_event, level, message) => {
+      consoleLogs.push({ cursor: ++consoleCursor, level: String(level), message: message.slice(0, 4096) });
+      if (consoleLogs.length > 500) consoleLogs.shift();
+      if (message.startsWith('[Roblox Import]')) console.error(message);
+    });
     function cancelAutomation() { automationReady = false; for (const item of pending.values()) { clearTimeout(item.timer); item.reject(new Error('编辑会话已关闭。')); } pending.clear(); }
     ipcMain.on('automation:ready', (event, ready) => { if (trusted(event)) { if (!ready) cancelAutomation(); else automationReady = true; } });
     ipcMain.handle('automation:reply', (event, reply) => {

@@ -13,7 +13,9 @@ const trainingAsset: ImageAsset = { id: 'training', platform: 'roblox', library:
 const training = robloxStrategy.createNode('ImageLabel'); training.name = 'TrainingIcon'; training.imageAssetId = trainingAsset.id; training.previewImage = trainingPreview; ui.root.children.push(training);
 const money = robloxStrategy.createNode('ImageLabel'); money.name = 'MoneyIcon'; money.previewImage = { name: 'MoneyIcon', dataUrl: 'data:image/png;base64,BBBB' }; ui.root.children.push(money);
 let current: RobloxImportTask = { id: 'a'.repeat(32), deliveryId: 'delivery', name: 'RewardsUI', status: 'awaiting_studio', message: '等待 Studio 回执', scriptPath: 'Client/UI/Generated/RewardsUI', sourceClass: 'CRewardsUIBaseCompClass' };
-const state = { submitted: 0, uploaded: [] as string[], received: null as UIDocument | null, failDiscovery: false, failTask: false, targetAvailable: true, succeed: () => { current = { ...current, status: 'succeeded', message: 'UI 已导入 Studio' }; } };
+const state = { submitted: 0, uploaded: [] as string[], received: null as UIDocument | null, failDiscovery: false, failSubmit: false, failTask: false, targetAvailable: true,
+  failReceipt: () => { current = { ...current, status: 'failed', message: 'Studio 导入失败：测试回执' }; },
+  succeed: () => { current = { ...current, status: 'succeeded', message: 'UI 已导入 Studio' }; } };
 (window as unknown as { importQA: typeof state }).importQA = state;
 window.toolkit = {
   imageTargets: async () => ({ ok: true, value: { targets: [{ id: 'game', name: 'Roblox_Y1', placeId: '123' }], automaticTargetId: 'game' } }),
@@ -25,6 +27,7 @@ window.toolkit = {
   imageTask: async () => ({ ok: false, error: '此测试不上传图片' }),
   discover: async () => state.failDiscovery ? { ok: false, error: '后台未启动' } : { ok: true, value: state.targetAvailable ? [{ id: 'game', name: 'Roblox_Y1', placeId: '123' }] : [{ id: 'other', name: 'Other', placeId: '456' }] },
   submit: async (target, document) => {
+    if (state.failSubmit) return { ok: false, error: '导入失败：测试提交错误' };
     if (target !== 'game' || document.root.name !== 'RewardsUI') throw new Error('Wrong snapshot');
     if (document.root.children.some(node => node.className.startsWith('Image') && !node.properties.Image)) throw new Error('Image IDs missing');
     state.received = document; state.submitted++; return { ok: true, value: { ...current } };
@@ -32,7 +35,7 @@ window.toolkit = {
   task: async (target, id, action) => {
     if (target !== 'game' || id !== current.id) throw new Error('Wrong task');
     if (action === 'cancel') current = { ...current, status: 'cancelled', message: '已取消等待' };
-    if (action === 'retry') current = { ...current, status: 'awaiting_studio' };
+    if (action === 'retry') current = { ...current, status: 'awaiting_studio', message: '等待 Studio 回执' };
     return state.failTask ? { ok: false, error: '连接已失效' } : { ok: true, value: { ...current } };
   },
 };
