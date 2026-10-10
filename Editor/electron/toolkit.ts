@@ -13,7 +13,26 @@ interface TargetConnection extends ToolkitTarget { token: string }
 export class ToolkitClient {
   private targets = new Map<string, TargetConnection>();
   private imageUploadSupported = false;
+  private connecting = false;
+  private retryTimer?: ReturnType<typeof setTimeout>;
+  private discovery?: Promise<ToolkitTarget[]>;
   constructor(private request: typeof fetch = fetch) {}
+  startConnection() {
+    if (this.connecting) return;
+    this.connecting = true;
+    void this.discover().catch(() => {});
+  }
+  stopConnection() {
+    this.connecting = false;
+    clearTimeout(this.retryTimer); this.retryTimer = undefined;
+  }
+  private retryConnection() {
+    if (!this.connecting || this.retryTimer) return;
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = undefined;
+      void this.discover().catch(() => {});
+    }, 5000);
+  }
   private async exchange(path: string, target?: TargetConnection, payload?: unknown): Promise<unknown> {
     const response = await this.request(bridge + path, {
       method: payload === undefined ? 'GET' : 'POST', redirect: 'error',
@@ -21,14 +40,25 @@ export class ToolkitClient {
       headers: { ...(payload === undefined ? {} : { 'Content-Type': 'application/json' }),
         ...(target ? { Authorization: `Bearer ${target.token}`, 'X-SGT-Place-Id': target.placeId } : {}) },
       body: payload === undefined ? undefined : JSON.stringify(payload),
-    }).catch(() => { throw new Error('无法连接 StudioGameToolkit，请打开目标游戏工程并确认后台与 Rojo 已启动。'); });
+    }).catch(() => { this.retryConnection(); throw new Error('无法连接 StudioGameToolkit，请打开目标游戏工程并确认后台与 Rojo 已启动。'); });
     const content = await response.text();
     if (content.length > 256 * 1024) throw new Error('Toolkit 响应过大。');
     const value = JSON.parse(content);
-    if (!response.ok) throw new Error(typeof value.error === 'string' ? value.error : `Toolkit HTTP ${response.status}`);
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403 || response.status >= 500 || /连接已失效/.test(value.error)) this.retryConnection();
+      throw new Error(typeof value.error === 'string' ? value.error : `Toolkit HTTP ${response.status}`);
+    }
     return value;
   }
-  async discover(): Promise<ToolkitTarget[]> {
+  discover(): Promise<ToolkitTarget[]> {
+    if (!this.discovery) this.discovery = this.discoverTargets().then(targets => {
+      clearTimeout(this.retryTimer); this.retryTimer = undefined;
+      if (!targets.length) this.retryConnection();
+      return targets;
+    }).catch(error => { this.retryConnection(); throw error; }).finally(() => { this.discovery = undefined; });
+    return this.discovery;
+  }
+  private async discoverTargets(): Promise<ToolkitTarget[]> {
     const value = await this.exchange('/discover') as { uiEditorImport?: unknown; uiEditorImageUpload?: unknown; projects?: unknown };
     this.imageUploadSupported = value.uiEditorImageUpload === 1;
     if (value.uiEditorImport !== 1 || !Array.isArray(value.projects)) throw new Error('请更新并重启 StudioGameToolkit，当前服务不支持 UIEditor 导入。');
@@ -39,7 +69,7 @@ export class ToolkitClient {
   }
   private target(id: string) {
     const target = this.targets.get(id);
-    if (!target) throw new Error('目标工程连接已失效，请刷新工程列表。');
+    if (!target) { this.retryConnection(); throw new Error('目标工程连接已失效，请刷新工程列表。'); }
     return target;
   }
   async imageTargets(workspace: string): Promise<ImageUploadTargets> {
@@ -61,6 +91,7 @@ export class ToolkitClient {
         (value as Record<string, unknown>).assetType !== 'Image' || (value as Record<string, unknown>).gameAccess !== 'not_verified'))) {
       throw new Error('Toolkit 图片上传任务响应无效。');
     }
+    if (task.status === 'failed' && /连接已失效/.test(task.message)) this.retryConnection();
     return { taskId: task.taskId, status: task.status, message: task.message, pollAfterMs: task.pollAfterMs,
       ...(task.status === 'succeeded' ? { robloxId: task.robloxId } : {}) };
   }

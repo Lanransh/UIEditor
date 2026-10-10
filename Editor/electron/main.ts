@@ -41,6 +41,9 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
   app.quit();
 } else {
   void app.whenReady().then(async () => {
+    const toolkit = new ToolkitClient();
+    toolkit.startConnection();
+    app.once('will-quit', () => toolkit.stopConnection());
     Menu.setApplicationMenu(null);
     const window = new BrowserWindow({
       width: 1200, height: 800, minWidth: 900, minHeight: 600,
@@ -353,7 +356,6 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     handle('project:list-recent', recentViews);
     handle('project:remove-recent', async path => { await recent.remove(await recent.resolveRecent(path)); return recentViews(); });
     const requireProject = () => { if (!activeProject) throw new Error('请先打开工程。'); return activeProject; };
-    const toolkit = new ToolkitClient();
     handle('toolkit:discover', async () => toolkit.discover());
     handle('toolkit:image-targets', async () => toolkit.imageTargets(requireProject().path));
     handle('toolkit:image-upload', async argument => {
