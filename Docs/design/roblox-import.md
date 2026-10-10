@@ -64,6 +64,8 @@ Toolkit 校验包结构、节点数量与深度、类继承关系和目标映射
 
 脚本先写入工程，UI 与生成类一起等待 Studio 回执；失败信息明确区分构建与投递。相同待完成包重发复用任务，旧回执不能完成新投递。连接变化后可刷新连接、重新投递；尚未领取的任务可取消等待，已生成脚本保留。只有 Studio 回执成功显示完成，用户仍需保存场景。
 
+Toolkit 以文档 ID 识别导入归属，复制 JSON 后只改根名称会与原界面冲突。遇到根名称修改错误时，应另存为不同路径的独立文档，再导入；另存为当前路径不会重建身份。另存为身份规则见 [保存与加载](roblox-ui.md#保存与加载)。
+
 ## 验证
 
 - `npx tsx --test tests/roblox-import.test.ts tests/toolkit.test.ts tests/script-templates.test.ts tests/runtime.test.ts`：转换、通信、公共类模板和 App 运行。

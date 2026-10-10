@@ -164,6 +164,18 @@ try {
   await page.waitForFunction(() => !document.querySelector('fieldset')?.disabled);
   assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), saved);
 
+  // Save As to another file creates an independent import identity, not a renamed original.
+  const copyFile = join(parent, 'UIEditorWorkspace', 'interfaces', '奖励副本.rbxui.json');
+  await dialogs(null, copyFile); await menu('另存为'); await dirty(false);
+  const copy = JSON.parse(await readFile(copyFile, 'utf8'));
+  assert.notEqual(copy.id, saved.id);
+  assert.deepEqual({ ...copy, id: saved.id }, saved);
+  assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), saved);
+  await input('Text', '副本修改'); await undo(); await dirty(false);
+  await dialogs(null, copyFile); await menu('保存'); await dirty(false);
+  assert.equal(JSON.parse(await readFile(copyFile, 'utf8')).id, copy.id);
+  await dialogs(file); await menu('打开界面'); await select('领取'); await dirty(false);
+
   // Pointer movement is converted through zoom; all move events form one command.
   await page.getByLabel('画布缩放').selectOption('0.5');
   const button = page.locator('[data-class-name="TextButton"]');

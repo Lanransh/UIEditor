@@ -499,7 +499,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       if ('projectUI' in argument && typeof argument.projectUI !== 'boolean') throw new Error('保存参数无效。');
       // The destination is issued by the main process, never by a renderer path.
       let path = documentPath;
-      const document = robloxStrategy.validate(argument.document);
+      let document = robloxStrategy.validate(argument.document);
       if ('projectUI' in argument && argument.projectUI) {
         path = join(project.path, 'interfaces', `${safeFileName(document.name)}.rbxui.json`);
         const exists = await stat(path).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });
@@ -521,6 +521,9 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
             if (answer.response !== 0) return null;
           }
         }
+      }
+      if ((documentPath || argument.saveAs) && (!documentPath || relative(documentPath, path) !== '')) {
+        document = { ...document, id: randomUUID() };
       }
       return saveBoundFile(path, document);
     });

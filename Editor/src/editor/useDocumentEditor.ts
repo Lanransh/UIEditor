@@ -95,6 +95,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
     const result = await window.documents.save(document, saveAs, projectUI);
     if (!result.ok) { setError(result.error); return false; }
     if (!result.value) return false;
+    if (result.value.document.id !== document.id) history.reset(result.value.document);
     fileState.current = { path: result.value.path, saved: JSON.stringify(result.value.document) };
     setPath(result.value.path); setSaved(JSON.stringify(result.value.document)); setError('');
     return true;
