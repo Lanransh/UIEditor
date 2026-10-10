@@ -172,7 +172,7 @@ ScrollingFrame 通过 CanvasSize 与 CanvasPosition 展示滚动区域，位置�
 
 交互类使用 FX.Class 继承 CUIView，负责通用展示与交互；测试接入子类继承交互类，提供临时配置、状态及动作入口，见 [运行规范](ui-runtime.md)。运行时可克隆已有模板子树并修改挂载关系，详见运行规范；不提供 Controller、任意 Roblox 服务、Instance.new 或热更新。
 
-## Roblox 导出与 Rojo
+## Roblox 节点导入与脚本同步
 
 文件菜单提供通过 Toolkit 的一次性导入，包含静态节点、交互基类和共用的公共基类；接入脚本仅用于编辑器预览，见 [Roblox 一次性导入](roblox-import.md)。
 
