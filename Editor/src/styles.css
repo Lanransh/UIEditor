@@ -93,9 +93,8 @@ svg { flex-shrink: 0; }
 .asset-context-menu button { width: 100%; padding: 8px 10px; border: 0; background: transparent; color: inherit; text-align: left; }
 .asset-context-menu button:hover { background: #e4f4f2; }
 .panel h2 { display: flex; align-items: center; gap: 8px; height: 43px; margin: 0; padding: 0 17px; border-bottom: 1px solid #e5eaea; font-size: 12px; font-weight: 600; }
-.node-tree-actions { display: flex; gap: 4px; margin-left: auto; }
-.node-tree-actions button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; }
-.node-tree-actions button:hover { background: #e4f4f2; color: var(--accent); }
+.node-tree-search { flex: 1; min-width: 0; width: 0; padding: 5px 7px; border: 1px solid #cedbda; border-radius: 4px; background: white; color: inherit; font: inherit; font-weight: 400; }
+.node-tree-search:focus { outline: 2px solid #76bab6; }
 .panel-empty { display: grid; justify-items: center; margin-top: 62px; color: #acb9b8; }
 .panel-empty p { margin: 14px 0 7px; color: #778887; font-size: 13px; }
 .panel-empty span { color: #99a5a4; font-size: 11px; }
