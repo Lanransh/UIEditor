@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
-import { ChevronsDownUp, ChevronsUpDown, Layers3 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { Layers3 } from 'lucide-react';
 import { allNodes, findParent, type PropertyValue, type UDim, type UDim2, type UINode, type Vector2 } from '../shared/uiDocument';
 import type { PropertyDefinition } from './strategy';
 import type { DocumentEditor } from './useDocumentEditor';
@@ -11,6 +11,23 @@ const nodeIcons = import.meta.glob<string>('../assets/roblox-node-icons/*.png', 
 
 export function NodeTree({ editor }: { editor: DocumentEditor }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState('');
+  const query = search.trim().toLowerCase();
+  const visible = useMemo(() => {
+    if (!query) return null;
+    const ids = new Set<string>();
+    function visit(node: UINode): boolean {
+      const childMatches = node.children.map(visit).some(Boolean);
+      const matches = node.name.toLowerCase().includes(query) || childMatches;
+      if (matches) ids.add(node.id);
+      return matches;
+    }
+    visit(editor.inspectionDocument.root);
+    return ids;
+  }, [query, editor.inspectionDocument.root]);
+  useEffect(() => {
+    if (visible) setCollapsed(previous => new Set([...previous].filter(id => !visible.has(id))));
+  }, [visible]);
   const [saving, setSaving] = useState(false);
   const [renaming, setRenaming] = useState<{ id: string; original: string; value: string } | null>(null);
   const [menu, setMenu] = useState<{ parent: UINode; x: number; y: number; context?: boolean } | null>(null);
@@ -78,6 +95,7 @@ export function NodeTree({ editor }: { editor: DocumentEditor }) {
     });
   }, [editor.selected.id, editor.inspectionDocument.root]);
   function branch(node: UINode, depth: number): ReactNode {
+    if (visible && !visible.has(node.id)) return null;
     const closed = collapsed.has(node.id);
     const position = dropTarget?.id === node.id ? dropTarget.position : null;
     return <div key={node.id} role="treeitem" aria-selected={editor.selected.id === node.id} aria-expanded={node.children.length ? !closed : undefined}>
@@ -124,18 +142,33 @@ export function NodeTree({ editor }: { editor: DocumentEditor }) {
     </div>;
   }
   const addableNodes = menu ? Object.keys(editor.strategy.nodes).filter(name => editor.strategy.canParent(menu.parent, editor.strategy.createNode(name))) : [];
+  function setBranchExpanded(node: UINode, expanded: boolean, recursive: boolean) {
+    setCollapsed(previous => {
+      const next = new Set(previous);
+      for (const target of recursive ? allNodes(node) : [node]) {
+        if (expanded) next.delete(target.id); else if (target.children.length) next.add(target.id);
+      }
+      if (expanded && !recursive) for (const child of node.children) if (child.children.length) next.add(child.id);
+      return next;
+    });
+    setMenu(null);
+  }
   return <>
-    <h2><Layers3 size={16} />节点树<span className="node-tree-actions">
-      <button type="button" aria-label="展开所有节点树" title="展开所有节点树" onClick={() => setCollapsed(new Set())}><ChevronsUpDown size={16} /></button>
-      <button type="button" aria-label="收起所有节点树" title="收起所有节点树" onClick={() => setCollapsed(new Set(allNodes(editor.inspectionDocument.root).filter(node => node.children.length).map(node => node.id)))}><ChevronsDownUp size={16} /></button>
-    </span></h2>
+    <h2><Layers3 size={16} />节点树<input className="node-tree-search" type="search" aria-label="搜索节点名称" placeholder="搜索节点名称" value={search} onChange={event => { setSearch(event.target.value); setMenu(null); }} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setSearch(''); } }} /></h2>
     <fieldset className="editor-fields" disabled={editor.inspectionBusy}>
       <div role="tree" aria-label="Roblox 节点">{branch(editor.inspectionDocument.root, 0)}</div>
+      {visible?.size === 0 && <p role="status">没有匹配的节点</p>}
       {menu && <div ref={menuElement} className="node-add-menu" role="menu" aria-label={menu.context ? '节点操作' : '添加子节点'} style={{ left: menu.x, top: menu.y }}
         onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setMenu(null); } }}
         onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setMenu(null); }}>
         {menu.context && <button role="menuitem" autoFocus onClick={() => beginRename(menu.parent)}>重命名</button>}
         {menu.context && <button role="menuitem" onClick={() => { setMenu(null); setSaving(true); }}>保存…</button>}
+        {menu.context && menu.parent.children.length > 0 && <>
+          <button role="menuitem" onClick={() => setBranchExpanded(menu.parent, true, true)}>展开子节点(递归)</button>
+          <button role="menuitem" onClick={() => setBranchExpanded(menu.parent, true, false)}>展开子节点</button>
+          <button role="menuitem" onClick={() => setBranchExpanded(menu.parent, false, true)}>收起子节点(递归)</button>
+          <button role="menuitem" onClick={() => setBranchExpanded(menu.parent, false, false)}>收起子节点</button>
+        </>}
         {menu.context && addableNodes.length > 0 && <div className="node-menu-separator" role="separator" />}
         {addableNodes.map((name, index) => <button key={name} role="menuitem" autoFocus={!menu.context && index === 0} onClick={() => {
           editor.add(name, menu.parent.id); setMenu(null);
