@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ImageUploadSource, ImageUploadTask, ToolkitTarget } from '../shared/toolkit';
 
-const connectionError = /无法连接|连接已失效|没有可用工程|Toolkit HTTP (401|403)/;
-
 export function ImageUploadDialog({ image, saveId, onClose, initialTargetId = '', onTargetSelected, onUploaded, batchProgress }: {
   image: ImageUploadSource; saveId(id: string): Promise<void>; onClose(): void;
   initialTargetId?: string; onTargetSelected?(id: string): void; onUploaded?(): void; batchProgress?: { current: number; total: number };
@@ -15,20 +13,13 @@ export function ImageUploadDialog({ image, saveId, onClose, initialTargetId = ''
   const [task, setTask] = useState<ImageUploadTask | null>(null);
   const [message, setMessage] = useState('正在识别同目录 Toolkit 工程…');
   const [error, setError] = useState('');
-  const [reconnecting, setReconnecting] = useState(false);
   const [busy, setBusy] = useState(false), [saved, setSaved] = useState(false);
   const completed = useRef(false);
   async function run(action: () => Promise<void>) {
     if (inFlight.current) return;
     inFlight.current = true; setBusy(true); setError('');
     try { await action(); }
-    catch (cause) {
-      if (alive.current) {
-        const message = cause instanceof Error ? cause.message : String(cause);
-        setError(message);
-        setReconnecting(connectionError.test(message));
-      }
-    }
+    catch (cause) { if (alive.current) setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { inFlight.current = false; if (alive.current) setBusy(false); }
   }
   async function persist(id: string) {
@@ -41,7 +32,6 @@ export function ImageUploadDialog({ image, saveId, onClose, initialTargetId = ''
   async function accept(value: ImageUploadTask) {
     if (!alive.current) return;
     setTask(value); setMessage(value.message);
-    setReconnecting(value.status === 'failed' && connectionError.test(value.message));
     if (value.status === 'succeeded') await persist(value.robloxId!);
   }
   async function submit(id: string) {
@@ -58,10 +48,8 @@ export function ImageUploadDialog({ image, saveId, onClose, initialTargetId = ''
     if (id && !result.value.targets.some(target => target.id === id)) throw new Error('目标工程连接已失效，等待工程重新连接。');
     setTargetId(id); onTargetSelected?.(id); setNeedsSelection(!id);
     if (!result.value.targets.length) throw new Error('没有可用工程，请在 Toolkit 打开游戏工程并配置 PlaceId。');
-    setReconnecting(false);
     if (task) {
       if (['processing', 'waiting_review'].includes(task.status)) await query();
-      else if (task.status === 'failed' && connectionError.test(task.message)) await submit(id);
     } else if (id) {
       setMessage('已识别同目录 Toolkit 工程，正在提交图片…');
       await submit(id);
@@ -73,17 +61,6 @@ export function ImageUploadDialog({ image, saveId, onClose, initialTargetId = ''
     alive.current = true; dialog.current?.showModal(); void run(discover);
     return () => { alive.current = false; };
   }, []);
-  useEffect(() => {
-    if (!reconnecting) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout>;
-    async function retry() {
-      await run(discover);
-      if (!cancelled) timer = setTimeout(retry, 5000);
-    }
-    timer = setTimeout(retry, 5000);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [reconnecting, targetId, task]);
   async function query() {
     if (!task) return;
     const result = await window.toolkit.imageTask(targetId, task.taskId);
@@ -108,7 +85,6 @@ export function ImageUploadDialog({ image, saveId, onClose, initialTargetId = ''
     <p role="status">{message}</p>
     {task?.robloxId && <p>Roblox 资源 ID：{task.robloxId}</p>}
     {error && <p role="alert">{error}</p>}
-    {reconnecting && <p>连接不可用，每隔 5 秒自动重试连接…</p>}
     {waiting && <p>关闭后停止查询，不取消 Toolkit 已提交的上传；再次上传同一图片会复用已有操作。</p>}
     <div className="new-interface-actions">
       {!task && <button type="button" disabled={busy} onClick={() => void run(discover)}>刷新连接</button>}
