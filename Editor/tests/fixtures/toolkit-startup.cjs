@@ -7,6 +7,6 @@ globalThis.fetch = async (url, options) => {
   state.attempts.push(Date.now());
   if (!state.online) throw new Error('Toolkit not started yet');
   state.connected = true;
-  return Response.json({ uiEditorImport: 1, uiEditorImageUpload: 1,
+  return Response.json({ protocol: 3, uiEditorImport: 1, uiEditorImageUpload: 1,
     projects: [{ id: 'game', name: 'Game', placeId: '123', token: 'test-private-token' }] });
 };

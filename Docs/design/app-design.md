@@ -70,4 +70,4 @@ Studio 或设备验收，测试覆盖和已知差异见 [显示对比测试记�
 
 ## Roblox 导入
 
-文件菜单通过 StudioGameToolkit 将当前编辑快照导入 Roblox。UI 与生成类由 Studio 插件在同一撤销事务中插入，生成脚本同时进入目标游戏的 Rojo 客户端目录；公共中间基类提供编辑器数据与动作合同。流程和更新边界见 [Roblox 一次性导入](roblox-import.md)。
+文件菜单通过 StudioGameToolkit 将当前编辑快照导入 Roblox。UI 由 Studio 插件在撤销事务中插入，生成脚本写入本机 Scripts 目录，由原生 Script Sync 同步和草稿提交；公共中间基类提供编辑器数据与动作合同。流程和更新边界见 [Roblox 一次性导入](roblox-import.md)。

@@ -19,7 +19,7 @@ async function fixture() {
 test('sibling Toolkit is matched by path ID, never display name or sole unrelated target', async () => {
   const { root, ui, toolkit } = await fixture();
   const id = toolkitProjectId(toolkit);
-  const client = new ToolkitClient(async () => Response.json({ uiEditorImport: 1, uiEditorImageUpload: 1,
+  const client = new ToolkitClient(async () => Response.json({ protocol: 3, uiEditorImport: 1, uiEditorImageUpload: 1,
     projects: [{ id, name: 'Renamed', placeId: '123', token: 'secret' }, { id: 'other', name: 'Same', placeId: '456', token: 'other' }] }));
   const found = await client.imageTargets(ui);
   assert.equal(found.automaticTargetId, id);
@@ -28,7 +28,7 @@ test('sibling Toolkit is matched by path ID, never display name or sole unrelate
   if (process.platform === 'win32') assert.equal(toolkitProjectId(toolkit.toUpperCase()), id);
 });
 test('image capability is required without breaking existing import discovery', async () => {
-  const client = new ToolkitClient(async () => Response.json({ uiEditorImport: 1, projects: [] }));
+  const client = new ToolkitClient(async () => Response.json({ protocol: 3, uiEditorImport: 1, projects: [] }));
   assert.deepEqual(await client.discover(), []);
   await assert.rejects(client.imageTargets('UIEditorWorkspace'), /更新并重启/);
 });
@@ -37,7 +37,7 @@ test('upload and queries use private connection headers and validate final Image
   let response: unknown = processing;
   const client = new ToolkitClient(async (url, init) => {
     calls.push({ url: String(url), init });
-    return Response.json(String(url).endsWith('/discover') ? { uiEditorImport: 1, uiEditorImageUpload: 1,
+    return Response.json(String(url).endsWith('/discover') ? { protocol: 3, uiEditorImport: 1, uiEditorImageUpload: 1,
       projects: [{ id: 'game', name: 'Game', placeId: '123', token: 'secret' }] } : response);
   });
   await client.discover();

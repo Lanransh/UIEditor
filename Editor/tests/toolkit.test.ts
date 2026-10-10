@@ -9,7 +9,7 @@ test('Toolkit discovery keeps tokens private and submits only validated packages
   const calls: { url: string; init?: RequestInit }[] = [];
   const client = new ToolkitClient(async (url, init) => {
     calls.push({ url: String(url), init });
-    return Response.json(String(url).endsWith('/discover') ? { uiEditorImport: 1, projects: [
+    return Response.json(String(url).endsWith('/discover') ? { protocol: 3, uiEditorImport: 1, projects: [
       { id: 'game', name: 'Roblox_Y1', placeId: '123', token: 'private-token' },
       { id: 'unconfigured', name: 'Other', placeId: '', token: 'other-token' },
     ] } : { id: 'a'.repeat(32), deliveryId: 'delivery', name: 'RewardsUI', status: 'awaiting_studio', message: 'waiting', scriptPath: 'Generated/RewardsUI', sourceClass: 'UI' });
@@ -41,7 +41,7 @@ test('startup connection retries every five seconds without a project or dialog 
   const client = new ToolkitClient(async () => {
     requests++;
     if (!online) throw new Error('offline');
-    return Response.json({ uiEditorImport: 1, projects: [{ id: 'game', name: 'Game', placeId: '123', token: 'secret' }] });
+    return Response.json({ protocol: 3, uiEditorImport: 1, projects: [{ id: 'game', name: 'Game', placeId: '123', token: 'secret' }] });
   });
   t.after(() => client.stopConnection());
   client.startConnection(); client.startConnection(); await setImmediate();
@@ -62,11 +62,11 @@ test('discovery shares in-flight startup requests and waits for a configured gam
   const manual = client.discover();
   assert.equal(client.discover(), manual);
   t.mock.timers.tick(15000); assert.equal(requests, 1);
-  release(Response.json({ uiEditorImport: 1, projects: [] })); await manual;
+  release(Response.json({ protocol: 3, uiEditorImport: 1, projects: [] })); await manual;
   t.mock.timers.tick(4999); assert.equal(requests, 1);
   t.mock.timers.tick(1); assert.equal(requests, 2);
   client.stopConnection();
-  release(Response.json({ uiEditorImport: 1, projects: [] })); await setImmediate();
+  release(Response.json({ protocol: 3, uiEditorImport: 1, projects: [] })); await setImmediate();
   t.mock.timers.tick(15000); assert.equal(requests, 2);
 });
 
@@ -88,7 +88,7 @@ test('a lost upload connection restarts retries and refreshes the private token 
     if (String(url).endsWith('/discover')) {
       discoveries++;
       if (!online) throw new Error('offline');
-      return Response.json({ uiEditorImport: 1, uiEditorImageUpload: 1,
+      return Response.json({ protocol: 3, uiEditorImport: 1, uiEditorImageUpload: 1,
         projects: [{ id: 'game', name: 'Game', placeId: '123', token }] });
     }
     uploads++; authorization = (init?.headers as Record<string, string>).Authorization;
@@ -104,4 +104,10 @@ test('a lost upload connection restarts retries and refreshes the private token 
   t.mock.timers.tick(5000); await setImmediate(); assert.equal(discoveries, 3); assert.equal(uploads, 1);
   await client.uploadImage('game', 'Icon', 'data:image/png;base64,iVBORw0KGgo=');
   assert.equal(authorization, 'Bearer new');
+});
+
+
+test('protocol 2 imports are rejected before submitting to the old script writer', async () => {
+  const client = new ToolkitClient(async () => Response.json({ protocol: 2, uiEditorImport: 1, projects: [] }));
+  await assert.rejects(client.discover(), /更新并重启/);
 });
