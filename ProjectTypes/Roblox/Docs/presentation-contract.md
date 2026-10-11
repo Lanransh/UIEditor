@@ -13,6 +13,35 @@
 
 ## 数据与虚方法
 
+### 通用打开与关闭动画
+
+`CUIView.OpenAnimation = true` 默认启用整页动画，在父构造中读取。
+普通弹窗无需调用 `SetOpenAnimation`，不重复编写 Tween、模糊或相机效果。
+基类统一处理 ScreenGui 的直属视觉节点，不依赖窗口节点名称、不改变查找路径；
+标题、页签、内容和关闭按钮同步围绕屏幕中心缩放，设备适配比例与动画倍率叠加。
+
+两个开关相互独立，按界面用途在 source 交互类上覆盖；注明关闭的原因：
+
+```lua
+-- 常驻 HUD 不播放整页缩放，不开启背景模糊或改变相机视野。
+CMainView.OpenAnimation = false
+
+-- 仅在 HUD 自行管理设备布局时关闭：不执行基类的 1280×720 等比居中适配。
+-- 保留默认 true 则仍由基类适配，不因关闭动画而关闭适配。
+CMainView.ScreenAdaptation = false
+```
+
+`OpenAnimation` 默认 true，控制整页缩放、共享背景模糊和相机视野变化；false 时立即显隐。
+`ScreenAdaptation` 默认 true，按 1280×720 等比缩放并居中；false 时由界面自己管理设备布局。
+在类定义中设置布尔值，实例创建前生效，不在 OnReady/Render 中切换；关闭适配不等于关闭动画。
+窗口开关统一调用 `Show()` / `Hide()`。关闭按钮可直接 Hide，或发出 Close 动作由接入类 Hide。
+Render 只更新内容、页签和条目显隐，不用 `state.open` 隐藏窗口主体，也不直接改根 Enabled；
+关闭动画完成前不要提前隐藏标题、面板或关闭按钮。若业务保留 open 状态，OnShow/OnHide 更新它，
+不让 Render 再控制整窗显隐。子类覆写 Show/Hide 时必须调用父方法。
+
+实际缩放、背景模糊、相机效果与关闭完成回调由游戏 `FCUICompClass` / `FC.UIAnim` 执行。
+App 模拟保留 Show/Hide 与这两个类开关，但立即显隐，不模拟游戏相机或 Tween；预览通过不代表游戏动画通过。
+
 编写交互脚本时必读 [脚本数据契约示例](script-contract-example.md)，按其中的 source 契约注释
 与 integration 配套方式组织代码，并替换为当前页面的真实字段。
 

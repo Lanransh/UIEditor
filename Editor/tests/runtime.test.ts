@@ -341,15 +341,16 @@ test('new shared UI base is registered and generated classes remain FC UI compon
   assert.ok((await readFile(resolve(directory, 'bootstrap.luau'), 'utf8')).includes(uiEditorCompSource));
   const document = robloxStrategy.createDocument('SharedContract');
   document.scripts.source = `local FX = _G.FX
-local UI = FX.Class("CSharedContractUIBaseCompClass", "CUIEditorUICompClass")
+local UI = FX.Class("CSharedContractUIBaseCompClass", "CUIView")
 function UI:OnReady()
-    assert(self:IsA("CUIEditorUICompClass"))
-    assert(FX.GetClass("CUIEditorUICompClass").Ctor ~= FX.GetClass("FCUICompClass").Ctor)
-    assert(FX.GetClass("CUIEditorUICompClass").RefreshUI ~= FX.GetClass("FCUICompClass").RefreshUI)
+    assert(self:IsA("CUIView"))
+    assert(FX.GetClass("CUIView").Ctor ~= FX.GetClass("FCUICompClass").Ctor)
+    assert(FX.GetClass("CUIView").RefreshUI ~= FX.GetClass("FCUICompClass").RefreshUI)
     assert(self:GetCompName() == "ScreenGuiComp")
     assert(self:GetRootNode().Name == "ScreenGui")
     assert(self:IsA("FCUICompClass"))
-    assert(FX.GetClass("CUIEditorUICompClass").Super == FX.GetClass("CUIView"))
+    assert(FX.GetClass("CUIView").Super == FX.GetClass("FCUICompClass"))
+    assert(self.OpenAnimation)
     self:EmitUIAction("Ready", { Id = "contract" })
 end
 function UI:Render(state)
@@ -369,6 +370,32 @@ return Preview`;
   finally { await session.stop(); }
 });
 
+
+test('HUD can override the animation switch and still show/hide in App', async () => {
+  const document = robloxStrategy.createDocument('HUD');
+  document.scripts.source = `local FX = _G.FX
+local UI = FX.Class("CHUDView", "CUIView")
+UI.OpenAnimation = false
+function UI:OnReady()
+    assert(not self.OpenAnimation)
+    self:Hide()
+    assert(not self:GetRootNode().Enabled)
+    self:Show()
+    assert(self:GetRootNode().Enabled)
+end
+return UI`;
+  document.scripts.integration = `local FX = _G.FX
+return FX.Class("CHUDPreview", "CHUDView")`;
+  const { session, frame } = await LuauSession.start(directory, document);
+  try { assert.equal(frame.document.root.properties.Enabled, true); }
+  finally { await session.stop(); }
+});
+
+test('removed shared class alias cannot be used by interaction scripts', async () => {
+  const document = robloxStrategy.createDocument('RemovedAlias');
+  document.scripts.source = 'return _G.FX.Class("COldView", "CUIEditorUICompClass")';
+  await assert.rejects(LuauSession.start(directory, document), /Base class not found/);
+});
 
 test('runtime templates clone independently, attach, dispatch and destroy without changing the document', async () => {
   const document = rewardExample();

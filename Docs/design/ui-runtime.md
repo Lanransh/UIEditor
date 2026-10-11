@@ -105,7 +105,7 @@ VM 内存上限 64 MiB、每条命令执行预算 250 ms，主进程 2 秒看门
 
 `npm test` 包含真实 Luau 执行、超时、类继承、数据维护、原子更新和连接清理测试，先构建辅助程序。`npm run test:runtime` 检查 Electron 中的三个一级页签、按钮、接入状态、重置、错误恢复及文档隔离。`node tests/runtime-smoke.mjs --packaged` 验证已打包程序的运行链路。上述检查不能证明 Roblox 的显示或设备性能。
 
-旧 `CUIEditorUICompClass` 作为 `CUIView` 的兼容子类保留；旧文件不自动重写。
+公共类统一使用 `CUIView`，不再注册旧 `CUIEditorUICompClass` 兼容别名；旧文件不自动重写。
 新界面名末尾的 `UI` 后缀会去除一次，例如 WelfareUI 生成 CWelfareView / CWelfarePreview。
 页面默认启用 ScreenAdaptation；MainUI 可在类上设置 `UI.ScreenAdaptation = false` 后自行适配。
 

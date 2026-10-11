@@ -42,6 +42,11 @@ description: 在 UIEditor 的 Roblox 工程中制作、修改和验证可编辑 
    可变列表的原型集中放在界面内隐藏的 Templates 下，由 source 在运行时克隆到显示容器，
    按稳定业务 ID 更新与清理；具体遵循业务接入参考的 Templates 与运行时克隆约定。
    仅属性变化时直接更新已有节点；普通页面不重复编写通用屏幕适配。
+   普通窗口通过 Show/Hide 开关，CUIView 默认接入整页动画，不重复调用 SetOpenAnimation 或编写 Tween。
+   常驻 HUD/MainUI 在 source 交互类设置 OpenAnimation = false，并注释说明不启用整页缩放、模糊和相机效果。
+   ScreenAdaptation 默认 true，控制 1280×720 等比居中适配；仅界面自行管理设备布局时设为 false 并注释原因。
+   两个开关独立，在类上定义、实例创建前生效，不在 OnReady/Render 切换。Render 不提前隐藏窗口主体。
+   具体职责与示例遵循展示与业务接入的「通用打开与关闭动画」合同；App 不验证游戏相机动画。
    在 source 中写入可随导出保留的 Config/State 与动作契约注释，具体要求见业务接入参考。
 
 ## 验证与交付

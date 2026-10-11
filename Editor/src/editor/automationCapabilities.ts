@@ -13,7 +13,7 @@ export const robloxAutomation: AutomationCapabilities = {
   },
   runtime: {
     language: 'luau', version: '0.694', actions: ['run', 'stop', 'reset'], event: 'Activated', mouseEvents, mouseTools: ['uie.runtime.hover', 'uie.runtime.scroll', 'uie.runtime.drag'], mouseCoordinates: 'drag from/to: normalized node-local 0–1; event Position: 1280×720 canvas pixels; scroll: content pixels; mouse only, no keyboard/text input', clickableNodeTypes: ['TextButton', 'ImageButton'], scripts: ['source', 'integration'],
-    api: ['_G.FX.Class', 'FX.Loader:PlayerGui("ScreenGui.Child")', 'FX.Loader:Here(root,"Child.Descendant")', 'node:Clone()', 'node:Destroy()', 'node:GetChildren()', 'node:GetPropertyChangedSignal(property):Connect(callback)', 'node.Name', 'node.Parent', 'CUIEditorUICompClass', 'OnReady', 'Render', 'GetUIConfig', 'GetUIState', 'RefreshUI', 'OnUIAction', 'EmitUIAction', 'TrackConnection', 'SetButtonEnabled'],
+    api: ['_G.FX.Class', 'FX.Loader:PlayerGui("ScreenGui.Child")', 'FX.Loader:Here(root,"Child.Descendant")', 'node:Clone()', 'node:Destroy()', 'node:GetChildren()', 'node:GetPropertyChangedSignal(property):Connect(callback)', 'node.Name', 'node.Parent', 'CUIView', 'OpenAnimation', 'ScreenAdaptation', 'Show', 'Hide', 'OnReady', 'Render', 'GetUIConfig', 'GetUIState', 'RefreshUI', 'OnUIAction', 'EmitUIAction', 'TrackConnection', 'SetButtonEnabled'],
   },
 };
 export function getCapabilities(strategy: ProjectStrategy, args: Record<string, unknown> = {}) {

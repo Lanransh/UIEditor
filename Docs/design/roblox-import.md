@@ -26,7 +26,7 @@ Generated/
 
 类文件按源码中的实际类名命名，不从可改的文档显示名猜测。界面交互类附加 ScreenGuiName 元数据供公共基类查找 PlayerGui；公共基类提供组件名、根节点、配置、状态、刷新、动作转发与原生按钮禁用。连接清理、Show/Hide 仍继承游戏 FCUICompClass。App 加载这份公共类，宿主仅适配固定画布、原生按钮禁用与动作日志，不载入完整游戏框架。
 
-新文档使用公共基类；旧直接继承 FCUICompClass 或 CUIEditorUICompClass 的交互类保留 App 兼容，导入时仅转换类声明的父类。迁移不修改已保存源码。
+新文档使用公共基类；旧直接继承 FCUICompClass 的交互类保留 App 兼容，导入时仅转换类声明的父类。迁移不修改已保存源码。已移除旧公共类名 CUIEditorUICompClass 的兼容别名，交互类应直接继承 CUIView。
 
 公共模块现命名为 `CUIView.luau`；本仓库已验证导出包，新名称在外部 Toolkit 与 Studio 的实际导入仍需联调验证。
 
@@ -35,6 +35,21 @@ Generated/
 普通页面默认 `ScreenAdaptation = true`；MainUI 可在类上设置 `ScreenAdaptation = false`，自行管理屏幕布局。公共类在 Ctor 中按开关启动适配，以 1280×720 为设计基准，取当前 ScreenGui 可用宽高比例的较小值，整体等比缩放并居中；大屏可放大，比例不同时留白。仅处理直属 GuiObject，不增加父级容器，保留节点查找路径；直属位置与尺寸中的 Scale/Offset 先按设计画布解析，子孙节点沿用内部布局。已有 UIScale 与设备比例相乘，避免重复缩放；尺寸变化和新增直属节点自动更新，移出节点与组件销毁时恢复设计值并清理监听。编辑器运行在固定 1280×720 画布，设备适配比例为 1。
 
 UIEditor 生成的 ScreenGui 和全部 GuiObject 使用文档中的 AutoLocalize 开关，默认开启，导入保留显式关闭的值。根节点关闭可停止整页及后代的自动翻译。布局与约束节点不写此属性；自动翻译由 Roblox 的游戏本地化表提供，App 不模拟翻译服务。
+
+## 通用窗口动画
+
+公共 CUIView 的类开关 `OpenAnimation` 默认 true，控制整页缩放、背景模糊和相机视野变化；常驻 HUD 在交互类设为 false，立即显隐。
+`ScreenAdaptation` 默认 true，控制 1280×720 等比居中适配，false 时由界面自行管理设备布局。
+两个开关独立，在类定义中设置并注释用途；父构造中读取，不在 OnReady/Render 动态切换。
+游戏端存在 FCUICompClass.SetOpenAnimation 时，公共类创建不挂入节点树的动画倍率控制器，
+通过框架登记弹窗；框架继续负责 Tween、共享背景模糊、相机视野、关闭完成后隐藏与动画清理。
+公共类将倍率叠加到全部直属 GuiObject 的缩放与相对屏幕中心的位置，不增加父容器、不改变节点路径，
+标题与内容分离也能同步运动。尺寸变化和新增直属节点沿用当前倍率，析构恢复原布局并销毁控制器。
+不启用屏幕适配时保留原 Size，动画仅调整原 Position 与 UIScale，动画结束恢复原显示比例。
+
+窗口入口与关闭按钮调用 Show/Hide；Render 不提前隐藏整窗主体。制作提示词与 HUD 覆写示例见
+[工程类型合同](../../ProjectTypes/Roblox/Docs/presentation-contract.md#通用打开与关闭动画)。
+App 宿主不提供 SetOpenAnimation，继续立即显隐，不创建控制器或模拟游戏相机动画。
 
 ## 游戏业务继承
 

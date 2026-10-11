@@ -6,6 +6,13 @@
 
 接入类 Ctor 先调用 Super.Ctor，在自身 Config/State 定义模拟数据；OnUIAction 修改状态并 RefreshUI。App 支持有限 FX.Class，不包含完整游戏框架。停止统一清理连接。
 
+窗口统一通过 `Show()` / `Hide()` 显隐。`CUIView.OpenAnimation` 默认 true，
+游戏端自动接入整页打开/关闭缩放、背景模糊和相机视野变化；常驻 HUD 在交互类设置 `OpenAnimation = false`，立即显隐。
+`ScreenAdaptation` 默认 true，执行 1280×720 等比居中适配；false 时由界面自己管理设备布局。
+两个开关独立，在类上设置并写明用途，实例创建前生效，不能在 OnReady/Render 中动态切换。
+普通界面不自行调用 SetOpenAnimation 或创建动画。Render 不提前隐藏整窗主体；详细合同和 HUD 示例见
+[通用打开与关闭动画](presentation-contract.md#通用打开与关闭动画)。App 仅立即显隐，不模拟相机和 Tween。
+
 - `uie.runtime.control({sessionId,revision,action="run"|"stop"|"reset"})`：返回 result.ok 和运行身份。reset 从运行开始快照重新构造。
 - `uie.runtime.click({sessionId,revision,id})`：模拟按钮 Activated。返回 dispatched；hidden/disabled 按钮不分发。
 - `uie.debug.get_diagnostics({cursor?,consoleCursor?})`：分别读取运行日志和 App 控制台的增量输出，返回最新游标及截断标记。

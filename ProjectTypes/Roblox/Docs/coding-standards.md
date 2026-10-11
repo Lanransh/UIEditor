@@ -10,5 +10,6 @@
 - 声明 `local FX = _G.FX`、`local FXLoader = FX.Loader`。先核对节点树中的真实 ScreenGui 名称，再用 `local root = FXLoader:PlayerGui("ExampleUI")` 获取界面；不要以 `self:GetRootNode()` 作为生成代码的节点获取入口。子节点用 `FXLoader:Here(root, "Panel.HintTxt")`，也可直接用 `FXLoader:PlayerGui("ExampleUI.Panel.HintTxt")`。Here 路径不包含根名，PlayerGui 路径包含根名。只支持 `.`，`/`、空路径和空段明确报错；节点名不含分隔符。
 - 不假设完整游戏 FXLoader API：当前只使用 runtime-api 中公开的接口。事件用 TrackConnection；动作只发必要业务标识，Render 只更新展示，模拟接入只更新模拟状态。
 - 所有效果保存为设计节点和属性，不在运行脚本创建效果。不要把可读性改动变成业务或视觉改动。
+- 窗口使用 CUIView 通用动画与 Show/Hide，不重复生成动画代码；常驻 HUD 设置 OpenAnimation = false 并注释原因。ScreenAdaptation 独立控制屏幕适配，关闭时说明由界面自行管理布局。两个类开关均在实例创建前设置；Render 不提前隐藏整窗，完整合同见 [展示与业务接入](presentation-contract.md#通用打开与关闭动画)。
 
 交付前检查格式、函数标签、节点路径；运行相关 App 模拟验证并停止，保存后重开确认源码保持。App 验证与 Roblox 实机验证分别报告。
