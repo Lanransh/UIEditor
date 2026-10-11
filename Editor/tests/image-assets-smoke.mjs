@@ -286,6 +286,7 @@ try {
   assert.equal(await page.getByRole('button', { name: '图片资产 LocalIcon-2', exact: true }).count(), 1);
   const beforeRun = await tool('uie.editor.get_state');
   await tool('uie.runtime.control', { sessionId: beforeRun.sessionId, revision: beforeRun.revision, action: 'run' });
+  await page.waitForFunction(() => window.document.querySelector('.image-asset-list > button')?.disabled === true);
   assert.equal(await importButton.isDisabled(), true);
   const duringRun = await tool('uie.editor.get_state');
   assert.equal((await rawTool('uie.assets.import', { sessionId: duringRun.sessionId, revision: duringRun.revision, library: 'project', filePath: localPath })).ok, false);

@@ -42,9 +42,14 @@ const imageAssets: ImageAssetAPI = {
   list: () => ipcRenderer.invoke('images:list'),
   import: library => ipcRenderer.invoke('images:import', library),
   importFile: (library, file) => ipcRenderer.invoke('images:import-file', { library, path: webUtils.getPathForFile(file) }),
+  bake: (document, nodeId, name, width, height) => ipcRenderer.invoke('images:bake', { document, nodeId, name, width, height }),
   update: value => ipcRenderer.invoke('images:update', value),
   updateRobloxId: (id, robloxId) => ipcRenderer.invoke('images:update-roblox-id', { id, robloxId }),
   openDirectory: id => ipcRenderer.invoke('images:open-directory', id),
+  listFolders: () => ipcRenderer.invoke('images:folders'),
+  createFolder: path => ipcRenderer.invoke('images:create-folder', path),
+  move: (id, folder) => ipcRenderer.invoke('images:move', { id, folder }),
+  remove: id => ipcRenderer.invoke('images:remove', id),
 };
 contextBridge.exposeInMainWorld('imageAssets', imageAssets);
 const runtime: RuntimeAPI = {

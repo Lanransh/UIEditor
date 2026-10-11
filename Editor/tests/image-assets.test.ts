@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cp, mkdtemp, mkdir, readFile, writeFile, rename } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, readFile, writeFile, rename, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { ImageAssetStore, permanentImageRoot } from '../electron/image-assets';
@@ -19,6 +19,35 @@ async function fixture() {
   await mkdir(project, { recursive: true }); await mkdir(runtime);
   return { root, runtime, project, store: new ImageAssetStore(runtime, project) };
 }
+
+test('project image folders move image and metadata together, preserve references and reject collisions and traversal', async () => {
+  const { store, project } = await fixture();
+  const preview = (await store.list())[0].previewImage;
+  const asset = await store.import('project', { ...preview, name: 'Close.png' });
+  const root = join(project, '..', 'ArtSource', 'UI');
+  const before = await readFile(join(root, 'Close.png.meta'), 'utf8');
+  assert.deepEqual(await store.createProjectFolder('按钮'), ['按钮']);
+  assert.deepEqual(await store.createProjectFolder('按钮/关闭'), ['按钮', '按钮/关闭']);
+  for (const path of ['../outside', '/absolute', '按钮/../../outside', 'C:/outside', 'bad\\path', '按钮//child']) {
+    await assert.rejects(store.createProjectFolder(path));
+    await assert.rejects(store.moveProjectImage(asset.id, path));
+  }
+  const assets = await store.moveProjectImage(asset.id, '按钮/关闭');
+  const moved = assets.find(item => item.id === asset.id)!;
+  assert.equal(moved.folder, '按钮/关闭');
+  assert.equal(moved.previewImage.dataUrl, asset.previewImage.dataUrl);
+  assert.equal(await readFile(join(root, '按钮/关闭/Close.png.meta'), 'utf8'), before);
+  await assert.rejects(stat(join(root, 'Close.png')));
+  const other = await store.import('project', { ...preview, name: 'Close.png' });
+  await assert.rejects(store.moveProjectImage(other.id, '按钮/关闭'), /同名/);
+  assert.equal(await readFile(join(root, 'Close.png.meta'), 'utf8').then(JSON.parse).then(meta => meta.id), other.id);
+  await store.removeProjectImage(asset.id);
+  await assert.rejects(stat(join(root, '按钮/关闭/Close.png')));
+  await assert.rejects(stat(join(root, '按钮/关闭/Close.png.meta')));
+  assert.ok((await store.list()).some(item => item.id === other.id));
+  assert.deepEqual(await store.projectFolders(), ['按钮', '按钮/关闭']);
+  await assert.rejects(store.removeProjectImage('builtin:roblox:stud'), /不存在/);
+});
 test('Roblox IDs normalize and reject invalid input without losing precision', () => {
   assert.equal(normalizeRobloxId(' 82793028306773 '), 'rbxassetid://82793028306773');
   assert.equal(normalizeRobloxId('rbxassetid://123'), 'rbxassetid://123');

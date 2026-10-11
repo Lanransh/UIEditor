@@ -79,9 +79,9 @@ try {
   await writeFile(join(root, 'template-editing.png'), Buffer.from(picture.content[0].data, 'base64'));
   // Saving a snapshot onto the active template must also update its saved baseline.
   await mutate('uie.scripts.set', { source: '-- snapshot onto original' });
-  await page.getByRole('button', { name: '选择节点 UpdatedPanel', exact: true }).click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '保存…', exact: true }).click();
-  await page.getByLabel('保存到', { exact: true }).selectOption('templates');
+  await page.getByRole('button', { name: '文件', exact: true }).click();
+  await page.getByRole('button', { name: '保存为模板参考', exact: true }).click();
+  assert.equal(await page.getByLabel('保存到', { exact: true }).inputValue(), 'templates');
   await page.getByLabel('模板文件夹', { exact: true }).selectOption('奖励');
   await page.getByRole('dialog', { name: '保存UI', exact: true }).getByRole('button', { name: '保存', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('.workspace-status')?.textContent?.includes('界面已保存'));

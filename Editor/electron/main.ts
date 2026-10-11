@@ -14,6 +14,7 @@ import { AutomationReader } from './automation-reader';
 import { getNode, nodeTree, findNodes, integer } from '../src/shared/automation';
 import { documentLocation } from '../src/shared/documents';
 import type { UIDocument } from '../src/shared/uiDocument';
+import { findNode } from '../src/shared/uiDocument';
 import { startBridge } from './automation-bridge';
 import { executeCode, getCodeAdapter } from './code-executor';
 import { openInterface, saveInterface, fileVersion } from './automation-files';
@@ -22,7 +23,7 @@ import { ImageAssetStore, permanentImageRoot } from './image-assets';
 import { syncAgentWorkspace } from './agent-workspace';
 import { ensureWorkspaceLauncher } from './workspace-launcher';
 import { listTemplateStyles, previewTemplateStyle, styleDirectory, templateStylesDirectory } from './template-styles';
-import { resolveImageAssets, type ImageAssetUpdate, type ImageLibrary } from '../src/shared/imageAssets';
+import { resolveImageAssets, type BakePreviewConfig, type ImageAssetUpdate, type ImageLibrary } from '../src/shared/imageAssets';
 
 const runtime = process.env.UI_EDITOR_USER_DATA
   ? process.env.UI_EDITOR_USER_DATA
@@ -79,7 +80,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     }
     let activeProject: Project | null = null;
     const reader = new AutomationReader(runtime, recent, () => automationReady ? activeProject : null, permanentImages);
-    const previews = new Map<Electron.WebContents, { document: UIDocument; ready(): void }>();
+    const previews = new Map<Electron.WebContents, { document: UIDocument; bake?: BakePreviewConfig; ready(): void; fail?(error: Error): void }>();
     async function savedScreenshot(document: UIDocument, target: object) {
       const preview = new BrowserWindow({ width: 1280, height: 720, useContentSize: true, show: false, skipTaskbar: true, focusable: false,
         webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false } });
@@ -97,6 +98,24 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
         const captured = await preview.webContents.capturePage({ x: 0, y: 0, width: 1280, height: 720 });
         const image = captured.resize({ width: 1280, height: 720, quality: 'best' });
         return { png: image.toPNG().toString('base64'), metadata: { width: image.getSize().width, height: image.getSize().height, zoom: 1, target, view: 'saved-design' } };
+      } finally { if (timer) clearTimeout(timer); previews.delete(preview.webContents); preview.destroy(); }
+    }
+    async function bakeScreenshot(document: UIDocument, bake: BakePreviewConfig): Promise<Buffer> {
+      const preview = new BrowserWindow({ width: bake.width, height: bake.height, useContentSize: true, transparent: true, backgroundColor: '#00000000', show: false, skipTaskbar: true, focusable: false,
+        webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false } });
+      preview.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+      preview.webContents.on('will-navigate', event => event.preventDefault());
+      const url = new URL(source); url.searchParams.set('uiePreview', '1');
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const ready = new Promise<void>((resolve, reject) => {
+          timer = setTimeout(() => reject(new Error('图片烘焙渲染超时。')), 15000);
+          previews.set(preview.webContents, { document, bake, ready: resolve, fail: reject });
+        });
+        await Promise.all([preview.loadURL(url.href), ready]);
+        const captured = await preview.webContents.capturePage({ x: 0, y: 0, width: bake.width, height: bake.height });
+        const size = captured.getSize();
+        return (size.width === bake.width && size.height === bake.height ? captured : captured.resize({ width: bake.width, height: bake.height, quality: 'best' })).toPNG();
       } finally { if (timer) clearTimeout(timer); previews.delete(preview.webContents); preview.destroy(); }
     }
     let documentPath: string | null = null;
@@ -188,7 +207,9 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       const preview = previews.get(event.sender);
       if (preview && event.senderFrame === event.sender.mainFrame && new URL(event.senderFrame.url).searchParams.get('uiePreview') === '1') {
         if (input?.operation === 'preview:document') return preview.document;
+        if (input?.operation === 'preview:config') return preview.bake ?? null;
         if (input?.operation === 'preview:ready') { preview.ready(); return null; }
+        if (input?.operation === 'preview:error') { preview.fail?.(new Error(String(input.argument))); return null; }
         throw new Error('截图窗口只允许读取预览。');
       }
       if (!trusted(event)) throw new Error('无效来源。');
@@ -460,7 +481,34 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       return { path, document: await writeDocument(path, document) };
     });
     const imageStore = () => new ImageAssetStore(runtime, requireProject().path, permanentImages);
+    handle('images:bake', async input => {
+      const store = imageStore();
+      const value = input as { document: unknown; nodeId: string; name: string; width: number; height: number };
+      if (!value || typeof value.nodeId !== 'string' || typeof value.name !== 'string' || !value.name.trim() || value.name.trim().length > 100 || /[<>:"/\\|?*\u0000-\u001f]/.test(value.name) || /[. ]$/.test(value.name.trim()) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(value.name.trim())) throw new Error('图片名称无效，请填写 1–100 个字符的有效文件名。');
+      if (![value.width, value.height].every(dimension => Number.isInteger(dimension) && dimension >= 1 && dimension <= 4096)) throw new Error('图片分辨率必须是 1–4096 的整数。');
+      const document = robloxStrategy.validate(value.document);
+      const node = findNode(document.root, value.nodeId);
+      if (!node || robloxStrategy.nodes[node.className].category !== 'object') throw new Error('请选择可显示的界面节点进行烘焙。');
+      const png = await bakeScreenshot(document, { nodeId: node.id, width: value.width, height: value.height });
+      if (png.length > 8 * 1024 * 1024) throw new Error('烘焙图片超过 8 MiB，请降低分辨率。');
+      return store.import('project', { name: `${value.name.trim()}.png`, dataUrl: `data:image/png;base64,${png.toString('base64')}` });
+    });
     handle('images:list', async () => imageStore().list());
+    handle('images:folders', async () => imageStore().projectFolders());
+    handle('images:create-folder', async path => imageStore().createProjectFolder(path as string));
+    handle('images:move', async input => {
+      const value = input as { id: string; folder: string };
+      if (!value || typeof value.id !== 'string' || typeof value.folder !== 'string') throw new Error('图片移动参数无效。');
+      return imageStore().moveProjectImage(value.id, value.folder);
+    });
+    handle('images:remove', async id => {
+      const store = imageStore();
+      const asset = (await store.list()).find(asset => asset.id === id && asset.library === 'project');
+      if (!asset) throw new Error('请选择项目图片资产。');
+      const answer = await dialog.showMessageBox(window, { type: 'warning', title: '删除图片资产', message: `确定删除图片“${asset.name}”吗？`, detail: '将删除项目中的原图及 .meta 文件。已引用的节点保留预览快照；不会删除云端 Roblox 资源。', buttons: ['删除', '取消'], defaultId: 1, cancelId: 1 });
+      if (answer.response !== 0) return null;
+      return store.removeProjectImage(asset.id);
+    });
     handle('images:update', async input => imageStore().update(input as ImageAssetUpdate));
     handle('images:update-roblox-id', async input => {
       const value = input as Pick<ImageAssetUpdate, 'id' | 'robloxId'>;

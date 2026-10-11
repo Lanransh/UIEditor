@@ -8,6 +8,7 @@ import { projectStrategy } from './roblox';
 import { deleteNode, documentCommand, duplicateNode, insertNode, pasteNode, reparentNode } from './commands';
 import { useRuntime } from './useRuntime';
 import { useAutomation } from './useAutomation';
+import { convertToBakedImage, type BakedNodeClass } from './imageBake';
 import { applyImageAsset, normalizeRobloxId, resolveImageAssets, type ImageAsset, type ImageAssetUpdate, type ImageLibrary } from '../shared/imageAssets';
 
 declare global { interface Window { documents: DocumentAPI } }
@@ -168,9 +169,17 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   });
   useEffect(() => {
     const listener = (event: KeyboardEvent) => {
-      if (!hasDocument || operating.current || event.defaultPrevented || event.isComposing || event.repeat || event.altKey || event.shiftKey) return;
+      if (operating.current || event.defaultPrevented || event.isComposing || event.repeat || event.altKey || event.shiftKey) return;
       const target = event.target;
       if (target instanceof HTMLElement && (target.closest('input, textarea, select') || target.isContentEditable)) return;
+      if (target instanceof HTMLElement && target.closest('dialog')) return;
+      if (event.key === 'Delete' && !event.ctrlKey && !event.metaKey && inspectedAssetId) {
+        event.preventDefault();
+        if (!runtime.active) window.dispatchEvent(new CustomEvent('uie:delete-image-asset', { detail: inspectedAssetId }));
+        return;
+      }
+      if (event.key === 'Delete' && target instanceof HTMLElement && target.closest('.image-assets, dialog')) { event.preventDefault(); return; }
+      if (!hasDocument) return;
       if (event.key === 'Delete' && !event.ctrlKey && !event.metaKey) {
         event.preventDefault(); remove(); return;
       }
@@ -240,9 +249,35 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
       execute('插入图片资产', value => insertNode(value, parent.id, node, strategy)); select(node.id);
     } else editNode(selected.id, node => applyImageAsset(node, asset), '应用图片资产');
   }
+  async function bakeImage(id: string, name: string, width: number, height: number, className: BakedNodeClass) {
+    if (!hasDocument || operating.current || runtime.active) throw new Error('请停止运行后烘焙图片。');
+    operating.current = true; setBusy(true);
+    try {
+      const result = await window.imageAssets.bake(document, id, name, width, height);
+      if (!result.ok) throw new Error(result.error);
+      replaceImages([...liveImageAssets.current, result.value]);
+      history.execute(documentCommand('烘焙为图片', value => convertToBakedImage(value, id, className, result.value, strategy), strategy));
+      setError('');
+    } finally { operating.current = false; setBusy(false); }
+  }
+  async function changeProjectImages(action: () => ReturnType<typeof window.imageAssets.remove>) {
+    if (operating.current || runtime.active) throw new Error('请停止运行后管理图片资产。');
+    const inspection = inspectedAssetId;
+    if (assetConfigurationDirty && !clearAssetInspection()) return false;
+    operating.current = true; setBusy(true);
+    try {
+      const result = await action();
+      if (!result.ok) throw new Error(result.error);
+      if (result.value) replaceImages(result.value);
+      if (inspection) setInspectedAssetId(!result.value || result.value.some(asset => asset.id === inspection) ? inspection : null);
+      return result.value !== null;
+    } finally { operating.current = false; setBusy(false); }
+  }
   const editor = { projectId: project.manifest.id, projectName: project.name, projectPath: project.path, strategy, document, inspectionDocument, inspectionBusy: busy || assetsLoading || (runtime.active && !runtime.ready), hasDocument, history, selected, select, editNode, editProperty, execute, add, reparent, pickImage,
     inspectedAssetId, inspectAsset, clearAssetInspection, setAssetConfigurationDirty,
-    imageAssets, inspectImages: () => liveImageAssets.current, assetsLoading, refreshImages, configureImage, configureImageRobloxId, assignRobloxImageId, importImage, useImage,
+    imageAssets, inspectImages: () => liveImageAssets.current, assetsLoading, refreshImages, configureImage, configureImageRobloxId, assignRobloxImageId, importImage, useImage, bakeImage,
+    moveImage: (id: string, folder: string) => changeProjectImages(() => window.imageAssets.move(id, folder)),
+    removeImage: (id: string) => changeProjectImages(() => window.imageAssets.remove(id)),
     location: documentLocation(project.path, path), newDocument, openDocument, openTemplate, saveTemplate, moveAsset, save: (saveAs = false) => run(async () => { await save(saveAs); }),
     saveProjectUI: () => run(async () => { await save(false, true); }), back, dirty, path, error, busy: busy || runtime.active || assetsLoading, runtime };
   useAutomation(editor, { reset, saved: () => fileState.current.saved, path: () => fileState.current.path, busy: value => { operating.current = value; setBusy(value); }, markSaved: (value, file) => { fileState.current = { path: file, saved: JSON.stringify(value) }; setPath(file); setSaved(fileState.current.saved); } });

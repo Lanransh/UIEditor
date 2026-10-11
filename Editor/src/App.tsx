@@ -8,6 +8,7 @@ import { DocumentAssets } from './editor/DocumentAssets';
 import { ImageAssets, ImageAssetProperties } from './editor/ImageAssets';
 import { ScriptPanel, RuntimeOutput } from './editor/ScriptPanel';
 import { NewInterfaceDialog } from './editor/NewInterfaceDialog';
+import { SaveDocumentDialog } from './editor/SaveDocumentDialog';
 import { NewProjectDialog } from './editor/NewProjectDialog';
 import { RobloxImportDialog } from './editor/RobloxImportDialog';
 import { McpSettings } from './editor/McpSettings';
@@ -122,6 +123,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
   const editor = useDocumentEditor(project, onBack);
   const history = editor.history;
   const [creatingInterface, setCreatingInterface] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
   const [importing, setImporting] = useState(false);
   const [uiLibrary, setUiLibrary] = useState('项目UI');
   const [imageLibrary, setImageLibrary] = useState('永久图片');
@@ -222,7 +224,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
           <button disabled={editor.busy} onClick={() => void editor.openDocument()}>打开界面</button>
           <button aria-label="保存" disabled={editor.busy || !editor.hasDocument} onClick={() => void editor.save()}>保存 <span>Ctrl+S</span></button>
           <button disabled={editor.busy || !editor.hasDocument} onClick={() => void editor.saveProjectUI()}>保存为项目UI</button>
-          <button disabled={editor.busy || !editor.hasDocument} onClick={() => void editor.saveTemplate()}>保存为模板参考</button>
+          <button disabled={editor.busy || !editor.hasDocument} onClick={() => setSavingTemplate(true)}>保存为模板参考</button>
           <button aria-label="另存为" disabled={editor.busy || !editor.hasDocument} onClick={() => void editor.save(true)}>另存为 <span>Ctrl+Shift+S</span></button>
           <button disabled={editor.busy} onClick={() => void editor.back()}><ArrowLeft size={15} />返回 Hub</button>
         </div>
@@ -243,6 +245,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
       </details>
     </header>
     {creatingInterface && <NewInterfaceDialog onCancel={() => setCreatingInterface(false)} onCreate={name => { setCreatingInterface(false); void editor.newDocument(name); }} />}
+    {savingTemplate && <SaveDocumentDialog editor={editor} onClose={() => setSavingTemplate(false)} />}
     {importing && !editor.runtime.active && project.manifest.mode === 'roblox' && <RobloxImportDialog document={editor.document} imageAssets={editor.imageAssets}
       saveAssetId={async (id, robloxId) => { await editor.configureImageRobloxId(id, robloxId); }}
       assignNodeIds={editor.assignRobloxImageId} onClose={() => setImporting(false)} />}

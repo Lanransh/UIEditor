@@ -7,15 +7,22 @@ export interface ImageAsset {
   name: string; tags: string; previewImage: NonNullable<UINode['previewImage']>;
   robloxId: string;
   usage: 'image' | 'tile' | 'placeholder';
+  folder?: string;
 }
 export interface ImageAssetUpdate { id: string; name: string; tags: string; robloxId: string }
+export interface BakePreviewConfig { nodeId: string; width: number; height: number }
 export interface ImageAssetAPI {
   list(): Promise<Result<ImageAsset[]>>;
   import(library: ImageLibrary): Promise<Result<ImageAsset | null>>;
   importFile(library: ImageLibrary, file: File): Promise<Result<ImageAsset>>;
+  bake(document: UIDocument, nodeId: string, name: string, width: number, height: number): Promise<Result<ImageAsset>>;
   update(value: ImageAssetUpdate): Promise<Result<ImageAsset[]>>;
   updateRobloxId(id: string, robloxId: string): Promise<Result<ImageAsset[]>>;
   openDirectory(id: string): Promise<Result<null>>;
+  listFolders(): Promise<Result<string[]>>;
+  createFolder(path: string): Promise<Result<string[]>>;
+  move(id: string, folder: string): Promise<Result<ImageAsset[]>>;
+  remove(id: string): Promise<Result<ImageAsset[] | null>>;
 }
 declare global { interface Window { imageAssets: ImageAssetAPI } }
 

@@ -248,7 +248,7 @@ export function DocumentPreview({ document: shown, strategy, selected: selection
     const scrollTexture = (length: number, horizontal = false) => <div style={{ position: 'absolute', width: thickness, height: length, top: horizontal ? thickness : 0, transform: horizontal ? 'rotate(-90deg)' : undefined, transformOrigin: '0 0', backgroundImage: `url("${scrollTop}"), url("${scrollBottom}"), url("${scrollMiddle}")`, backgroundSize: `100% ${thickness}px, 100% ${thickness}px, 100% ${Math.max(0, length - 2 * thickness)}px`, backgroundPosition: 'top, bottom, center', backgroundRepeat: 'no-repeat' }} />;
     const button = ['TextButton', 'ImageButton'].includes(node.className);
     const disabled = runtime?.frame?.disabled.includes(node.id);
-    return <div key={node.id} data-node-id={runtime ? node.id : undefined} data-class-name={runtime ? node.className : undefined} className="preview-node" style={{ ...style, cursor: runtime?.active ? button ? disabled ? 'not-allowed' : 'pointer' : 'default' : undefined }}
+    return <div key={node.id} data-node-id={node.id} data-class-name={runtime ? node.className : undefined} className="preview-node" style={{ ...style, cursor: runtime?.active ? button ? disabled ? 'not-allowed' : 'pointer' : 'default' : undefined }}
       role={runtime?.active && button ? 'button' : undefined} aria-label={runtime?.active && button ? node.name : undefined} aria-disabled={runtime?.active && button ? disabled : undefined}
       onPointerDown={event => onNodePointerDown?.(event, node)}>
       <div style={contentStyle}>

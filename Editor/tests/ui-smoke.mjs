@@ -105,7 +105,7 @@ try {
   await dialogs(imageFile); await page.getByRole('button', { name: '选择预览图片', exact: true }).click();
   await page.getByText('图标.png', { exact: true }).waitFor();
   await select('主面板'); await add('TextButton'); await input('节点名称', '领取'); await input('Text', '领取奖励'); await input('Position.y.offset', 260);
-  // Selected nodes can be renamed inline from F2 or the row context menu.
+  // Selected nodes can be renamed inline from F2 or a double click.
   await select('领取');
   await page.keyboard.press('F2');
   await page.getByRole('textbox', { name: '重命名节点 领取', exact: true }).fill('临时名称');
@@ -114,22 +114,18 @@ try {
   await page.keyboard.press('F2');
   await page.getByRole('textbox', { name: '重命名节点 领取', exact: true }).fill('领取按钮');
   await page.keyboard.press('Enter');
-  await page.getByRole('button', { name: '选择节点 领取按钮', exact: true }).click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '重命名', exact: true }).click();
+  await page.getByRole('button', { name: '选择节点 领取按钮', exact: true }).dblclick();
   await page.getByRole('textbox', { name: '重命名节点 领取按钮', exact: true }).fill('领取');
   await page.keyboard.press('Enter');
   await page.getByRole('button', { name: '选择节点 领取', exact: true }).waitFor();
-  // Tree context save selects the project library without a native file dialog.
+  // The context menu has only node operations; project save remains in the file menu.
   await dialogs(null, null);
   await page.getByRole('button', { name: '选择节点 领取', exact: true }).click({ button: 'right' });
   const nodeMenu = page.getByRole('menu', { name: '节点操作', exact: true });
-  assert.equal(await nodeMenu.getByRole('separator').count(), 1);
-  assert.deepEqual(await nodeMenu.evaluate(menu => {
-    const children = [...menu.children], divider = children.findIndex(child => child.getAttribute('role') === 'separator');
-    return { operations: children.slice(0, divider).map(child => child.textContent), firstAddition: children[divider + 1].textContent };
-  }), { operations: ['重命名', '保存…'], firstAddition: 'Frame' });
-  await page.getByRole('menuitem', { name: '保存…', exact: true }).click();
-  await page.getByRole('dialog', { name: '保存UI', exact: true }).getByRole('button', { name: '保存', exact: true }).click();
+  assert.equal(await nodeMenu.getByRole('separator').count(), 0);
+  assert.deepEqual(await nodeMenu.getByRole('menuitem').allTextContents(), ['烘焙为图片…']);
+  await page.keyboard.press('Escape');
+  await menu('保存为项目UI');
   await dirty(false);
   const saved = JSON.parse(await readFile(file, 'utf8'));
   await page.getByRole('button', { name: 'UI 资产 在线奖励', exact: true }).waitFor();

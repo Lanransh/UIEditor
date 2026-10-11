@@ -3,7 +3,7 @@ import type { DocumentEditor } from './useDocumentEditor';
 
 export function SaveDocumentDialog({ editor, onClose }: { editor: DocumentEditor; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [target, setTarget] = useState('project');
+  const [target, setTarget] = useState('templates');
   const [folders, setFolders] = useState<string[]>([]);
   const [folder, setFolder] = useState('');
   const [error, setError] = useState('');

@@ -5,7 +5,7 @@ import type { PropertyDefinition } from './strategy';
 import type { DocumentEditor } from './useDocumentEditor';
 import { layoutComponent } from './roblox';
 import { moveNode, nodeDropParent, type NodeDropPosition } from './commands';
-import { SaveDocumentDialog } from './SaveDocumentDialog';
+import { BakeImageDialog } from './BakeImageDialog';
 
 const nodeIcons = import.meta.glob<string>('../assets/roblox-node-icons/*.png', { eager: true, query: '?url', import: 'default' });
 
@@ -28,7 +28,7 @@ export function NodeTree({ editor }: { editor: DocumentEditor }) {
   useEffect(() => {
     if (visible) setCollapsed(previous => new Set([...previous].filter(id => !visible.has(id))));
   }, [visible]);
-  const [saving, setSaving] = useState(false);
+  const [baking, setBaking] = useState<UINode | null>(null);
   const [renaming, setRenaming] = useState<{ id: string; original: string; value: string } | null>(null);
   const [menu, setMenu] = useState<{ parent: UINode; x: number; y: number; context?: boolean } | null>(null);
   const menuElement = useRef<HTMLDivElement>(null);
@@ -104,6 +104,7 @@ export function NodeTree({ editor }: { editor: DocumentEditor }) {
         onContextMenu={event => {
           event.preventDefault(); event.stopPropagation();
           if (editor.busy || !editor.select(node.id)) return;
+          if (editor.strategy.nodes[node.className].category !== 'object' && !node.children.length) { setMenu(null); return; }
           setMenu({ parent: node, context: true, x: Math.max(8, Math.min(event.clientX, window.innerWidth - 208)), y: Math.max(8, Math.min(event.clientY, window.innerHeight - 288)) });
         }}
         onDragStart={event => { draggedId.current = node.id; editor.select(node.id); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', node.id); }}
@@ -132,7 +133,7 @@ export function NodeTree({ editor }: { editor: DocumentEditor }) {
             if (event.key === 'Enter') event.currentTarget.blur();
             else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); renameCancelled.current = true; setRenaming(null); }
           }} /></div>
-          : <button className="node-select" aria-label={`选择节点 ${node.name}`} onClick={() => editor.select(node.id)}><img className="node-icon" src={nodeIcons[`../assets/roblox-node-icons/${node.className}.png`]} width={16} height={16} alt="" draggable={false} /><span>{node.name}</span></button>}
+          : <button className="node-select" aria-label={`选择节点 ${node.name}`} onClick={() => editor.select(node.id)} onDoubleClick={() => beginRename(node)}><img className="node-icon" src={nodeIcons[`../assets/roblox-node-icons/${node.className}.png`]} width={16} height={16} alt="" draggable={false} /><span>{node.name}</span></button>}
         {editor.strategy.nodes[node.className].category !== 'component' && <button disabled={editor.busy} className="node-add-child" aria-label={`为 ${node.name} 添加子节点`} title="添加子节点" aria-haspopup="menu" aria-expanded={menu?.parent.id === node.id} onClick={event => {
           const bounds = event.currentTarget.getBoundingClientRect();
           setMenu({ parent: node, x: Math.max(8, Math.min(bounds.right, window.innerWidth - 208)), y: Math.max(8, Math.min(bounds.bottom, window.innerHeight - 288)) });
@@ -161,21 +162,19 @@ export function NodeTree({ editor }: { editor: DocumentEditor }) {
       {menu && <div ref={menuElement} className="node-add-menu" role="menu" aria-label={menu.context ? '节点操作' : '添加子节点'} style={{ left: menu.x, top: menu.y }}
         onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setMenu(null); } }}
         onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setMenu(null); }}>
-        {menu.context && <button role="menuitem" autoFocus onClick={() => beginRename(menu.parent)}>重命名</button>}
-        {menu.context && <button role="menuitem" onClick={() => { setMenu(null); setSaving(true); }}>保存…</button>}
+        {menu.context && editor.strategy.nodes[menu.parent.className].category === 'object' && <button role="menuitem" autoFocus onClick={() => { setBaking(menu.parent); setMenu(null); }}>烘焙为图片…</button>}
         {menu.context && menu.parent.children.length > 0 && <>
           <button role="menuitem" onClick={() => setBranchExpanded(menu.parent, true, true)}>展开子节点(递归)</button>
           <button role="menuitem" onClick={() => setBranchExpanded(menu.parent, true, false)}>展开子节点</button>
           <button role="menuitem" onClick={() => setBranchExpanded(menu.parent, false, true)}>收起子节点(递归)</button>
           <button role="menuitem" onClick={() => setBranchExpanded(menu.parent, false, false)}>收起子节点</button>
         </>}
-        {menu.context && addableNodes.length > 0 && <div className="node-menu-separator" role="separator" />}
-        {addableNodes.map((name, index) => <button key={name} role="menuitem" autoFocus={!menu.context && index === 0} onClick={() => {
+        {!menu.context && addableNodes.map((name, index) => <button key={name} role="menuitem" autoFocus={index === 0} onClick={() => {
           editor.add(name, menu.parent.id); setMenu(null);
         }}><img className="node-icon" src={nodeIcons[`../assets/roblox-node-icons/${name}.png`]} width={16} height={16} alt="" />{name}</button>)}
       </div>}
-      {saving && <SaveDocumentDialog editor={editor} onClose={() => setSaving(false)} />}
     </fieldset>
+    {baking && <BakeImageDialog editor={editor} node={baking} onClose={() => setBaking(null)} />}
   </>;
 }
 

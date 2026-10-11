@@ -1,0 +1,211 @@
+import { _electron as electron } from 'playwright';
+import assert from 'node:assert/strict';
+import { mkdir, mkdtemp, readFile, writeFile, stat } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { robloxStrategy as strategy } from '../src/editor/roblox';
+import { dim2, type UIDocument } from '../src/shared/uiDocument';
+
+const output = resolve('test-results');
+await mkdir(output, { recursive: true });
+const temporary = await mkdtemp(join(output, 'image-bake-'));
+const parent = join(temporary, 'project');
+await mkdir(parent);
+const runtime = join(temporary, 'runtime');
+const document = strategy.createDocument('BakeTest');
+const button = strategy.createNode('ImageButton');
+button.name = 'RewardButton';
+button.properties.Position = dim2(100, 100);
+button.properties.Size = dim2(200, 100);
+button.properties.BackgroundTransparency = 1;
+button.properties.ScaleType = 'Stretch';
+const child = strategy.createNode('Frame');
+child.name = 'RedChild';
+child.properties.Position = dim2(40, 20);
+child.properties.Size = dim2(80, 60);
+child.properties.BackgroundColor3 = '#ff0000';
+const constraint = strategy.createNode('UISizeConstraint');
+constraint.name = 'KeepSize';
+const cross = strategy.createNode('TextLabel');
+cross.name = 'CloseCross'; cross.properties.Position = dim2(40, 20); cross.properties.Size = dim2(80, 60);
+cross.properties.Text = '×'; cross.properties.TextColor3 = '#ffffff'; cross.properties.TextSize = 38;
+cross.properties.BackgroundTransparency = 1;
+button.children.push(child, cross, constraint);
+document.root.children.push(button);
+const file = join(temporary, 'BakeTest.rbxui.json');
+await writeFile(file, JSON.stringify(document));
+const env: Record<string, string> = { ...process.env, UI_EDITOR_BACKGROUND: '1', UI_EDITOR_USER_DATA: runtime };
+delete env.ELECTRON_RUN_AS_NODE;
+const app = await electron.launch({ args: ['.'], env, timeout: 15000 });
+const page = await app.firstWindow();
+button.previewImage = { name: 'SolidBlue.png', dataUrl: await app.evaluate(({ nativeImage }) => nativeImage.createFromBitmap(Buffer.from([255, 0, 0, 255]), { width: 1, height: 1 }).toDataURL()) };
+await writeFile(file, JSON.stringify(document));
+page.setDefaultTimeout(15000);
+const errors: string[] = [];
+page.on('pageerror', error => errors.push(error.message));
+const node = (name: string) => page.getByRole('button', { name: `选择节点 ${name}`, exact: true });
+async function tool(name: string, args: Record<string, unknown> = {}) {
+  const discovery = JSON.parse(await readFile(join(runtime, 'ui-editor-automation.json'), 'utf8'));
+  const response = await fetch(`http://127.0.0.1:${discovery.port}/call`, { method: 'POST', headers: { authorization: `Bearer ${discovery.token}`, 'content-type': 'application/json' }, body: JSON.stringify({ name, arguments: args }) });
+  const result = await response.json();
+  assert.equal(result.ok, true, result.error);
+  return result.value;
+}
+async function currentDocument(): Promise<UIDocument> {
+  return (await tool('uie.editor.get_state', { detail: 'full' })).document;
+}
+async function open() {
+  await app.evaluate(({ dialog }, path) => {
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
+    dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false });
+  }, file);
+  await page.getByRole('button', { name: '文件', exact: true }).click();
+  await page.getByRole('button', { name: '打开界面', exact: true }).click();
+  await node('RewardButton').waitFor();
+}
+try {
+  await app.evaluate(({ dialog }, path) => {
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
+  }, parent);
+  await page.getByRole('button', { name: '创建工程', exact: true }).click();
+  await page.getByRole('dialog', { name: '创建工程', exact: true }).getByRole('button', { name: '下一步', exact: true }).click();
+  await page.getByText('请打开一个工程', { exact: true }).waitFor();
+  await open();
+  for (const [name, width, hidden] of [['InvalidSize', 0, false], ['../bad', 200, false], ['HiddenNode', 200, true]] as const) {
+    const input = structuredClone(document);
+    if (hidden) input.root.children[0].properties.Visible = false;
+    const result = await page.evaluate(async ({ input, id, name, width }) => window.imageAssets.bake(input, id, name, width, 100), { input, id: button.id, name, width });
+    assert.equal(result.ok, false, `${name} 烘焙应失败`);
+    assert.equal((await tool('uie.assets.search', { library: 'project' })).assets.length, 0, '失败不生成图片资产');
+  }
+  await node('RewardButton').click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: '节点操作', exact: true });
+  assert.equal(await menu.getByRole('menuitem', { name: /^(保存|重命名)/ }).count(), 0);
+  assert.equal(await menu.getByRole('menuitem', { name: 'Frame', exact: true }).count(), 0);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: '为 RewardButton 添加子节点', exact: true }).click();
+  await page.getByRole('menu', { name: '添加子节点', exact: true }).getByRole('menuitem', { name: 'Frame', exact: true }).waitFor();
+  await page.keyboard.press('Escape');
+  await node('RewardButton').dblclick();
+  const rename = page.getByRole('textbox', { name: '重命名节点 RewardButton', exact: true });
+  await rename.fill('CancelledName');
+  await rename.press('Escape');
+  await node('RewardButton').waitFor();
+  assert.equal((await currentDocument()).root.children[0].name, 'RewardButton');
+  await node('RewardButton').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '烘焙为图片…', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '烘焙为图片', exact: true });
+  assert.equal(await dialog.getByLabel('图片宽度', { exact: true }).inputValue(), '200');
+  assert.equal(await dialog.getByLabel('图片高度', { exact: true }).inputValue(), '100');
+  assert.equal(await dialog.getByLabel('转换为', { exact: true }).inputValue(), 'ImageButton');
+  await dialog.getByLabel('图片名称', { exact: true }).fill('BakedButton');
+  await dialog.getByLabel('图片宽度', { exact: true }).fill('400');
+  await dialog.getByLabel('图片高度', { exact: true }).fill('200');
+  await dialog.getByRole('button', { name: '烘焙并转换', exact: true }).click();
+  await dialog.waitFor({ state: 'detached' });
+  const baked = (await currentDocument()).root.children[0];
+  assert.equal(baked.className, 'ImageButton');
+  assert.equal(baked.id, button.id);
+  assert.equal(baked.name, button.name);
+  assert.deepEqual(baked.properties.Position, button.properties.Position);
+  assert.deepEqual(baked.properties.Size, button.properties.Size);
+  assert.deepEqual(baked.children, [constraint]);
+  assert.equal(baked.properties.BackgroundTransparency, 1);
+  assert.equal(baked.properties.Image, '');
+  const asset = (await tool('uie.assets.search', { library: 'project' })).assets[0];
+  assert.equal(asset.name, 'BakedButton');
+  assert.equal(asset.id, baked.imageAssetId);
+  const pngPath = join(parent, 'ArtSource/UI/BakedButton.png');
+  const png = await readFile(pngPath);
+  const metadata = JSON.parse(await readFile(`${pngPath}.meta`, 'utf8'));
+  assert.equal(metadata.id, asset.id);
+  assert.deepEqual(metadata.uploads, []);
+  assert.equal(png.readUInt32BE(16), 400);
+  assert.equal(png.readUInt32BE(20), 200);
+  const pixels = await app.evaluate(({ nativeImage }, base64) => {
+    const image = nativeImage.createFromBuffer(Buffer.from(base64, 'base64'));
+    const bitmap = image.getBitmap() as unknown as Buffer;
+    return { corner: Array.from(bitmap.subarray((5 * 400 + 5) * 4, (5 * 400 + 5) * 4 + 4)),
+      child: Array.from(bitmap.subarray((50 * 400 + 90) * 4, (50 * 400 + 90) * 4 + 4)),
+      whitePixels: Array.from(bitmap).filter((_value, index) => index % 4 === 0 && bitmap[index] === 255 && bitmap[index + 1] === 255 && bitmap[index + 2] === 255 && bitmap[index + 3] === 255).length };
+  }, png.toString('base64'));
+  assert.deepEqual(pixels.corner, [255, 0, 0, 255], '选中节点自身的纯色图片也被烘焙');
+  assert.deepEqual(pixels.child, [0, 0, 255, 255], '子节点红色被合成到图片');
+  assert.ok(pixels.whitePixels > 0, '叉号子节点合成到同一张图片');
+  const roundedDocument = structuredClone(document);
+  const roundedButton = roundedDocument.root.children[0];
+  const corner = strategy.createNode('UICorner'); corner.properties.CornerRadius = { scale: 0, offset: 20 };
+  const outline = strategy.createNode('UIStroke'); outline.properties.Color = '#000000'; outline.properties.Thickness = 6;
+  roundedButton.children.push(corner, outline);
+  const rounded = await page.evaluate(async ({ input, id }) => window.imageAssets.bake(input, id, 'RoundedStroke', 200, 100), { input: roundedDocument, id: button.id });
+  if (!rounded.ok) throw new Error(rounded.error);
+  const roundedPixels = await app.evaluate(({ nativeImage }, dataUrl) => {
+    const image = nativeImage.createFromDataURL(dataUrl), bitmap = image.getBitmap() as unknown as Buffer;
+    return [[1, 50], [100, 1], [198, 50], [100, 98], [0, 0], [25, 50]].map(([x, y]) => Array.from(bitmap.subarray((y * 200 + x) * 4, (y * 200 + x) * 4 + 4)));
+  }, rounded.value.previewImage.dataUrl);
+  for (const edge of [0, 1, 2, 3]) assert.deepEqual(roundedPixels[edge], [0, 0, 0, 255], `完整保留第${edge + 1}条外圈描边`);
+  assert.equal(roundedPixels[4][3], 0, '圆角外部保留透明像素');
+  assert.deepEqual(roundedPixels[5], [255, 0, 0, 255], '圆角与描边内部仍保留选中节点底图');
+  await page.keyboard.press('Control+z');
+  await node('RedChild').waitFor();
+  assert.deepEqual((await currentDocument()).root.children[0], button);
+  await page.keyboard.press('Control+y');
+  assert.deepEqual((await currentDocument()).root.children[0], baked);
+  await page.keyboard.press('Control+s');
+  await page.getByText('界面已保存', { exact: true }).waitFor();
+  assert.deepEqual(JSON.parse(await readFile(file, 'utf8')).root.children[0], baked);
+  await open();
+  assert.deepEqual((await currentDocument()).root.children[0], baked);
+  await page.screenshot({ path: join(output, 'image-bake-converted.png') });
+  await page.getByRole('button', { name: '图片资产', exact: true }).click();
+  await page.getByRole('button', { name: '项目图片', exact: true }).click();
+  await page.getByRole('button', { name: '图片资产 BakedButton', exact: true }).waitFor();
+  await page.locator('.image-asset-list').click({ button: 'right', position: { x: 600, y: 20 } });
+  await page.getByRole('menuitem', { name: '新建文件夹…', exact: true }).click();
+  await page.getByLabel('文件夹名称', { exact: true }).fill('按钮');
+  await page.getByRole('dialog', { name: '新建图片文件夹', exact: true }).getByRole('button', { name: '创建', exact: true }).click();
+  await page.getByRole('button', { name: '图片文件夹 按钮', exact: true }).dblclick();
+  await page.locator('.image-asset-list').click({ button: 'right', position: { x: 600, y: 20 } });
+  await page.getByRole('menuitem', { name: '新建文件夹…', exact: true }).click();
+  await page.getByLabel('文件夹名称', { exact: true }).fill('关闭');
+  await page.getByRole('dialog', { name: '新建图片文件夹', exact: true }).getByRole('button', { name: '创建', exact: true }).click();
+  await page.getByRole('button', { name: '图片文件夹 按钮/关闭', exact: true }).waitFor();
+  await page.getByRole('button', { name: '返回上级', exact: true }).click();
+  await page.getByRole('button', { name: '图片资产 BakedButton', exact: true }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '移动到文件夹…', exact: true }).click();
+  await page.getByLabel('目标文件夹', { exact: true }).selectOption('按钮/关闭');
+  await page.getByRole('dialog', { name: '移动图片', exact: true }).getByRole('button', { name: '移动', exact: true }).click();
+  await page.getByRole('dialog', { name: '移动图片', exact: true }).waitFor({ state: 'detached' });
+  const movedPath = join(parent, 'ArtSource/UI/按钮/关闭/BakedButton.png');
+  assert.deepEqual(await readFile(movedPath), png);
+  assert.equal(JSON.parse(await readFile(`${movedPath}.meta`, 'utf8')).id, asset.id);
+  await assert.rejects(stat(pngPath));
+  await app.evaluate(({ dialog }) => {
+    const state = globalThis as unknown as { imageDeleteResponse: number; imageDeleteCount: number; imageDeletePrompt: Electron.MessageBoxOptions };
+    state.imageDeleteResponse = 1; state.imageDeleteCount = 0;
+    dialog.showMessageBox = async (...args: unknown[]) => {
+      state.imageDeletePrompt = args.at(-1) as Electron.MessageBoxOptions;
+      state.imageDeleteCount++;
+      return { response: state.imageDeleteResponse, checkboxChecked: false };
+    };
+  });
+  await page.getByRole('button', { name: '图片资产 BakedButton', exact: true }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '删除图片…', exact: true }).click();
+  await page.waitForFunction(() => !(window.document.querySelector('.image-asset-list > button') as HTMLButtonElement)?.disabled);
+  const confirmation = await app.evaluate(() => (globalThis as unknown as { imageDeletePrompt: Electron.MessageBoxOptions }).imageDeletePrompt);
+  assert.deepEqual(confirmation.buttons, ['删除', '取消']); assert.equal(confirmation.defaultId, 1);
+  await stat(movedPath); await stat(`${movedPath}.meta`);
+  await app.evaluate(() => { (globalThis as unknown as { imageDeleteResponse: number }).imageDeleteResponse = 0; });
+  await page.getByRole('button', { name: '图片资产 BakedButton', exact: true }).click();
+  await page.keyboard.press('Delete');
+  await page.getByRole('button', { name: '图片资产 BakedButton', exact: true }).waitFor({ state: 'detached' });
+  assert.equal(await app.evaluate(() => (globalThis as unknown as { imageDeleteCount: number }).imageDeleteCount), 2);
+  await assert.rejects(stat(movedPath)); await assert.rejects(stat(`${movedPath}.meta`));
+  assert.deepEqual((await currentDocument()).root.children[0], baked, '删除图片资产不能删除选中 UI 节点或其快照');
+  await page.keyboard.press('Delete');
+  assert.deepEqual((await currentDocument()).root.children[0], baked, '删除后再次按 Delete 不能误删 UI 节点');
+  assert.deepEqual(errors, []);
+  console.log('PASS: selected image node, child surface and cross baked together, four outline edges and rounded transparent corners; undo/redo and save/reopen; project folder creation, nested browsing, image/meta moves, confirmed context/Delete removal and cancellation, retained UI snapshots.');
+} finally {
+  await app.evaluate(({ app }) => app.exit()).catch(() => {});
+  await app.close();
+}

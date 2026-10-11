@@ -120,6 +120,21 @@ export class ImageAssetStore {
     await regular(path);
     return this.import(library, await readPreviewImage(path));
   }
+  async projectFolders(): Promise<string[]> {
+    return withCatalog(this.directory('project'), () => this.projectStore().folders());
+  }
+  async createProjectFolder(path: string): Promise<string[]> {
+    await withCatalog(this.directory('project'), () => this.projectStore().createFolder(path));
+    return this.projectFolders();
+  }
+  async moveProjectImage(id: string, folder: string): Promise<ImageAsset[]> {
+    await withCatalog(this.directory('project'), () => this.projectStore().move(id, folder));
+    return this.list();
+  }
+  async removeProjectImage(id: string): Promise<ImageAsset[]> {
+    await withCatalog(this.directory('project'), () => this.projectStore().remove(id));
+    return this.list();
+  }
   async import(library: ImageLibrary, previewImage: NonNullable<UINode['previewImage']>): Promise<ImageAsset> {
     if (!['permanent', 'project'].includes(library)) throw new Error('图片资产库无效。');
     let asset = validateAsset({ id: library === 'project' ? randomUUID().replaceAll('-', '') : randomUUID(), platform: 'roblox', library, name: previewImage.name.replace(/\.[^.]+$/, ''), tags: '', previewImage, robloxId: '', usage: 'image' });

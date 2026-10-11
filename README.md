@@ -90,6 +90,7 @@ npm run dev
 | `npm run test:mcp` | 构建并通过真实 stdio MCP 验证制作、查询、历史、运行与保存 |
 | `npm run test:mcp:packaged` | 验证已打包程序的 MCP 完整链路，需先 package |
 | `npm run test:assets` | 构建并验证图片库、共用属性面板、单一 Roblox ID、保存重开及资产 MCP |
+| `npm run test:bake` | 构建并验证节点烘焙、透明 PNG、项目资产落盘、转换撤销及保存重开 |
 | `npm run test:templates` | 构建并验证项目模板与文件夹隔离、缩略图、独立副本、重启持久化、UI库互移与保存路径 |
 | `npm run test:styles` | 构建并验证风格库、整套独立复制、失败清理、风格选择和历史克隆互斥、重开提示词保护 |
 | `npm run test:style-library` | 构建并验证 Hub 画风库入口、全部模板预览、小组件聚焦、缩放刷新、只读保护与错误重试 |

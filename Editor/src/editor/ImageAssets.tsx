@@ -1,18 +1,63 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { DocumentEditor } from './useDocumentEditor';
 import { normalizeRobloxId, type ImageAsset } from '../shared/imageAssets';
 import { ImageUploadDialog } from './ImageUploadDialog';
+import { ImageFolderDialog } from './ImageFolderDialog';
+import { Folder } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 export function ImageAssets({ editor, library, selectedId, select }: {
   editor: DocumentEditor; library: string; selectedId: string | null; select(id: string): void;
 }) {
   const [error, setError] = useState('');
-  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [menu, setMenu] = useState<{ id: string | null; x: number; y: number } | null>(null);
+  const [folder, setFolder] = useState(''), [folders, setFolders] = useState<string[]>([]);
+  const [folderDialog, setFolderDialog] = useState<{ mode: 'create' | 'move'; id?: string } | null>(null);
   const menuElement = useRef<HTMLDivElement>(null);
+  const container = useRef<HTMLDivElement>(null);
   const scope = library === '永久图片' ? 'permanent' : 'project';
-  const assets = editor.imageAssets.filter(a => a.library === scope);
+  const assets = editor.imageAssets.filter(a => a.library === scope && (scope !== 'project' || (a.folder ?? '') === folder));
+  const subfolders = folders.filter(path => path.startsWith(folder ? `${folder}/` : '') && !path.slice(folder ? folder.length + 1 : 0).includes('/'));
   const asset = assets.find(a => a.id === menu?.id);
   useEffect(() => { setMenu(null); }, [library, editor.busy]);
+  useEffect(() => {
+    setFolder(''); setMenu(null);
+    setFolders([]);
+    let alive = true;
+    if (scope === 'project') void window.imageAssets.listFolders().then(result => {
+      if (!alive) return;
+      if (result.ok) setFolders(result.value); else setError(result.error);
+    }).catch(cause => { if (alive) setError(String(cause)); });
+    return () => { alive = false; };
+  }, [scope]);
+  useEffect(() => {
+    if (scope !== 'project' || editor.inspectedAssetId !== selectedId) return;
+    const selected = editor.imageAssets.find(asset => asset.id === selectedId && asset.library === 'project');
+    if (selected) setFolder(selected.folder ?? '');
+  }, [scope, selectedId, editor.inspectedAssetId]);
+  useEffect(() => {
+    const remove = (event: Event) => {
+      const id = (event as CustomEvent<string>).detail;
+      if (scope === 'project' && assets.some(asset => asset.id === id) && !editor.busy) void removeImage(id);
+    };
+    window.addEventListener('uie:delete-image-asset', remove);
+    return () => window.removeEventListener('uie:delete-image-asset', remove);
+  }, [scope, assets, editor.busy]);
+  async function removeImage(id: string) {
+    setMenu(null); setError('');
+    try { if (await editor.removeImage(id)) container.current?.focus(); }
+    catch (cause) { setError(String(cause)); }
+  }
+  function openMenu(id: string | null, x: number, y: number) {
+    setMenu({ id, x: Math.max(0, Math.min(x, window.innerWidth - 150)), y: Math.max(0, Math.min(y, window.innerHeight - 252)) });
+  }
+  useLayoutEffect(() => {
+    if (!menu || !menuElement.current) return;
+    const bounds = menuElement.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(menu.x, window.innerWidth - bounds.width));
+    const y = Math.max(0, Math.min(menu.y, window.innerHeight - bounds.height));
+    if (x !== menu.x || y !== menu.y) setMenu({ ...menu, x, y });
+  }, [menu]);
   useEffect(() => {
     if (!menu) return;
     function dismiss(event: PointerEvent) {
@@ -21,11 +66,11 @@ export function ImageAssets({ editor, library, selectedId, select }: {
     const close = () => setMenu(null);
     window.addEventListener('pointerdown', dismiss);
     window.addEventListener('resize', close);
-    window.addEventListener('scroll', close, true);
+    window.addEventListener('wheel', close, true);
     return () => {
       window.removeEventListener('pointerdown', dismiss);
       window.removeEventListener('resize', close);
-      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('wheel', close, true);
     };
   }, [menu]);
   async function openDirectory(id: string) {
@@ -39,30 +84,46 @@ export function ImageAssets({ editor, library, selectedId, select }: {
     setMenu(null); setError('');
     try {
       const imported = await editor.importImage(scope);
-      if (imported) select(imported.id);
+      if (imported) { setFolder(''); select(imported.id); }
     } catch (cause) { setError(String(cause)); }
   }
-  return <div className="image-assets">
+  return <div ref={container} tabIndex={-1} className="image-assets" onContextMenu={event => {
+    if (scope !== 'project' || editor.busy || (event.target as HTMLElement).closest('button, [role="menu"], dialog')) return;
+    event.preventDefault(); openMenu(null, event.clientX, event.clientY);
+  }}>
     <div className="image-asset-list">
       <button disabled={editor.busy} onClick={() => void importLocalImage()} title={`导入到${library}，仅本地使用，不会上传 Roblox`}>导入本地图片</button>
+      {scope === 'project' && <div className="image-folder-path">
+        {folder && <button disabled={editor.busy} onClick={() => { if (editor.clearAssetInspection()) { setFolder(folder.split('/').slice(0, -1).join('/')); setMenu(null); } }}>返回上级</button>}
+        <span>{folder || '项目图片根目录'}</span>
+      </div>}
       {error && <p role="alert" className="asset-error">{error}</p>}
       {editor.assetsLoading ? <p role="status">正在加载图片资产…</p> : <div className="asset-grid">
+        {scope === 'project' && subfolders.map(path => <button key={path} className="ui-asset image-folder" aria-label={`图片文件夹 ${path}`} disabled={editor.busy} onDoubleClick={() => {
+          if (editor.clearAssetInspection()) { setFolder(path); setMenu(null); }
+        }}><span className="ui-asset-preview"><Folder size={36} /></span><span className="ui-asset-name">{path.split('/').at(-1)}</span><small>双击打开</small></button>)}
         {assets.map(a => <div key={a.id} className="image-asset-entry">
-          <button className={`ui-asset${selectedId === a.id ? ' current' : ''}`} aria-label={`图片资产 ${a.name}`} aria-pressed={selectedId === a.id}
+          <button className={`ui-asset${selectedId === a.id ? ' current' : ''}`} disabled={editor.busy} aria-label={`图片资产 ${a.name}`} aria-pressed={selectedId === a.id}
             draggable={!editor.busy} onDragStart={event => { event.dataTransfer.setData('application/x-uie-image-asset', a.id); event.dataTransfer.effectAllowed = 'copy'; }}
             onClick={() => { select(a.id); setMenu(null); }}
             onContextMenu={event => {
-              event.preventDefault(); select(a.id);
+              event.preventDefault(); event.stopPropagation();
+              if (editor.busy || !editor.inspectAsset(a.id)) return;
+              select(a.id);
               const bounds = event.currentTarget.getBoundingClientRect();
-              setMenu({ id: a.id, x: Math.max(0, Math.min(event.clientX || bounds.left, window.innerWidth - 150)), y: Math.max(0, Math.min(event.clientY || bounds.bottom, window.innerHeight - 160)) });
+              openMenu(a.id, event.clientX || bounds.left, event.clientY || bounds.bottom);
             }}>
             <span className="ui-asset-preview image-checker"><img src={a.previewImage.dataUrl} alt="" /></span>
             <span className="ui-asset-name">{a.name}</span><small>{a.usage === 'placeholder' ? '占位图 · ' : ''}{a.robloxId ? '已配置 ID' : '仅本地'}</small>
           </button>
         </div>)}
       </div>}
-      {!editor.assetsLoading && !assets.length && <p role="status">暂无{library}</p>}
-      {menu && asset && <div ref={menuElement} className="asset-context-menu" role="menu" aria-label="图片资产操作" style={{ left: menu.x, top: menu.y }}
+      {!editor.assetsLoading && !assets.length && !subfolders.length && <p role="status">暂无{library}</p>}
+      {menu && !menu.id && createPortal(<div ref={menuElement} className="asset-context-menu" role="menu" aria-label="项目图片目录操作" style={{ left: menu.x, top: menu.y, fontSize: 12 }}
+        onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setMenu(null); } }}>
+        <button role="menuitem" autoFocus onClick={() => { setMenu(null); setFolderDialog({ mode: 'create' }); }}>新建文件夹…</button>
+      </div>, window.document.body)}
+      {menu && asset && createPortal(<div ref={menuElement} className="asset-context-menu" role="menu" aria-label="图片资产操作" style={{ left: menu.x, top: menu.y, fontSize: 12 }}
         onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setMenu(null); } }}
         onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setMenu(null); }}>
         <button role="menuitem" autoFocus disabled={editor.busy} onClick={() => { setMenu(null); editor.useImage(asset); }}>应用到选中节点</button>
@@ -72,8 +133,24 @@ export function ImageAssets({ editor, library, selectedId, select }: {
           setMenu(null);
           void navigator.clipboard.writeText(asset.robloxId).catch(cause => setError(String(cause)));
         }}>复制 ID</button>
-      </div>}
+        {scope === 'project' && <>
+          <button role="menuitem" disabled={editor.busy} onClick={() => { setMenu(null); setFolderDialog({ mode: 'move', id: asset.id }); }}>移动到文件夹…</button>
+          <button role="menuitem" disabled={editor.busy} onClick={() => void removeImage(asset.id)}>删除图片…</button>
+        </>}
+      </div>, window.document.body)}
     </div>
+    {folderDialog && <ImageFolderDialog mode={folderDialog.mode} folders={folders} current={folder} onClose={() => setFolderDialog(null)} onSubmit={async value => {
+      if (folderDialog.mode === 'move') {
+        if (!await editor.moveImage(folderDialog.id!, value)) throw new Error('移动已取消。');
+        setFolder(value);
+      }
+      else {
+        if (value.includes('/') || value.includes('\\')) throw new Error('文件夹名称不能包含路径。');
+        const result = await window.imageAssets.createFolder(folder ? `${folder}/${value.trim()}` : value.trim());
+        if (!result.ok) throw new Error(result.error);
+        setFolders(result.value);
+      }
+    }} />}
   </div>;
 }
 

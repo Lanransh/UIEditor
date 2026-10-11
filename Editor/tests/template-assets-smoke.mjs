@@ -43,9 +43,8 @@ async function add(type, parent) {
   await page.waitForFunction(type => document.querySelector('[aria-label="节点名称"]')?.value === type, type);
 }
 async function idle() { await page.waitForFunction(() => !document.querySelector('fieldset')?.disabled); }
-async function treeSave(target) {
-  await page.getByRole('button', { name: '选择节点 TextLabel', exact: true }).click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '保存…', exact: true }).click();
+async function saveSnapshot(target) {
+  await menu('保存为模板参考');
   await page.getByLabel('保存到', { exact: true }).selectOption(target);
   await page.getByRole('dialog', { name: '保存UI', exact: true }).getByRole('button', { name: '保存', exact: true }).click();
   await idle();
@@ -81,7 +80,7 @@ try {
   await page.getByText('界面已保存', { exact: true }).waitFor();
   const projectBefore = await readFile(projectFile(first), 'utf8');
   await input('Text', '参考快照');
-  await menu('保存为模板参考'); await idle();
+  await saveSnapshot('templates');
   assert.equal(await readFile(projectFile(first), 'utf8'), projectBefore);
   await page.getByText('界面有未保存修改', { exact: true }).waitFor();
   assert.equal(textOf(JSON.parse(await readFile(templateFile, 'utf8'))), '参考快照');
@@ -99,19 +98,18 @@ try {
   await input('Text', '更新参考');
   await dialogs(first, 1);
   assert.equal(await page.getByRole('button', { name: '保存当前UI为模板参考', exact: true }).count(), 0);
-  await treeSave('templates');
+  await saveSnapshot('templates');
   assert.equal(await readFile(templateFile, 'utf8'), referenceBefore);
   await page.getByText('界面有未保存修改', { exact: true }).waitFor();
   await dialogs();
-  await treeSave('templates');
+  await saveSnapshot('templates');
   await preview('更新参考');
   const reference = await readFile(templateFile, 'utf8');
   // Existing project folders remain usable without a folder-creation UI.
   await mkdir(join(first, 'UIEditorWorkspace', 'AgentWorkspace', 'styles', 'templates', '奖励界面'));
   await preview('更新参考');
-  await page.getByRole('button', { name: '选择节点 TextLabel', exact: true }).click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '保存…', exact: true }).click();
-  await page.getByLabel('保存到', { exact: true }).selectOption('templates');
+  await menu('保存为模板参考');
+  assert.equal(await page.getByLabel('保存到', { exact: true }).inputValue(), 'templates');
   await page.getByLabel('模板文件夹', { exact: true }).selectOption('奖励界面');
   await page.getByRole('dialog', { name: '保存UI', exact: true }).getByRole('button', { name: '保存', exact: true }).click();
   await idle();

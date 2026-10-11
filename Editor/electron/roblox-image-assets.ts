@@ -1,5 +1,5 @@
 import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { basename, dirname, extname, join, resolve } from 'node:path';
+import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { normalizeRobloxId, type ImageAsset, type ImageAssetUpdate } from '../src/shared/imageAssets';
 import { readPreviewImage, safeFileName } from './documents';
@@ -88,6 +88,7 @@ export class RobloxImageAssetStore {
           const asset: ImageAsset = {
             id: meta.id, platform: 'roblox', library: 'project', name: basename(path, extname(path)),
             tags: meta.tags.join(', '), usage: 'image', previewImage,
+            ...(directory !== this.root ? { folder: relative(this.root, directory).replaceAll('\\', '/') } : {}),
             robloxId: upload ? normalizeRobloxId(upload.assetId) : '',
           };
           entries.push({ path, meta, asset });
@@ -105,6 +106,65 @@ export class RobloxImageAssetStore {
     const entry = (await this.entries()).find(entry => entry.asset.id === id);
     if (!entry) throw new Error('图片资产不存在。');
     return dirname(entry.path);
+  }
+  private async folder(path: string): Promise<string> {
+    if (typeof path !== 'string' || path.length > 500 || path.split('/').some(part => path !== '' && (!part || part.startsWith('.') || part !== safeFileName(part)))) throw new Error('图片文件夹路径无效。');
+    await this.checkRoot();
+    let directory = this.root;
+    for (const part of path ? path.split('/') : []) {
+      directory = join(directory, part);
+      if (!await regular(directory, true)) throw new Error('图片文件夹不存在。');
+    }
+    return directory;
+  }
+  async folders(): Promise<string[]> {
+    if (!await this.checkRoot()) return [];
+    const result: string[] = [];
+    const visit = async (directory: string) => {
+      for (const item of await readdir(directory, { withFileTypes: true })) {
+        if (item.name.startsWith('.')) continue;
+        if (item.isSymbolicLink()) throw new Error('图片资产目录不能包含链接。');
+        if (!item.isDirectory()) continue;
+        const path = join(directory, item.name);
+        await regular(path, true);
+        result.push(relative(this.root, path).replaceAll('\\', '/'));
+        await visit(path);
+      }
+    };
+    await visit(this.root);
+    return result.sort((a, b) => a.localeCompare(b, 'zh-CN'));
+  }
+  async createFolder(path: string): Promise<void> {
+    if (typeof path !== 'string' || !path || path.length > 500 || path.split('/').some(part => !part || part.startsWith('.') || part !== safeFileName(part))) throw new Error('图片文件夹名称无效。');
+    const parts = path.split('/'), name = parts.pop()!;
+    if (name.startsWith('.') || name !== safeFileName(name)) throw new Error('图片文件夹名称无效。');
+    const parent = await this.folder(parts.join('/'));
+    await mkdir(this.root, { recursive: true });
+    await mkdir(join(parent, name));
+  }
+  async move(id: string, folder: string): Promise<void> {
+    const entry = (await this.entries()).find(entry => entry.asset.id === id);
+    if (!entry) throw new Error('图片资产不存在。');
+    const directory = await this.folder(folder), target = join(directory, basename(entry.path));
+    if (target.toLowerCase() === entry.path.toLowerCase()) return;
+    if (await regular(target) || await regular(`${target}.meta`)) throw new Error('目标文件夹已有同名图片，未移动。');
+    await rename(entry.path, target);
+    try { await rename(`${entry.path}.meta`, `${target}.meta`); }
+    catch (error) { await rename(target, entry.path); throw error; }
+  }
+  async remove(id: string): Promise<void> {
+    const entry = (await this.entries()).find(entry => entry.asset.id === id);
+    if (!entry) throw new Error('图片资产不存在。');
+    const temporary = join(dirname(entry.path), `.delete-${randomUUID()}`);
+    await rename(entry.path, temporary);
+    try { await rm(`${entry.path}.meta`); await rm(temporary); }
+    catch (error) {
+      if (await regular(temporary)) {
+        await rename(temporary, entry.path);
+        await writeMeta(`${entry.path}.meta`, entry.meta);
+      }
+      throw error;
+    }
   }
   async import(asset: ImageAsset): Promise<ImageAsset> {
     await this.checkRoot();
