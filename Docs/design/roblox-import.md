@@ -34,7 +34,7 @@ Generated/
 
 普通页面默认 `ScreenAdaptation = true`；MainUI 可在类上设置 `ScreenAdaptation = false`，自行管理屏幕布局。公共类在 Ctor 中按开关启动适配，以 1280×720 为设计基准，取当前 ScreenGui 可用宽高比例的较小值，整体等比缩放并居中；大屏可放大，比例不同时留白。仅处理直属 GuiObject，不增加父级容器，保留节点查找路径；直属位置与尺寸中的 Scale/Offset 先按设计画布解析，子孙节点沿用内部布局。已有 UIScale 与设备比例相乘，避免重复缩放；尺寸变化和新增直属节点自动更新，移出节点与组件销毁时恢复设计值并清理监听。编辑器运行在固定 1280×720 画布，设备适配比例为 1。
 
-UIEditor 生成的 ScreenGui 和全部 GuiObject 显式开启 AutoLocalize，布局与约束节点不写此属性；自动翻译由 Roblox 的游戏本地化表提供，App 不模拟翻译服务。
+UIEditor 生成的 ScreenGui 和非文本 GuiObject 显式开启 AutoLocalize；TextLabel、TextButton、TextBox 使用文档中的 AutoLocalize 开关，导入保留显式关闭的值。布局与约束节点不写此属性；自动翻译由 Roblox 的游戏本地化表提供，App 不模拟翻译服务。
 
 ## 游戏业务继承
 

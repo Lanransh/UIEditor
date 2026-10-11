@@ -98,6 +98,12 @@ try {
   assert.equal(await page.getByRole('button', { name: '选择节点 TextLabel', exact: true }).count(), 0);
   await page.keyboard.press('Control+y');
   await select('TextLabel'); await input('节点名称', '标题'); await input('Text', '在线奖励');
+  assert.equal(await page.getByLabel('AutoLocalize', { exact: true }).isChecked(), true);
+  await page.getByLabel('AutoLocalize', { exact: true }).uncheck();
+  await undo();
+  assert.equal(await page.getByLabel('AutoLocalize', { exact: true }).isChecked(), true);
+  await page.keyboard.press('Control+y');
+  assert.equal(await page.getByLabel('AutoLocalize', { exact: true }).isChecked(), false);
   await select('主面板'); await add('ImageLabel'); await input('节点名称', '奖励图标'); await input('Position.y.offset', 100);
   assert.ok(await page.getByTestId('ui-artboard').getByText('缺少预览图片', { exact: true }).isVisible());
   const imageFile = join(root, '图标.png');
@@ -130,6 +136,7 @@ try {
   const saved = JSON.parse(await readFile(file, 'utf8'));
   await page.getByRole('button', { name: 'UI 资产 在线奖励', exact: true }).waitFor();
   assert.equal(saved.root.children[0].children.length, 4);
+  assert.equal(saved.root.children[0].children[1].properties.AutoLocalize, false);
   assert.equal(saved.root.children[0].children[2].previewImage.name, '图标.png');
   assert.equal('state' in saved, false); assert.equal('config' in saved, false);
   // Compact icon/name rows and native tree drag, including collapsed destinations.
@@ -171,6 +178,9 @@ try {
   await dialogs(null, copyFile); await menu('保存'); await dirty(false);
   assert.equal(JSON.parse(await readFile(copyFile, 'utf8')).id, copy.id);
   await dialogs(file); await menu('打开界面'); await select('领取'); await dirty(false);
+  await select('标题');
+  assert.equal(await page.getByLabel('AutoLocalize', { exact: true }).isChecked(), false);
+  await select('领取');
 
   // Pointer movement is converted through zoom; all move events form one command.
   await page.getByLabel('画布缩放').selectOption('0.5');

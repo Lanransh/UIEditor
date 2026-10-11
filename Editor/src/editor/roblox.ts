@@ -18,6 +18,7 @@ const common = {
   BackgroundColor3: color('#ffffff'), BackgroundTransparency: number(0, 0, 1), ClipsDescendants: bool(false),
 };
 const text = {
+  AutoLocalize: bool(true),
   Text: string('文字'), TextColor3: color('#263a3a'), TextSize: number(24, 1, 100), TextTransparency: number(0, 0, 1),
   Font: enumeration('SourceSans', ['SourceSans', 'Arial', 'Gotham', 'GothamBold']), TextWrapped: bool(true), TextScaled: bool(false),
   TextXAlignment: enumeration('Center', ['Left', 'Center', 'Right']), TextYAlignment: enumeration('Center', ['Top', 'Center', 'Bottom']),
@@ -105,6 +106,7 @@ export class RobloxProjectStrategy implements ProjectStrategy {
       if (Object.hasOwn(value, 'imageAssetId') && (!value.className.startsWith('Image') || typeof value.imageAssetId !== 'string' || !value.imageAssetId.trim() || value.imageAssetId.length > 160)) throw new Error('图片资产引用无效。');
       ids.add(value.id);
       const definition = this.nodes[value.className];
+      if (Object.hasOwn(definition.properties, 'AutoLocalize') && isRecord(value.properties) && !Object.hasOwn(value.properties, 'AutoLocalize')) value.properties.AutoLocalize = definition.properties.AutoLocalize.value;
       if (value.className.startsWith('Image') && isRecord(value.properties) && !Object.hasOwn(value.properties, 'TileSize')) value.properties.TileSize = structuredClone(image.TileSize.value);
       if (value.className === 'ScrollingFrame' && isRecord(value.properties) && !Object.hasOwn(value.properties, 'ScrollingDirection')) value.properties.ScrollingDirection = definition.properties.ScrollingDirection.value;
       if (!exact(value.properties, Object.keys(definition.properties))) throw new Error(`${value.name} 存在缺失或不支持的属性。`);
