@@ -2,9 +2,9 @@
 
 ## 使用流程
 
-在 StudioGameToolkit 打开目标游戏的 GameKitWorkspace 工程，在项目设置填写 PlaceId；Studio 打开同一地图，使用更新后的 Toolkit 插件。UIEditor 运行控制栏最右侧的「导入」按当前工程类型进入对应流程，目前支持 Roblox；运行期间隐藏此入口，文件菜单不再提供导入。先检查当前界面图片。若有仅本地预览、缺少 Roblox ID 的图片，导入暂停并显示图片清单，列出图片名称与节点路径；可单张上传，也可全部按顺序上传。上传成功后，图片资产的 ID 保存到资产库，内联预览图的 ID 保存到对应节点并进入文档历史。失败、审核未完成或 ID 未保存的图片继续阻止导入。所有图片就绪后使用 Toolkit 唯一可用的工程连接，不在编辑器选择目标游戏；没有连接或存在多个连接时明确报错，用户在 Toolkit 处理后刷新连接。用户点击导入后提交当前编辑快照，不要求先保存。导入操作本身不写入文档历史，也不使用运行副本。
+在 StudioGameToolkit 打开目标游戏的 GameKitWorkspace 工程，在项目设置填写 PlaceId；Studio 打开同一地图，使用更新后的 Toolkit 插件。UIEditor 运行控制栏最右侧的「导出」按当前工程类型进入对应流程，目前支持 Roblox；运行期间隐藏此入口，文件菜单不再提供导入。先检查当前界面图片。若有仅本地预览、缺少 Roblox ID 的图片，导入暂停并显示图片清单，列出图片名称与节点路径；可单张上传，也可全部按顺序上传。上传成功后，图片资产的 ID 保存到资产库，内联预览图的 ID 保存到对应节点并进入文档历史。失败、审核未完成或 ID 未保存的图片继续阻止导入。所有图片就绪后使用 Toolkit 唯一可用的工程连接，不在编辑器选择目标游戏；没有连接或存在多个连接时明确报错，用户在 Toolkit 处理后刷新连接。用户点击“导出 UI 和脚本”后提交当前编辑快照，不要求先保存。导入操作本身不写入文档历史，也不使用运行副本。
 
-导入弹窗仅显示当前界面名、操作状态与必要按钮，不展示类继承说明和生成脚本路径。提交错误、连接错误与失败回执统一显示醒目的红色错误区域；发生错误时显示刷新连接，成功后提示在 Studio 保存场景。
+“导出到 Roblox”弹窗仅显示当前界面名、操作状态与必要按钮，不展示类继承说明和生成脚本路径。提交错误、连接错误与失败回执统一显示醒目的红色错误区域；发生错误时显示刷新连接，成功后提示在 Studio 保存场景。
 
 UIEditor 主进程连接固定本机桥接 `127.0.0.1:34871`。工程令牌只留在主进程，渲染进程只得到工程名称、ID 和 PlaceId。更新 Toolkit 后需重启后台；Toolkit 自动更新插件后需重新打开 Studio。
 
@@ -94,7 +94,7 @@ Toolkit 的文档 ID 用于未完成任务冲突检查，不限制根名称变�
 - `npx tsx --test tests/roblox-import.test.ts tests/toolkit.test.ts tests/script-templates.test.ts tests/runtime.test.ts`：转换、通信、公共类模板和 App 运行。
 - `lua tests/ui-comp-scaling.luau`（在 Editor 目录，需要 Lua 5.4）：使用模拟引擎接口验证缩放、居中与清理，不代替 Studio 渲染。
 - `npm run test:roblox-import`：隔离 Electron 对话框测试，不向实际后台或地图投递。
-- `node tests/runtime-smoke.mjs --import-toolbar`（先构建）：仅验证导入入口在运行栏右侧、文件菜单移除，以及运行时隐藏和停止后恢复。
+- `node tests/runtime-smoke.mjs --import-toolbar`（先构建）：仅验证导出入口在运行栏右侧、文件菜单移除，以及运行时隐藏和停止后恢复。
 - Toolkit `pytest tests/roblox_sync tests/figma_roblox/test_studio_delivery.py -q`：原生节点构造、归属、回执、失败保留及共享插件回归。
 
 这些检查不证明 Studio 实际显示、原生 Activated 行为或设备性能。实际导入与游戏业务接入需在目标地图验证。

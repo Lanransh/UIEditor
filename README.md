@@ -49,7 +49,7 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 沿用本风格的字体、字号、加粗、语义色与纹理，通过 MCP 制作、测试、
 截图、保存和重开。不能用模拟领取/购买状态代替真实资格校验、支付或发奖。
 
-使用“文件 → 保存”或 Ctrl+S 保存，默认文件为 `interfaces/自定义名称/自定义名称.json`；通过“打开界面”重新编辑。节点支持复制、删除、调整层级、画布拖动和尺寸调整，Ctrl+Z 撤销。空白处拖动、空格或中键平移，Ctrl+滚轮缩放，“适应窗口”重新居中。布局组件控制的子节点不能直接拖动。图片属性可保存 Roblox 资源 ID，并选择本地预览图嵌入文件。
+使用“文件 → 保存”或 Ctrl+S 保存，默认文件为 `interfaces/自定义名称/自定义名称.json`；通过“打开界面”重新编辑。节点支持复制、删除、调整层级、画布拖动和尺寸调整，Ctrl+Z 撤销。空白处拖动、空格或中键平移，普通滚轮围绕鼠标指针缩放；适配中央区域的大小为 100%，视口比例范围为 10%–100%，100% 显示完整画布，百分比越小越放大聚焦局部；10% 对应适配大小的 10 倍放大，“适应窗口”恢复 100% 并居中。布局组件控制的子节点不能直接拖动。图片属性可保存 Roblox 资源 ID，并选择本地预览图嵌入文件。
 
 使用“文件 → 新建界面”创建 UI，底部“项目资产”显示当前未保存界面和工程 `interfaces` 目录内的 UI 文件卡片。右键卡片选择“打开”即可编辑对应界面，左侧显示其节点树；切换前会提示保存未保存修改。工程外文件仍通过“文件 → 打开界面”选择。
 
@@ -84,6 +84,7 @@ npm run dev
 | `npm run test:display` | 使用源码启动隔离显示样例，检查节点渲染与字号约束并保存截图；Studio 对比另行执行，见[显示测试记录](Editor/tests/roblox-display-report.md) |
 | `npm run test:packaged` | 启动已打包 exe，检查 Hub、IPC、运行目录和沙箱配置 |
 | `node tests/workspace-launcher-smoke.mjs` | build 后验证工作区启动文件生成、直接打开工程及已有实例接收启动请求 |
+| `node tests/canvas-viewport-smoke.mjs` | 先构建，再验证画布适配、指针缩放、缩放上下限、中键平移、窗口变化及导出入口 |
 | `npm run test:mouse` | 构建并验证鼠标事件、固定适应画布、滚动条及稳定 MCP 鼠标接口；需要已有原生宿主 |
 | `npm run test:runtime` | 构建并验证脚本、按钮动作、数据刷新、重置及错误恢复 |
 | `npm run build:mcp` | 构建独立 stdio MCP 服务，普通 build 已包含 |
@@ -116,4 +117,4 @@ npm run dev
 
 工程数据存放在用户选择的目录。最近记录及 Electron 数据集中保存在 `ToolRuntime/Runtime/`，构建不会清除该目录；应用所在位置需可写。
 
-通过运行控制栏最右侧的「导入」使用 Toolkit 唯一已连接且配置了 PlaceId 的游戏工程（运行期间隐藏入口），提交当前 UI 和交互脚本；接入脚本只用于编辑器模拟预览。Toolkit 用 Rojo 构建并投递模型；生成脚本写入 Client/UI/Generated，游戏业务类继承生成交互类。首次使用需更新并重启 Toolkit/Studio 插件，接入与验证命令见 [导入设计](Docs/design/roblox-import.md)。
+通过运行控制栏最右侧的「导出」使用 Toolkit 唯一已连接且配置了 PlaceId 的游戏工程（运行期间隐藏入口），提交当前 UI 和交互脚本；接入脚本只用于编辑器模拟预览。Toolkit 用 Rojo 构建并投递模型；生成脚本写入 Client/UI/Generated，游戏业务类继承生成交互类。首次使用需更新并重启 Toolkit/Studio 插件，接入与验证命令见 [导入设计](Docs/design/roblox-import.md)。

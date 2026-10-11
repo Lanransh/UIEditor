@@ -71,7 +71,7 @@ try {
   await page.getByRole('button', { name: '编辑', exact: true }).click();
   await page.getByRole('button', { name: /重做/ }).click();
   await page.getByText('界面已保存', { exact: true }).waitFor();
-  const importButton = page.getByRole('button', { name: '导入', exact: true });
+  const importButton = page.getByRole('button', { name: '导出', exact: true });
   await importButton.waitFor({ state: 'visible' });
   assert.equal(await page.locator('.workspace-menu-items').getByRole('button', { name: '导入 Roblox', exact: true }).count(), 0);
   const importBounds = await importButton.boundingBox();

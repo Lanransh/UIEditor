@@ -92,9 +92,9 @@ export function RobloxImportDialog({ document, imageAssets, saveAssetId, assignN
   }
 
   return <dialog ref={dialog} className="new-interface-dialog roblox-import-dialog" aria-labelledby="roblox-import-title" onCancel={event => { if (busy || waiting) event.preventDefault(); else onClose(); }}>
-    <h2 id="roblox-import-title">导入 Roblox</h2>
+    <h2 id="roblox-import-title">导出到 Roblox</h2>
     {!imagesReady ? <section className="roblox-import-images" aria-labelledby="roblox-import-images-title">
-      <h3 id="roblox-import-images-title">有图片尚未上传，导入已暂停</h3>
+      <h3 id="roblox-import-images-title">有图片尚未上传，导出已暂停</h3>
       <div className="roblox-import-missing-list" role="list" aria-label="尚未上传的图片">
         {missingImages.map(image => <article key={image.key} className="roblox-import-missing-image" role="listitem">
           <img src={image.dataUrl} alt={`${image.name}预览`} />
@@ -104,18 +104,18 @@ export function RobloxImportDialog({ document, imageAssets, saveAssetId, assignN
       </div>
       <div className="new-interface-actions">
         <button type="button" disabled={busy || !!uploadSession} onClick={startAll}>全部上传（{missingImages.length}）</button>
-        <button type="button" disabled={busy || !!uploadSession} onClick={onClose}>取消导入</button>
+        <button type="button" disabled={busy || !!uploadSession} onClick={onClose}>取消导出</button>
       </div>
     </section> : <>
       <p>界面：{snapshot?.root.name ?? document.root.name}</p>
-      {failure ? <div role="alert"><strong>导入失败</strong><span>{failure}</span></div>
+      {failure ? <div role="alert"><strong>导出失败</strong><span>{failure}</span></div>
         : task ? <div className={`import-result ${task.status}`} role="status"><span>{task.message}</span>{task.status === 'succeeded' && <span>请在 Studio 保存场景。</span>}</div>
         : busy && <p role="status">正在准备…</p>}
       <div className="new-interface-actions">
         {error && <button disabled={busy} onClick={() => void run(discover)}>刷新连接</button>}
         {(waiting || task?.status === 'failed') && <button disabled={busy} onClick={() => void run(() => control('retry'))}>重新投递 UI</button>}
         {waiting ? <button disabled={busy} onClick={() => void run(() => control('cancel'))}>取消等待</button> : <button disabled={busy} onClick={onClose}>关闭</button>}
-        {!task && <button className="import-primary" disabled={busy || !targetId} onClick={() => void run(submit)}>{busy ? '正在准备…' : '导入 UI 和脚本'}</button>}
+        {!task && <button className="import-primary" disabled={busy || !targetId} onClick={() => void run(submit)}>{busy ? '正在准备…' : '导出 UI 和脚本'}</button>}
       </div>
     </>}
     {currentUpload && <ImageUploadDialog key={currentUpload.key} image={{

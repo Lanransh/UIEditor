@@ -18,7 +18,9 @@ interface Gesture {
 }
 export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEditor; visible?: boolean }) {
   const viewport = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(.5);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [fitScale, setFitScale] = useState(1);
+  const zoom = fitScale / zoomLevel;
   const [pan, setPan] = useState({ x: 24, y: 24 });
   const [draft, setDraft] = useState<UIDocument | null>(null);
   const draftRef = useRef<UIDocument | null>(null);
@@ -49,23 +51,37 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
   }, []);
   function fit() {
     const area = viewport.current!;
-    const scale = Math.max(editor.runtime.active ? .001 : .1, Math.min(editor.runtime.active ? Infinity : 2, (area.clientWidth - 48) / 1280, (area.clientHeight - 48) / 720));
-    setZoom(scale); setPan({ x: (area.clientWidth - 1280 * scale) / 2, y: (area.clientHeight - 720 * scale) / 2 });
+    const padding = editor.runtime.active ? 48 : 0;
+    const scale = Math.max(.001, Math.min((area.clientWidth - padding) / 1280, (area.clientHeight - padding) / 720));
+    setFitScale(scale); setZoomLevel(1); setPan({ x: (area.clientWidth - 1280 * scale) / 2, y: (area.clientHeight - 720 * scale) / 2 });
   }
   useEffect(() => { if (visible) fit(); }, [editor.document.id, visible]);
   useEffect(() => {
-    if (!editor.runtime.active) {
-      if (editView.current) { setZoom(editView.current.zoom); setPan(editView.current.pan); editView.current = null; }
-      mouseGesture.current = null; return;
-    }
-    editView.current = { zoom, pan };
-    setSpace(false); gesture.current = null; draftRef.current = null; setDraft(null);
+    if (!visible) return;
     const area = viewport.current!;
+    const padding = editor.runtime.active ? 48 : 0;
+    let previous = { width: area.clientWidth, height: area.clientHeight };
+    const observer = new ResizeObserver(() => {
+      const width = area.clientWidth, height = area.clientHeight;
+      const scale = Math.max(.001, Math.min((width - padding) / 1280, (height - padding) / 720));
+      const oldScale = Math.max(.001, Math.min((previous.width - padding) / 1280, (previous.height - padding) / 720));
+      const old = previous; previous = { width, height };
+      setFitScale(scale);
+      setPan(current => ({ x: width / 2 + (current.x - old.width / 2) * scale / oldScale, y: height / 2 + (current.y - old.height / 2) * scale / oldScale }));
+    });
     const preventWheelDefault = (event: WheelEvent) => event.preventDefault();
     area.addEventListener('wheel', preventWheelDefault, { passive: false });
-    const observer = new ResizeObserver(fit);
-    observer.observe(viewport.current!); fit();
+    observer.observe(area);
     return () => { observer.disconnect(); area.removeEventListener('wheel', preventWheelDefault); };
+  }, [editor.runtime.active, visible]);
+  useEffect(() => {
+    if (!editor.runtime.active) {
+      if (editView.current) { setZoomLevel(editView.current.zoom); setPan(editView.current.pan); editView.current = null; }
+      mouseGesture.current = null; return;
+    }
+    editView.current = { zoom: zoomLevel, pan };
+    setSpace(false); gesture.current = null; draftRef.current = null; setDraft(null);
+    fit();
   }, [editor.runtime.active]);
   function nodeId(target: EventTarget) { return (target as HTMLElement).closest<HTMLElement>('[data-node-id]')?.dataset.nodeId ?? null; }
   function point(event: PointerEvent) {
@@ -169,7 +185,10 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
     if (viewport.current?.hasPointerCapture(event.pointerId)) viewport.current.releasePointerCapture(event.pointerId);
   }
   return <section className="canvas" aria-label="Roblox 画布">
-    <div className="canvas-heading"><span>1280 × 720 · {editor.document.name}</span><div className="canvas-tools"><button disabled={editor.busy || editor.runtime.active} onClick={fit}>适应窗口</button><select aria-label="画布缩放" disabled={editor.busy || editor.runtime.active} value={zoom} onChange={event => setZoom(Number(event.target.value))}><option value={zoom}>{Math.round(zoom * 100)}%</option>{[.25, .5, .75, 1, 1.5, 2].filter(value => value !== zoom).map(value => <option key={value} value={value}>{value * 100}%</option>)}</select></div></div>
+    <div className="canvas-heading"><span>1280 × 720 · {editor.document.name}</span><div className="canvas-tools"><button disabled={editor.busy || editor.runtime.active} onClick={fit}>适应窗口</button><select aria-label="画布缩放" disabled={editor.busy || editor.runtime.active} value={zoomLevel} onChange={event => {
+      const next = Number(event.target.value), area = viewport.current!;
+      setPan({ x: area.clientWidth / 2 - (area.clientWidth / 2 - pan.x) * zoomLevel / next, y: area.clientHeight / 2 - (area.clientHeight / 2 - pan.y) * zoomLevel / next }); setZoomLevel(next);
+    }}><option value={zoomLevel}>{Math.round(zoomLevel * 100)}%</option>{[.1, .25, .5, .75, 1].filter(value => value !== zoomLevel).map(value => <option key={value} value={value}>{value * 100}%</option>)}</select></div></div>
     <div ref={viewport} data-zoom={zoom} className={`canvas-viewport${space ? ' panning' : ''}`} onDragOver={event => { if (!editor.busy && event.dataTransfer.types.includes('application/x-uie-image-asset')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }} onDrop={event => {
       if (editor.busy) return;
       const asset = editor.imageAssets.find(asset => asset.id === event.dataTransfer.getData('application/x-uie-image-asset'));
@@ -185,19 +204,17 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
         if (id) void editor.runtime.wheel(id, { x: event.deltaX * unit, y: event.deltaY * unit });
         return;
       }
-      if (gesture.current) return;
-      if (event.ctrlKey || event.metaKey) {
-        const next = Math.max(.1, Math.min(3, zoom * (event.deltaY > 0 ? .9 : 1.1)));
-        const bounds = viewport.current!.getBoundingClientRect(), x = event.clientX - bounds.left, y = event.clientY - bounds.top;
-        setPan({ x: x - (x - pan.x) * next / zoom, y: y - (y - pan.y) * next / zoom }); setZoom(next);
-      } else setPan({ x: pan.x - event.deltaX, y: pan.y - event.deltaY });
+      if (editor.busy || gesture.current || event.deltaY === 0) return;
+      const next = Math.max(.1, Math.min(1, zoomLevel * (event.deltaY > 0 ? 1.1 : .9)));
+      const bounds = viewport.current!.getBoundingClientRect(), x = event.clientX - bounds.left, y = event.clientY - bounds.top;
+      setPan({ x: x - (x - pan.x) * zoomLevel / next, y: y - (y - pan.y) * zoomLevel / next }); setZoomLevel(next);
     }}>
       <div className="ui-artboard" data-testid="ui-artboard" style={{ width: 1280, height: 720, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
         <DocumentPreview document={shown} strategy={editor.strategy} selected={!capturing && !editor.runtime.active ? editor.selected : undefined} runtime={editor.runtime}
           onNodePointerDown={(event, node) => { if (editor.runtime.active) return; start(event, space || event.button === 1 ? 'pan' : 'move', space || event.button === 1 ? undefined : node); }}
-          onResize={(event, node) => start(event, 'resize', node)} />
+          onResize={(event, node) => start(event, space || event.button === 1 ? 'pan' : 'resize', space || event.button === 1 ? undefined : node)} />
       </div>
-      {!capturing && <div className="canvas-hint">{editor.runtime.active ? editor.runtime.inputMode === 'mobile' ? '移动端模式 · 左键模拟单指点按 / 拖动内容 · 自动适应窗口' : 'PC 模式 · 滚轮 / 拖动滚动条 · 自动适应窗口' : '空白处拖动 / 空格或中键平移 · Ctrl+滚轮缩放 · 静态设计'}</div>}
+      {!capturing && <div className="canvas-hint">{editor.runtime.active ? editor.runtime.inputMode === 'mobile' ? '移动端模式 · 左键模拟单指点按 / 拖动内容 · 自动适应窗口' : 'PC 模式 · 滚轮 / 拖动滚动条 · 自动适应窗口' : '滚轮以鼠标位置缩放 · 中键拖动平移 · 100% 全景 / 10% 聚焦 · 静态设计'}</div>}
     </div>
   </section>;
 }

@@ -273,7 +273,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
               <button title="隐藏当前界面，保留运行状态" disabled={!editor.runtime.ready} onClick={() => void editor.runtime.hide()}><EyeOff size={12} aria-hidden="true" />隐藏</button>
             </div>
           </div>}
-          {!editor.runtime.active && <button className="runtime-import" disabled={!editor.hasDocument || editor.busy} onClick={() => setImporting(true)}>导入</button>}
+          {!editor.runtime.active && <button className="runtime-import" disabled={!editor.hasDocument || editor.busy} onClick={() => setImporting(true)}>导出</button>}
         </div>
         {editor.location?.library === 'templates' && <div className="template-editing-banner" role="status" title={editor.path ?? undefined}>编辑模板 · {editor.location.relativePath}{editor.dirty ? ' · 未保存' : ''}</div>}
         <nav className="workspace-tabs" aria-label="工作区页签">{(['design', 'source', 'integration'] as const).map((tab, index) => <button key={tab} aria-pressed={workspaceTab === tab} disabled={!editor.hasDocument} onClick={() => setWorkspaceTab(tab)}>{['界面', '交互脚本', '接入脚本'][index]}</button>)}</nav>
