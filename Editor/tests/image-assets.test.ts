@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cp, mkdtemp, mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
 import { ImageAssetStore, permanentImageRoot } from '../electron/image-assets';
 import { normalizeRobloxId, applyImageAsset, resolveImageAssets } from '../src/shared/imageAssets';
 import { robloxStrategy } from '../src/editor/roblox';
@@ -14,8 +15,8 @@ import { documentCommand } from '../src/editor/commands';
 async function fixture() {
   await mkdir('test-results', { recursive: true });
   const root = await mkdtemp(resolve('test-results/image-assets-'));
-  const runtime = join(root, 'runtime'), project = join(root, 'project');
-  await mkdir(project); await mkdir(runtime);
+  const runtime = join(root, 'runtime'), project = join(root, 'game', 'UIEditorWorkspace');
+  await mkdir(project, { recursive: true }); await mkdir(runtime);
   return { root, runtime, project, store: new ImageAssetStore(runtime, project) };
 }
 test('Roblox IDs normalize and reject invalid input without losing precision', () => {
@@ -31,7 +32,7 @@ test('asset directories follow the library and reject unknown asset IDs', async 
   const builtin = (await store.list())[0];
   assert.equal(await store.assetDirectory(builtin.id), join(root, 'SharedAssets', 'image-assets'));
   const imported = await store.import('project', builtin.previewImage);
-  assert.equal(await store.assetDirectory(imported.id), join(project, 'image-assets'));
+  assert.equal(await store.assetDirectory(imported.id), join(project, '..', 'ArtSource', 'UI'));
   await assert.rejects(store.assetDirectory('../outside'), /不存在/);
 });
 test('MCP local import requires a library, file path and current session', () => {
@@ -53,7 +54,7 @@ test('local file import persists previews without a Roblox ID and rejects invali
   assert.equal(asset.name, 'local'); assert.equal(asset.robloxId, '');
   assert.equal(asset.previewImage.dataUrl, preview.dataUrl);
   assert.deepEqual((await store.list()).find(a => a.id === asset.id), asset);
-  const catalog = join(project, 'image-assets', 'catalog.json'), before = await readFile(catalog, 'utf8');
+  const catalog = join(project, '..', 'ArtSource', 'UI', 'local.png.meta'), before = await readFile(catalog, 'utf8');
   await assert.rejects(store.importFile('project', 'local.png'), /绝对路径/);
   await assert.rejects(store.importFile('project', join(root, 'missing.png')));
   await assert.rejects(store.importFile('project', root), /文件类型/);
@@ -71,23 +72,71 @@ test('each image has one Roblox ID; permanent IDs are shared and project imports
   assert.equal(placeholder.robloxId, '');
   await store.update({ ...stud, robloxId: '12345' });
   assert.equal((await new ImageAssetStore(runtime, project).list()).find(a => a.id === stud.id)!.robloxId, 'rbxassetid://12345');
-  const other = join(root, 'other'); await mkdir(other);
+  const other = join(root, 'other', 'UIEditorWorkspace'); await mkdir(other, { recursive: true });
   const otherStore = new ImageAssetStore(runtime, other);
   assert.equal((await otherStore.list()).find(a => a.id === stud.id)!.robloxId, 'rbxassetid://12345');
   assert.equal('projectRobloxId' in (await otherStore.list())[0], false);
   const imported = await store.import('project', placeholder.previewImage);
+  await mkdir(join(project, '..', 'GameKitWorkspace'));
+  await writeFile(join(project, '..', 'GameKitWorkspace', 'setting.json'), JSON.stringify({ robloxOwnerType: 'user', robloxOwnerId: '123' }));
   await store.update({ ...imported, robloxId: '54321' });
   assert.equal((await otherStore.list()).some(a => a.id === imported.id), false);
-  const moved = join(root, 'moved'); await rename(project, moved);
-  assert.equal((await new ImageAssetStore(runtime, moved).list()).find(a => a.id === imported.id)!.robloxId, 'rbxassetid://54321');
+  const moved = join(root, 'moved'); await rename(join(project, '..'), moved);
+  assert.equal((await new ImageAssetStore(runtime, join(moved, 'UIEditorWorkspace')).list()).find(a => a.id === imported.id)!.robloxId, 'rbxassetid://54321');
 });
 test('invalid updates and corrupt catalogs preserve data and report errors', async () => {
   const { store, project } = await fixture();
   const imported = await store.import('project', (await store.list())[0].previewImage);
-  const file = join(project, 'image-assets/catalog.json'), before = await readFile(file, 'utf8');
+  const file = join(project, '..', 'ArtSource', 'UI', imported.previewImage.name + '.meta'), before = await readFile(file, 'utf8');
   await assert.rejects(store.update({ ...imported, robloxId: 'invalid' }));
   assert.equal(await readFile(file, 'utf8'), before);
   await writeFile(file, '{}'); await assert.rejects(store.list(), /格式/);
+});
+
+test('Toolkit sidecars are read recursively and refreshed from shared upload history', async () => {
+  const { store, project } = await fixture();
+  const previewImage = (await store.list())[0].previewImage;
+  const root = join(project, '..'), folder = join(root, 'ArtSource', 'UI', 'Icons');
+  await mkdir(folder, { recursive: true }); await mkdir(join(root, 'GameKitWorkspace'));
+  await writeFile(join(root, 'GameKitWorkspace', 'setting.json'), JSON.stringify({ robloxOwnerType: 'user', robloxOwnerId: '123' }));
+  const bytes = Buffer.from(previewImage.dataUrl.split(',')[1], 'base64');
+  const image = join(folder, 'Money.png'); await writeFile(image, bytes);
+  const upload = { ownerType: 'user', ownerId: '123', sha256: createHash('sha256').update(bytes).digest('hex'), assetId: '111', uploadedAt: '2026-01-01T00:00:00Z' };
+  const meta = { schemaVersion: 1, id: 'a'.repeat(32), kind: 'Image', tags: ['money'], uploads: [upload], extra: { preserved: true } };
+  await writeFile(image + '.meta', JSON.stringify(meta));
+  const asset = (await store.list()).find(item => item.id === meta.id)!;
+  assert.equal(asset.robloxId, 'rbxassetid://111'); assert.equal(asset.tags, 'money');
+  assert.equal(await store.assetDirectory(asset.id), folder);
+  await store.update({ ...asset, name: 'Coins', tags: 'daily reward, currency' });
+  const renamed = join(folder, 'Coins.png');
+  await assert.rejects(readFile(image));
+  assert.deepEqual(await readFile(renamed), bytes);
+  const saved = JSON.parse(await readFile(renamed + '.meta', 'utf8'));
+  assert.equal('uiEditor' in saved, false);
+  assert.deepEqual(saved.tags, ['daily reward', 'currency']);
+  assert.deepEqual(saved.extra, meta.extra); assert.deepEqual(saved.uploads, meta.uploads);
+  saved.uploads.push({ ...upload, assetId: '222', uploadedAt: '2099-01-01T00:00:00Z' });
+  await writeFile(renamed + '.meta', JSON.stringify(saved));
+  assert.equal((await store.list()).find(item => item.id === meta.id)!.robloxId, 'rbxassetid://222');
+  await store.update({ id: meta.id, name: 'Coins', tags: 'currency', robloxId: '' });
+  assert.equal((await store.list()).find(item => item.id === meta.id)!.robloxId, '');
+  await writeFile(renamed + '.meta', '{}'); await assert.rejects(store.list(), /meta/);
+  assert.equal(await readFile(renamed + '.meta', 'utf8'), '{}');
+});
+
+test('project imports use only Toolkit metadata and reject conflicting file renames', async () => {
+  const { store, project } = await fixture();
+  const preview = (await store.list())[0].previewImage;
+  const first = await store.import('project', { ...preview, name: 'First.png' });
+  const second = await store.import('project', { ...preview, name: 'First.png' });
+  assert.equal(second.name, 'First-2');
+  const metaPath = join(project, '..', 'ArtSource', 'UI', 'First.png.meta');
+  const before = await readFile(metaPath, 'utf8'), meta = JSON.parse(before);
+  assert.deepEqual(Object.keys(meta).sort(), ['schemaVersion', 'id', 'kind', 'tags', 'uploads'].sort());
+  assert.equal(meta.id, first.id); assert.match(first.id, /^[a-f0-9]{32}$/);
+  await assert.rejects(store.update({ ...first, name: second.name }), /同名/);
+  await assert.rejects(store.updateRobloxId(first.id, '123'), /所有者/);
+  assert.equal(await readFile(metaPath, 'utf8'), before);
 });
 test('legacy catalogs keep each image ID and stop applying old overrides; new writes remove override fields', async () => {
   const { store, root, project, runtime } = await fixture();

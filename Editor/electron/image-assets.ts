@@ -5,6 +5,7 @@ import builtins from '../src/assets/images/builtins.json';
 import { normalizeRobloxId, type ImageAsset, type ImageAssetUpdate, type ImageLibrary } from '../src/shared/imageAssets';
 import type { UINode } from '../src/shared/uiDocument';
 import { readPreviewImage } from './documents';
+import { RobloxImageAssetStore } from './roblox-image-assets';
 
 interface Catalog { version: 2; assets: ImageAsset[] }
 const empty = (): Catalog => ({ version: 2, assets: [] });
@@ -41,7 +42,12 @@ function validateAsset(value: unknown): ImageAsset {
 }
 export class ImageAssetStore {
   constructor(private runtime: string, private project?: string, private permanent = join(dirname(runtime), 'SharedAssets')) {}
+  private projectStore() {
+    if (!this.project) throw new Error('请先打开工程。');
+    return new RobloxImageAssetStore(this.project);
+  }
   private directory(library: ImageLibrary) {
+    if (library === 'project') return this.projectStore().root;
     const root = library === 'permanent' ? this.permanent : this.project;
     if (!root) throw new Error('请先打开工程。');
     return join(root, 'image-assets');
@@ -49,6 +55,7 @@ export class ImageAssetStore {
   async assetDirectory(id: string): Promise<string> {
     const asset = (await this.list()).find(a => a.id === id);
     if (!asset) throw new Error('图片资产不存在。');
+    if (asset.library === 'project') return withCatalog(this.directory('project'), () => this.projectStore().directory(id));
     const directory = this.directory(asset.library);
     await regular(directory, true); await mkdir(directory, { recursive: true });
     return directory;
@@ -99,7 +106,7 @@ export class ImageAssetStore {
       await this.migratePermanent();
       return this.read('permanent');
     });
-    const project = await this.read('project');
+    const project = this.project ? { assets: await withCatalog(this.directory('project'), () => this.projectStore().list()) } : empty();
     const assets = new Map((builtins as ImageAsset[]).map(a => [a.id, validateAsset(a)]));
     for (const a of permanent.assets) assets.set(a.id, a);
     for (const a of project.assets) {
@@ -115,8 +122,12 @@ export class ImageAssetStore {
   }
   async import(library: ImageLibrary, previewImage: NonNullable<UINode['previewImage']>): Promise<ImageAsset> {
     if (!['permanent', 'project'].includes(library)) throw new Error('图片资产库无效。');
-    const asset = validateAsset({ id: randomUUID(), platform: 'roblox', library, name: previewImage.name.replace(/\.[^.]+$/, ''), tags: '', previewImage, robloxId: '', usage: 'image' });
+    let asset = validateAsset({ id: library === 'project' ? randomUUID().replaceAll('-', '') : randomUUID(), platform: 'roblox', library, name: previewImage.name.replace(/\.[^.]+$/, ''), tags: '', previewImage, robloxId: '', usage: 'image' });
     await withCatalog(this.directory(library), async () => {
+      if (library === 'project') {
+        asset = await this.projectStore().import(asset);
+        return;
+      }
       if (library === 'permanent') await this.migratePermanent();
       const catalog = await this.read(library); catalog.assets.push(asset); await this.write(library, catalog);
     });
@@ -136,6 +147,13 @@ export class ImageAssetStore {
     const asset = (await this.list()).find(a => a.id === id);
     if (!asset) throw new Error('图片资产不存在。');
     await withCatalog(this.directory(asset.library), async () => {
+      if (asset.library === 'project') {
+        const current = (await this.projectStore().list()).find(item => item.id === id);
+        if (!current) throw new Error('图片资产不存在。');
+        validateAsset({ ...current, ...changes });
+        await this.projectStore().patch(id, changes);
+        return;
+      }
       if (asset.library === 'permanent') await this.migratePermanent();
       const catalog = await this.read(asset.library);
       const index = catalog.assets.findIndex(a => a.id === id);

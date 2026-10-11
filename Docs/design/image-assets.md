@@ -8,11 +8,19 @@
 
 图片属性提供预览、名称、标签和唯一 Roblox 资源 ID。永久与项目图片使用相同字段，不提供默认/覆盖配置。接受正整数字符串或 `rbxassetid://…`，存储统一为完整引用。未保存属性切换页签、库、图片或节点时提示放弃修改。属性点击保存即落盘，不进入界面撤销历史；应用和插入图片节点进入文档历史。
 
-图片列表不显示常驻操作按钮。资产卡片右键弹出菜单，提供「应用到选中节点」「插入图片节点」「打开目录」「复制 ID」。菜单在点击外部、按 Escape、滚动或切换库时关闭。「打开目录」通过系统文件管理器打开图片所属库的 `image-assets` 目录，目录不存在时创建；内置图片属于永久库。图片以 Data URL 保存于清单，目录并非原始图片所在位置。「复制 ID」复制完整 `rbxassetid://…` 引用；未配置 ID 时禁用。
+图片列表不显示常驻操作按钮。资产卡片右键弹出菜单，提供「应用到选中节点」「插入图片节点」「打开目录」「复制 ID」。菜单在点击外部、按 Escape、滚动或切换库时关闭。「打开目录」通过系统文件管理器打开图片所在目录：永久图片为 `SharedAssets/image-assets`，Roblox 项目图片为 `ArtSource/UI` 下原图所在目录；内置图片属于永久库。永久图片以 Data URL 保存于清单，项目图片直接保存原始文件。「复制 ID」复制完整 `rbxassetid://…` 引用；未配置 ID 时禁用。
 
 ## 数据和解析
 
-资产使用稳定内部字符串 ID，平台当前固定 Roblox；列表、属性和 MCP 只处理当前支持平台。永久图片保存于 UIEditor 仓库根目录 `SharedAssets/image-assets/catalog.json`，随编辑器仓库提交；项目图片保存于 `<工程>/image-assets/catalog.json`，随游戏工程提交。新清单使用 version=2，仅含 assets，不改变 project.json。兼容读取 version=1 图片及其自身 robloxId，旧覆盖字段不参与解析，新写入不包含覆盖字段。每个清单最多 100 张、64 MiB，图片沿用 PNG/JPEG/WebP/GIF 与单张 8 MiB 读取限制。清单嵌入图片 Data URL，移动项目不依赖导入源路径；拒绝目录与清单链接、损坏格式，不覆盖损坏清单。
+资产使用稳定内部字符串 ID，平台当前固定 Roblox。永久图片继续保存于 UIEditor 仓库根目录 `SharedAssets/image-assets/catalog.json`，兼容 version=1/2；不改变永久库的共享与迁移规则。
+
+Roblox 工程的项目图片直接递归读取 `UIEditorWorkspace` 同级 `ArtSource/UI`，与 Toolkit 共用原图及完整文件名追加 `.meta` 的 JSON 元数据，不再读取或写入项目 `image-assets/catalog.json`。导入保存原图及 meta，同名文件追加数字，不覆盖；目录内直接放入的受支持图片首次读取时生成 meta。保留 PNG/JPEG/WebP/GIF、单张 8 MiB、项目库 100 张/64 MiB 限制，拒绝链接及损坏 meta。
+
+meta 完全沿用 Toolkit 的 `schemaVersion=1`、32 位十六进制 `id`、`kind=Image`、`tags` 数组及 `uploads` 历史，不添加 `uiEditor` 或编辑器专用字段。图片引用直接使用 meta.id，名称来自原图文件名；改名同时移动原图与 meta，拒绝覆盖同名文件。项目图片用途为普通图片，平铺等效果由节点属性维护。标签与 Toolkit 一致，以逗号分隔，保存为去重数组，保留标签内部空格；不会自动打标签。
+
+PNG 按同级 `GameKitWorkspace/setting.json` 的所有者及当前原图 SHA-256 匹配上传记录，后续 Toolkit 写入的新结果在重新读取时可见。配置 ID 写入同一 uploads 格式，需要已配置所有者；清空 ID 会移除该所有者与当前内容匹配的记录。未知字段和不匹配的旧上传记录保留。非 PNG 的 Toolkit 上传哈希对应转换后的 PNG，当前编辑器不能自动匹配此类记录，也不另存专用 ID；此类图片的云记录由 Toolkit 维护。
+
+项目图片与 meta 一起提交 Git，移动时应移动整个工程父目录，保留 `UIEditorWorkspace / ArtSource / GameKitWorkspace` 的同级关系。应用不包含旧项目图片清单迁移逻辑；已有工程需一次性迁移，将 UI 图片引用同步为 meta.id。编辑器界面及文档快照仍使用 Data URL，不将本机文件路径写入界面定义。
 
 永久图片的内容、稳定 ID、名称、标签和 Roblox ID 保存在同一清单，不能只提交 UI 文件或程序代码而漏掉图片清单。电脑 A 上传成功并提交清单后，电脑 B 拉取并重新打开编辑器即可读取相同图片和资源 ID，不需要再次上传。共享清单不包含 API Key、本机路径、Toolkit 令牌或任务状态；未取得成功 ID 的上传任务不会跨电脑恢复。
 

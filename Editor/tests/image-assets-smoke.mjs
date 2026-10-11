@@ -264,7 +264,7 @@ try {
   const current = await tool('uie.editor.get_state', { detail: 'full' });
   assert.deepEqual(current.document, beforeMcpImport.document);
   assert.equal(current.sessionId, imported.sessionId);
-  const catalog = join(parent, 'UIEditorWorkspace', 'image-assets', 'catalog.json');
+  const catalog = join(parent, 'ArtSource', 'UI', 'LocalIcon-2.png.meta');
   const beforeFailedImport = await readFile(catalog, 'utf8');
   assert.equal((await rawTool('uie.assets.import', { sessionId: beforeMcpImport.sessionId, revision: beforeMcpImport.revision, library: 'project', filePath: localPath })).ok, false);
   assert.equal((await rawTool('uie.assets.import', { sessionId: current.sessionId, revision: current.revision, library: 'project', filePath: invalidPath })).ok, false);
@@ -282,7 +282,8 @@ try {
   await tool('uie.document.open', { sessionId: beforeOpen.sessionId, revision: beforeOpen.revision, relativePath: 'Assets.rbxui.json' });
   assert.deepEqual((await tool('uie.editor.get_state', { detail: 'full' })).document.root.children.find(n => n.name === applied.name), applied);
   await page.getByRole('button', { name: '项目图片', exact: true }).click();
-  assert.equal(await page.getByRole('button', { name: '图片资产 LocalIcon', exact: true }).count(), 2);
+  assert.equal(await page.getByRole('button', { name: '图片资产 LocalIcon', exact: true }).count(), 1);
+  assert.equal(await page.getByRole('button', { name: '图片资产 LocalIcon-2', exact: true }).count(), 1);
   const beforeRun = await tool('uie.editor.get_state');
   await tool('uie.runtime.control', { sessionId: beforeRun.sessionId, revision: beforeRun.revision, action: 'run' });
   assert.equal(await importButton.isDisabled(), true);
