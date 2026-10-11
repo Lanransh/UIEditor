@@ -16,7 +16,7 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 
 ## 使用
 
-1. 点击“创建工程”，先选择整套模板风格，再选择父文件夹。程序创建固定的 `UIEditorWorkspace/project.json`，不要求输入名称；所有新工程从 `ProjectTypes/Roblox/` 创建独立 `AgentWorkspace/`，包含公共入口与制作技能；选定风格再从 `TemplateStyles/Roblox/` 复制模板到 `AgentWorkspace/styles/templates/`，视觉规范、资源和专项 skills 进入 `styles/`。默认也可选择空白工程；有历史时保留仅克隆模板的兼容入口，与风格选择互斥。
+1. 点击“创建工程”，先选择整套模板风格，再选择父文件夹。程序创建固定的 `UIEditorWorkspace/project.json`，不要求输入名称；所有新工程从 `ProjectTypes/Roblox/` 创建工作区根目录，包含公共入口与制作技能；选定风格再从 `TemplateStyles/Roblox/` 复制模板到 `styles/templates/`，视觉规范、资源和专项 skills 进入 `styles/`。默认也可选择空白工程；有历史时保留仅克隆模板的兼容入口，与风格选择互斥。
 2. 工程创建后进入工作台，通过“文件 → 新建界面”创建 ScreenGui 或在底部“模板参考”中打开独立副本。鼠标移到左侧节点行，点击右侧“+”展开类型列表，选择类型即添加子节点；右侧编辑名称、父节点和属性，中间为 1280×720 画布。
 3. 点击“打开工程”选择已有的 `UIEditorWorkspace` 文件夹，或点击最近工程卡片。
 4. 同一父目录已有有效工程时，会询问是否打开；已有无效目录时不覆盖内容。
@@ -43,17 +43,17 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 缺文档、坏模板、资源链接不闭合、链接目录或权限错误会给出具体反馈；
 复制失败清理本次创建内容，目标已有文件不会被覆盖。
 
-在 Codex 中以项目 `UIEditorWorkspace/AgentWorkspace/` 为 AI 工作目录，
+在 Codex 中以项目 `UIEditorWorkspace/` 为 AI 工作目录，
 启用 `ui-editor` MCP 并在 App 中打开该项目，只需描述界面需求。
 项目入口要求 AI 先读规范及实际模板结构，按用途自动选择窗口和组件，
 沿用本风格的字体、字号、加粗、语义色与纹理，通过 MCP 制作、测试、
 截图、保存和重开。不能用模拟领取/购买状态代替真实资格校验、支付或发奖。
 
-使用“文件 → 保存”或 Ctrl+S 保存，默认文件为 `interfaces/自定义名称.rbxui.json`；通过“打开界面”重新编辑。节点支持复制、删除、调整层级、画布拖动和尺寸调整，Ctrl+Z 撤销。空白处拖动、空格或中键平移，Ctrl+滚轮缩放，“适应窗口”重新居中。布局组件控制的子节点不能直接拖动。图片属性可保存 Roblox 资源 ID，并选择本地预览图嵌入文件。
+使用“文件 → 保存”或 Ctrl+S 保存，默认文件为 `interfaces/自定义名称/自定义名称.json`；通过“打开界面”重新编辑。节点支持复制、删除、调整层级、画布拖动和尺寸调整，Ctrl+Z 撤销。空白处拖动、空格或中键平移，Ctrl+滚轮缩放，“适应窗口”重新居中。布局组件控制的子节点不能直接拖动。图片属性可保存 Roblox 资源 ID，并选择本地预览图嵌入文件。
 
 使用“文件 → 新建界面”创建 UI，底部“项目资产”显示当前未保存界面和工程 `interfaces` 目录内的 UI 文件卡片。右键卡片选择“打开”即可编辑对应界面，左侧显示其节点树；切换前会提示保存未保存修改。工程外文件仍通过“文件 → 打开界面”选择。
 
-当前 Roblox 是固定工程模式，提供外部 AI 使用的 MCP，支持通过 Toolkit 导入 Roblox，尚未提供内置 AI 或状态外观编辑器。MCP 服务需要可用的 Node.js；普通 App 使用不需要。支持类型和预览差异见 [静态 UI 设计](Docs/design/roblox-ui.md)。界面文件采用 version=3，只保存交互和接入两份类脚本；加载 version=2 时将配置、状态和引用转换到脚本中，不支持 version=1。
+当前 Roblox 是固定工程模式，提供外部 AI 使用的 MCP，支持通过 Toolkit 导入 Roblox，尚未提供内置 AI 或状态外观编辑器。MCP 服务需要可用的 Node.js；普通 App 使用不需要。支持类型和预览差异见 [静态 UI 设计](Docs/design/roblox-ui.md)。UI JSON 采用 version=4，仅保存节点与样式，交互和模拟接入分别保存到同名 `.view.luau` 与 `.example.luau`；可读取旧嵌入文件，不提供工作区自动迁移。
 
 中央工作区只有“界面 / 交互脚本 / 接入脚本”三个一级页签。交互脚本返回继承 CUIEditorUICompClass 的 FX 类，负责通用展示和事件；接入脚本返回继承交互类的测试类，在 Ctor 中定义临时 Config、State，在动作处理中维护状态并 RefreshUI。通过 FX.Loader:Here 获取节点，直接读写属性和连接 Activated 事件，不再使用二级配置、引用或模拟状态面板。“载入奖励示例”会替换当前界面，可撤销；示例运行后点击领取，由接入类模拟修改为 Claimed。需要测试其他状态时，停止后修改接入类中的初始状态，再重新运行。底部“输出”显示 print、warn、动作和源码错误，与“UI 资产 / 图片资产”共用底部面板。脚本支持 UDim、UDim2、Vector2、Color3 和当前 UI 属性使用的 Enum，具体子集见运行规范。
 
@@ -61,7 +61,7 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 
 ## 开发与验证
 
-Hub 右上角“设置”提供 Codex MCP 配置以启用 `ui-editor`。AI 在当前打开的工程内通过节点查询和代码事务制作界面，用 `uie.scripts.get/set` 直接读写交互代码和接入代码，再运行、模拟点击、读取日志和截图。执行结果可在 App 内撤销重做，MCP 不提供 undo/redo。所有新工程从项目 `AgentWorkspace` 开始；工程类型提供平台技能，风格提供视觉规范和专项技能。旧工程重开不会自动改写。接口与边界见 [MCP 自动化](Docs/design/mcp-automation.md)。
+Hub 右上角“设置”提供 Codex MCP 配置以启用 `ui-editor`。AI 在当前打开的工程内通过节点查询和代码事务制作界面，可用文件工具直接修改同名 `.view.luau` 交互代码与 `.example.luau` 模拟接入代码，再运行、模拟点击、读取日志和截图。执行结果可在 App 内撤销重做，MCP 不提供 undo/redo。所有新工程从项目 `UIEditorWorkspace` 根目录开始；工程类型提供平台技能，风格提供视觉规范和专项技能。运行、保存或重开界面时重新读取磁盘；同一文件两侧修改冲突时提示处理。工作区启动不迁移旧结构。接口与边界见 [MCP 自动化](Docs/design/mcp-automation.md)。
 
 ```powershell
 cd Editor

@@ -10,6 +10,7 @@ import { listDocumentAssets } from '../electron/documents';
 async function snapshot(root: string): Promise<Record<string, string>> {
   const result: Record<string, string> = {};
   for (const entry of await readdir(root, { withFileTypes: true })) {
+    if (entry.name === '.git') continue;
     const path = join(root, entry.name);
     if (entry.isDirectory()) {
       for (const [key, value] of Object.entries(await snapshot(path))) result[entry.name + '/' + key] = value;
@@ -25,7 +26,7 @@ test('打开更新公共提示词，保留 styles/LOCAL，重复同步不改写�
   const type = join(root, 'type');
   await cp(resolve('../ProjectTypes/Roblox'), type, { recursive: true });
   const project = (await createProject(root, undefined, resolve('../TemplateStyles/Roblox/多彩棋格风格'), type)).project;
-  const agent = join(project.path, 'AgentWorkspace');
+  const agent = project.path;
   const local = join(agent, 'AGENTS.LOCAL.md');
   await writeFile(local, '# 项目要求');
   await writeFile(join(agent, 'styles', 'Game-DESIGN.md'), '# 自定义风格');
@@ -49,10 +50,10 @@ test('打开更新公共提示词，保留 styles/LOCAL，重复同步不改写�
   assert.equal((await listDocumentAssets(project.path, 'templates')).length, 7);
   execFileSync('git', ['init', '-q', project.path]);
   for (const path of ['AGENTS.md', 'Docs/runtime-api.md', '.agents/skills/roblox-ui-authoring/SKILL.md']) {
-    assert.equal(execFileSync('git', ['check-ignore', 'AgentWorkspace/' + path], { cwd: project.path }).toString().trim(), 'AgentWorkspace/' + path);
+    assert.equal(execFileSync('git', ['check-ignore', path], { cwd: project.path }).toString().trim(), path);
   }
   for (const path of ['AGENTS.LOCAL.md', 'styles/Game-DESIGN.md', 'styles/templates/SmallWindow.rbxui.json', 'styles/skills/ui-editor-style-check/SKILL.md']) {
-    assert.throws(() => execFileSync('git', ['check-ignore', 'AgentWorkspace/' + path], { cwd: project.path }), error => (error as { status: number }).status === 1);
+    assert.throws(() => execFileSync('git', ['check-ignore', path], { cwd: project.path }), error => (error as { status: number }).status === 1);
   }
   await assert.rejects(syncAgentWorkspace(project.path, join(root, 'missing')), /无法读取/);
   assert.deepEqual(await snapshot(agent), before);
@@ -69,7 +70,7 @@ test('缺失的 AI 入口和 LOCAL 会生成，已有 LOCAL 保留，不创建�
   t.after(() => rm(root, { recursive: true, force: true }));
   const type = resolve('../ProjectTypes/Roblox');
   await syncAgentWorkspace(root, type);
-  const agent = join(root, 'AgentWorkspace');
+  const agent = root;
   assert.ok((await readFile(join(agent, 'AGENTS.md'), 'utf8')).includes('AGENTS.LOCAL.md'));
   assert.ok((await readFile(join(agent, 'AGENTS.LOCAL.md'), 'utf8')).includes('项目补充要求'));
   await assert.rejects(stat(join(agent, 'styles')), /ENOENT/);

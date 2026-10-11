@@ -3,8 +3,8 @@ import { basename, dirname, join, resolve, relative, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { AGENT_IGNORE_RULES, LOCAL_INSTRUCTIONS } from './agent-workspace';
 import { WORKSPACE_DIRECTORY, type Project, type ProjectManifest, type RecentProject } from '../src/shared/project';
-import { listDocumentAssets, readDocument, documentAssetDirectory } from './documents';
-import { relocateStyleFile, readTemplateStyle, readAgentPackage, validateDocumentLinks, validateSkillNames } from './template-styles';
+import { listDocumentAssets, readDocument, documentAssetDirectory, documentFiles, documentStem, documentScriptPaths, documentBundlePath } from './documents';
+import { relocateStyleFile, projectStylePath, readTemplateStyle, readAgentPackage, validateDocumentLinks, validateSkillNames } from './template-styles';
 
 function code(error: unknown): string | undefined {
   return (error as NodeJS.ErrnoException)?.code;
@@ -61,8 +61,8 @@ export async function createProject(parent: string, templateSource?: string, sty
     const common = await readAgentPackage(projectTypeSource, ['AGENTS.md']);
     validateDocumentLinks(common);
     validateSkillNames(common);
-    const templates: { path: string; content: string | Buffer }[] = common.map(item => ({ path: join('AgentWorkspace', item.path), content: item.content }));
-    templates.push({ path: join('AgentWorkspace', 'AGENTS.LOCAL.md'), content: LOCAL_INSTRUCTIONS });
+    const templates: { path: string; content: string | Buffer }[] = common.map(item => ({ path: item.path, content: item.content }));
+    templates.push({ path: 'AGENTS.LOCAL.md', content: LOCAL_INSTRUCTIONS });
     templates.push({ path: '.gitignore', content: AGENT_IGNORE_RULES.join('\n') + '\n' });
     await mkdir(join(directory, 'interfaces'));
     templateDirectories.add(join(directory, 'interfaces'));
@@ -71,10 +71,15 @@ export async function createProject(parent: string, templateSource?: string, sty
       validateSkillNames([...common, ...style.files]);
       const commonSkills = new Set(common.filter(item => item.path.startsWith(join('.agents', 'skills') + sep)).map(item => item.path.split(sep)[2].toLowerCase()));
       const occupied = new Set(common.map(item => item.path.toLowerCase()));
+      const scriptFiles = new Set(style.files.filter(item => item.path.startsWith(`template-references${sep}`) && item.path.toLowerCase().endsWith('.json')).flatMap(item => Object.values(documentScriptPaths(item.path))));
       for (const item of style.files) {
         const skill = item.path.startsWith(join('.agents', 'skills') + sep) ? item.path.split(sep)[2].toLowerCase() : null;
         if (occupied.has(item.path.toLowerCase()) || (skill && commonSkills.has(skill))) throw new Error(`工程类型与风格文件或技能冲突：${item.path}`);
-        templates.push(relocateStyleFile(item));
+        if (item.path.startsWith(`template-references${sep}`) && item.path.toLowerCase().endsWith('.json')) {
+          templates.push(...documentFiles(projectStylePath(item.path), await readDocument(join(styleSource, item.path))));
+        } else if (!scriptFiles.has(item.path)) {
+          templates.push(relocateStyleFile(item));
+        }
       }
     }
     if (templateSource !== undefined) {
@@ -83,7 +88,7 @@ export async function createProject(parent: string, templateSource?: string, sty
       const info = await lstat(root).catch(error => { if (code(error) === 'ENOENT') return null; throw error; });
       if (info && (!info.isDirectory() || info.isSymbolicLink())) throw new Error('来源工程的模板参考目录无效。');
       for (const asset of await listDocumentAssets(source.path, 'templates')) {
-        templates.push({ path: join('AgentWorkspace', 'styles', 'templates', relative(root, asset.path)), content: JSON.stringify(await readDocument(asset.path), null, 2) + '\n' });
+        templates.push(...documentFiles(documentBundlePath(join('styles', 'templates', documentStem(relative(root, asset.path)) + '.json')), await readDocument(asset.path)));
       }
     }
     const { open } = await import('node:fs/promises');

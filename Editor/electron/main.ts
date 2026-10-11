@@ -6,7 +6,7 @@ import { mkdir, stat } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { createProject, describeError, openProject, RecentProjects } from './projects';
 import type { Project, Result, RecentProjectView } from '../src/shared/project';
-import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset, moveDocumentAsset, listTemplateFolders, templateFolderPath, documentAssetDirectory } from './documents';
+import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset, moveDocumentAsset, listTemplateFolders, templateFolderPath, documentAssetDirectory, documentBundlePath, saveDocumentBundle } from './documents';
 import { robloxStrategy } from '../src/editor/roblox';
 import { LuauSession, RuntimeError } from './runtime';
 import { ToolkitClient } from './toolkit';
@@ -126,12 +126,13 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     }
     async function saveBoundFile(path: string, document: UIDocument) {
       const project = requireProject(), location = documentLocation(project.path, path);
-      const saved = location?.library === 'templates' && path === documentPath
-        ? (await saveInterface(project.path, location.relativePath, document, false, 'templates', templateVersion?.path === path ? templateVersion.version : undefined)).document
-        : await writeDocument(path, document);
-      bindFile({ path, version: location?.library === 'templates' ? await fileVersion(path) : undefined });
-      return { path, document: saved };
+      const result = location?.library === 'templates' && path === documentPath
+        ? await saveInterface(project.path, location.relativePath, document, false, 'templates', templateVersion?.path === path ? templateVersion.version : undefined)
+        : path === documentPath ? await saveDocumentBundle(path, document) : { path, document: await writeDocument(path, document) };
+      bindFile({ path: result.path, version: location?.library === 'templates' ? await fileVersion(result.path) : undefined });
+      return result;
     }
+
     let dirty = false;
     let allowClose = false;
     const trusted = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === source;
@@ -189,7 +190,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
         pending.set(requestId, { resolve, reject, timer }); window.webContents.send('automation:request', { ...request, requestId });
       });
       if (request.name === 'uie.editor.get_state') {
-        const workspacePath = activeProject!.path, agentWorkspacePath = join(workspacePath, 'AgentWorkspace');
+        const workspacePath = activeProject!.path, agentWorkspacePath = workspacePath;
         const gameDesignPath = join(agentWorkspacePath, 'styles', 'Game-DESIGN.md');
         const gameDesignExists = await stat(gameDesignPath).then(info => info.isFile(), (error: NodeJS.ErrnoException) => { if (error.code === 'ENOENT') return false; throw error; });
         return { ...(value as object), workspacePath, agentWorkspacePath, gameDesignPath, gameDesignExists };
@@ -247,7 +248,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
         case 'file:save': {
           if (!activeProject || !automationReady) throw new Error('请先打开工程。');
           const location = documentLocation(activeProject.path, documentPath);
-          if (argument.relativePath === undefined && location?.library === 'templates' && documentPath) return saveBoundFile(documentPath, robloxStrategy.validate(argument.document));
+          if (argument.relativePath === undefined && documentPath) return saveBoundFile(documentPath, robloxStrategy.validate(argument.document));
           const target = argument.relativePath ?? (documentPath ? relative(join(activeProject.path, 'interfaces'), documentPath) : null);
           const result = await saveInterface(activeProject.path, target, robloxStrategy.validate(argument.document), argument.relativePath !== undefined);
           bindFile(result); return result;
@@ -471,7 +472,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       const document = robloxStrategy.validate(source);
       const directory = folder === undefined || folder === '' ? documentAssetDirectory(project.path, 'templates') : templateFolderPath(project.path, folder);
       if (folder && !(await listTemplateFolders(project.path)).includes(folder)) throw new Error('模板文件夹不存在，请刷新后重试。');
-      const path = join(directory, `${safeFileName(document.name)}.rbxui.json`);
+      const path = documentBundlePath(join(directory, `${safeFileName(document.name)}.json`));
       if (path === documentPath) return saveBoundFile(path, document);
       const exists = await stat(path).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });
       if (exists) {
@@ -532,6 +533,14 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       const result = await dialog.showOpenDialog(window, { title: '导入图片资产（不会上传）', properties: ['openFile'], filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }] });
       return result.canceled || !result.filePaths[0] ? null : store.importFile(library as ImageLibrary, result.filePaths[0]);
     });
+    handle('document:reload', async () => {
+      if (!documentPath) return null;
+      const version = templateVersion ? await fileVersion(documentPath) : undefined;
+      const document = await readDocument(documentPath);
+      if (version && version !== await fileVersion(documentPath)) throw new Error('模板读取期间发生变化，请重试。');
+      if (version) templateVersion = { path: documentPath, version };
+      return { path: documentPath, document };
+    });
     handle('document:open', async assetPath => {
       stopRuntime();
       const project = requireProject();
@@ -540,7 +549,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
         bindFile(file);
         return file;
       }
-      const result = await dialog.showOpenDialog(window, { title: '打开界面', defaultPath: join(project.path, 'interfaces'), properties: ['openFile'], filters: [{ name: 'Roblox UI', extensions: ['rbxui.json'] }] });
+      const result = await dialog.showOpenDialog(window, { title: '打开界面', defaultPath: join(project.path, 'interfaces'), properties: ['openFile'], filters: [{ name: 'Roblox UI', extensions: ['json'] }] });
       if (result.canceled || !result.filePaths[0]) return null;
       const path = result.filePaths[0], location = documentLocation(project.path, path);
       const file = location?.library === 'templates'
@@ -555,7 +564,8 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       let path = documentPath;
       let document = robloxStrategy.validate(argument.document);
       if ('projectUI' in argument && argument.projectUI) {
-        path = join(project.path, 'interfaces', `${safeFileName(document.name)}.rbxui.json`);
+        if (path && !argument.saveAs && documentLocation(project.path, path)?.library === 'project') return saveBoundFile(path, document);
+        path = documentBundlePath(join(project.path, 'interfaces', `${safeFileName(document.name)}.json`));
         const exists = await stat(path).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });
         if (exists && path !== documentPath) {
           const answer = await dialog.showMessageBox(window, { type: 'question', title: '文件已存在', message: '是否覆盖已有项目UI？', detail: path, buttons: ['覆盖', '取消'], defaultId: 1, cancelId: 1 });
@@ -564,9 +574,9 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       } else if (!path || argument.saveAs) {
         const directory = join(project.path, 'interfaces');
         await mkdir(directory, { recursive: true });
-        const result = await dialog.showSaveDialog(window, { title: '保存界面', defaultPath: join(directory, `${safeFileName(document.name)}.rbxui.json`), filters: [{ name: 'Roblox UI', extensions: ['rbxui.json'] }] });
+        const result = await dialog.showSaveDialog(window, { title: '保存界面', defaultPath: join(directory, `${safeFileName(document.name)}.json`), filters: [{ name: 'Roblox UI', extensions: ['json'] }] });
         if (result.canceled || !result.filePath) return null;
-        path = result.filePath.toLowerCase().endsWith('.rbxui.json') ? result.filePath : `${result.filePath}.rbxui.json`;
+        path = documentBundlePath(result.filePath.toLowerCase().endsWith('.json') ? result.filePath : `${result.filePath}.json`);
         // Appending the extension can change the file checked by the native overwrite dialog.
         if (path !== result.filePath) {
           const exists = await stat(path).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });

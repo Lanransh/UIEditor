@@ -101,13 +101,15 @@ test('project files reject traversal, existing destinations and junction escape'
   const root = await mkdtemp(resolve('test-results/automation-files-'));
   const document = robloxStrategy.createDocument();
   const result = await saveInterface(root, 'reward.rbxui.json', document, true);
-  assert.deepEqual((await openInterface(root, 'reward.rbxui.json')).document, document);
+  assert.deepEqual((await openInterface(root, 'reward/reward.rbxui.json')).document, document);
   await assert.rejects(saveInterface(root, 'reward.rbxui.json', document, true), /EEXIST/);
   for (const target of ['../escape.rbxui.json', 'C:/escape.rbxui.json', 'foo.txt', './a.rbxui.json']) await assert.rejects(interfacePath(root, target));
   const outside = await mkdtemp(resolve('test-results/automation-outside-'));
   await symlink(outside, join(root, 'interfaces/link'), 'junction');
   await assert.rejects(interfacePath(root, 'link/escape.rbxui.json'), /符号链接/);
-  assert.equal(JSON.parse(await readFile(result.path, 'utf8')).version, 3);
+  const disk = JSON.parse(await readFile(result.path, 'utf8'));
+  assert.equal(disk.version, 4);
+  assert.equal(Object.hasOwn(disk, 'scripts'), false);
 });
 test('Codex settings preserve unrelated entries and invalid TOML is never modified', async () => {
   const original = '# keep comment\nmodel = "test"\n[mcp_servers.other]\ncommand = "other"\n';

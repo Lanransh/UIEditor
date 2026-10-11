@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, writeFile, readdir, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset, moveDocumentAsset } from '../electron/documents';
+import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset, moveDocumentAsset, documentScriptPaths } from '../electron/documents';
 import { robloxStrategy } from '../src/editor/roblox';
 
 test('工程资产列出界面文件，打开校验文档并拒绝工程外路径', async () => {
@@ -34,7 +34,7 @@ test('中文界面原子保存、重新打开与覆盖，不保存会话字段',
   assert.deepEqual(await readDocument(path), document);
   document.root.name = 'Rewards'; await writeDocument(path, document);
   assert.deepEqual(await readDocument(path), document);
-  assert.deepEqual(await readdir(join(directory, 'interfaces')), ['在线奖励.rbxui.json']);
+  assert.deepEqual((await readdir(join(directory, 'interfaces'))).sort(), ['在线奖励.example.luau', '在线奖励.rbxui.json', '在线奖励.view.luau']);
 });
 
 test('项目UI包含多层子目录文件，保留同名资产并跳过目录链接', async () => {
@@ -79,7 +79,7 @@ test('模板参考保存于工程目录，与项目UI隔离且校验资产路径
   const project = await mkdtemp(join(tmpdir(), 'ui-template-library-'));
   assert.deepEqual(await listDocumentAssets(project, 'templates'), []);
   const document = robloxStrategy.createDocument('TemplateDemo');
-  const path = join(project, 'AgentWorkspace', 'styles', 'templates', '分类', 'TemplateDemo.rbxui.json');
+  const path = join(project, 'styles', 'templates', '分类', 'TemplateDemo.rbxui.json');
   await writeDocument(path, document);
   const projectFile = join(project, 'interfaces', 'ProjectOnly.rbxui.json');
   await writeDocument(projectFile, document);
@@ -87,8 +87,8 @@ test('模板参考保存于工程目录，与项目UI隔离且校验资产路径
   assert.deepEqual(await openDocumentAsset(project, path, 'templates'), { path, document });
   await assert.rejects(openDocumentAsset(project, projectFile, 'templates'), /模板参考库/);
   await assert.rejects(openDocumentAsset(project, path), /当前工程/);
-  await assert.rejects(openDocumentAsset(project, join(project, 'AgentWorkspace', 'styles', 'templates', '分类'), 'templates'), /模板参考库/);
-  const link = join(project, 'AgentWorkspace', 'styles', 'templates', '链接');
+  await assert.rejects(openDocumentAsset(project, join(project, 'styles', 'templates', '分类'), 'templates'), /模板参考库/);
+  const link = join(project, 'styles', 'templates', '链接');
   await symlink(join(project, 'interfaces'), link, process.platform === 'win32' ? 'junction' : 'dir');
   assert.equal((await listDocumentAssets(project, 'templates')).length, 1);
   await writeFile(path, '{bad');
@@ -118,7 +118,7 @@ test('UI在三个库之间移动，保留原始字节，拒绝同名覆盖与工
   await writeDocument(source, document);
   const content = await readFile(source, 'utf8');
   const permanent = await moveDocumentAsset(project, source, 'project', runtime, 'permanent');
-  assert.equal(permanent.path, join(runtime, 'ui-assets', 'MoveDemo.rbxui.json'));
+  assert.equal(permanent.path, join(runtime, 'ui-assets', 'MoveDemo', 'MoveDemo.rbxui.json'));
   assert.equal(await readFile(permanent.path, 'utf8'), content);
   await assert.rejects(readFile(source), { code: 'ENOENT' });
   assert.deepEqual(await listDocumentAssets(runtime, 'permanent'), [permanent]);
@@ -126,10 +126,10 @@ test('UI在三个库之间移动，保留原始字节，拒绝同名覆盖与工
   await assert.rejects(moveDocumentAsset(runtime, permanent.path, 'permanent', runtime, 'permanent'), /其他资产文件夹/);
 
   const template = await moveDocumentAsset(runtime, permanent.path, 'permanent', project, 'templates');
-  assert.equal(template.path, join(project, 'AgentWorkspace', 'styles', 'templates', 'MoveDemo.rbxui.json'));
+  assert.equal(template.path, join(project, 'styles', 'templates', 'MoveDemo', 'MoveDemo.rbxui.json'));
   assert.equal(await readFile(template.path, 'utf8'), content);
   await assert.rejects(readFile(permanent.path), { code: 'ENOENT' });
-  const target = join(project, 'interfaces', 'MoveDemo.rbxui.json');
+  const target = join(project, 'interfaces', 'MoveDemo', 'MoveDemo.rbxui.json');
   const other = robloxStrategy.createDocument('OtherUI');
   await writeDocument(target, other);
   await assert.rejects(moveDocumentAsset(project, template.path, 'templates', project, 'project'), /同名UI/);
@@ -145,4 +145,35 @@ test('UI在三个库之间移动，保留原始字节，拒绝同名覆盖与工
   await assert.rejects(moveDocumentAsset(project, outside, 'project', runtime, 'permanent'), /当前工程/);
   assert.deepEqual(await readDocument(outside), document);
   await assert.rejects(moveDocumentAsset(project, join(project, 'interfaces', '子目录'), 'project', runtime, 'permanent'), /当前工程/);
+});
+
+
+test('拆分文件不嵌入源码，文件工具修改脚本后重新读取，拒绝缺失脚本', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'ui-split-'));
+  const path = join(root, 'interfaces', 'RewardUI.json');
+  const document = robloxStrategy.createDocument('RewardUI');
+  await writeDocument(path, document);
+  const raw = JSON.parse(await readFile(path, 'utf8'));
+  assert.equal(raw.version, 4); assert.equal(Object.hasOwn(raw, 'scripts'), false);
+  const scripts = documentScriptPaths(path);
+  await writeFile(scripts.source, '-- external view');
+  await writeFile(scripts.integration, '-- external preview');
+  assert.deepEqual((await readDocument(path)).scripts, { source: '-- external view', integration: '-- external preview' });
+  const { unlink } = await import('node:fs/promises');
+  await unlink(scripts.source);
+  await assert.rejects(readDocument(path), /缺少界面脚本/);
+});
+
+test('移动UI携带两份源码，目标脚本冲突不删除来源文件', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'ui-sidecar-move-'));
+  const path = join(root, 'interfaces', 'RewardUI.json');
+  const document = robloxStrategy.createDocument('RewardUI');
+  await writeDocument(path, document);
+  const target = join(root, 'styles', 'templates', 'RewardUI', 'RewardUI.json');
+  await mkdir(join(root, 'styles', 'templates', 'RewardUI'), { recursive: true });
+  await writeFile(documentScriptPaths(target).integration, '-- occupied');
+  await assert.rejects(moveDocumentAsset(root, path, 'project', root, 'templates'), /同名UI/);
+  assert.deepEqual(await readDocument(path), document);
+  assert.equal(await readFile(documentScriptPaths(target).integration, 'utf8'), '-- occupied');
+  await assert.rejects(readFile(target), /ENOENT/);
 });

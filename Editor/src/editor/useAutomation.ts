@@ -26,7 +26,7 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
       if (assetsSignature.current !== signature) { assetsSignature.current = signature; sessionId.current = crypto.randomUUID(); }
       if (documentId.current !== h.state.id) { documentId.current = h.state.id; sessionId.current = crypto.randomUUID(); }
       const stamp = () => ({ sessionId: sessionId.current, revision: e.history.inspect().revision });
-      const verify = () => { if (!alive || a.sessionId !== sessionId.current || a.revision !== e.history.inspect().revision || signature !== JSON.stringify(current.current.editor.inspectImages())) throw new Error('编辑会话、资产配置或 revision 已变化，请重新读取状态。'); };
+      const verify = (revision = a.revision) => { if (!alive || a.sessionId !== sessionId.current || revision !== e.history.inspect().revision || signature !== JSON.stringify(current.current.editor.inspectImages())) throw new Error('编辑会话、资产配置或 revision 已变化，请重新读取状态。'); };
       const writable = () => { verify(); if (e.runtime.inspect().sessionId || e.runtime.active || e.busy) throw new Error('当前正在运行或处理操作，请停止后编辑。'); };
       const resolved = () => resolveImageAssets(e.history.inspect().state, e.inspectImages());
       const dirty = () => e.hasDocument && JSON.stringify(resolved()) !== f.saved();
@@ -113,12 +113,15 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
           }
           case 'uie.document.save': {
             writable(); f.busy(true);
-            try { const result = await window.automation.invoke('file:save', { document: resolved(), relativePath: a.relativePath }); verify(); f.markSaved(result.document, result.path); return state(); } finally { f.busy(false); }
+            try {
+              const document = await e.refreshSavedDocument(), revision = e.history.inspect().revision;
+              const result = await window.automation.invoke('file:save', { document, relativePath: a.relativePath }); verify(revision); f.markSaved(result.document, result.path); return state();
+            } finally { f.busy(false); }
           }
           case 'uie.runtime.control': {
             verify(); let result;
             if (a.action === 'stop') { result = await e.runtime.stop(); }
-            else if (a.action === 'run') { writable(); result = await e.runtime.start(resolved()); }
+            else if (a.action === 'run') { writable(); result = await e.startRuntime(); }
             else if (a.action === 'reset') { if (!e.runtime.inspect().sessionId) throw new Error('没有运行会话。'); result = await e.runtime.reset(); }
             else throw new Error('不支持的运行操作。');
             return { ...state(), result, runtimeSessionId: e.runtime.inspect().sessionId, frameSequence: e.runtime.inspect().sequence };

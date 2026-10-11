@@ -57,18 +57,19 @@ export async function executeRuntimeBatch(
   args: Record<string, unknown>,
   dispatch: (request: AutomationRequest) => Promise<any>,
   inspect: () => RuntimeFrame | null,
-  verify: () => void,
+  verify: (revision?: unknown) => void,
   interaction: () => { hoveredId: string | null; pressedId: string | null } = () => ({ hoveredId: null, pressedId: null }),
 ) {
   validateRuntimeBatchSteps(args.steps);
-  verify();
+  let revision = args.revision;
+  verify(revision);
   const startedAt = Date.now();
   const metadata = new Set(['sessionId', 'revision', 'projectId', 'projectName', 'documentId', 'projectType', 'state', 'dirty', 'relativePath', 'library', 'mode']);
   const results: { index: number; action: string; success: boolean; result?: unknown; error?: string }[] = [];
   for (const [index, step] of args.steps.entries()) {
     let result: any;
     try {
-      verify();
+      verify(revision);
       if (Date.now() - startedAt >= 8000) throw new Error('批量验证超过 8 秒预算，请拆成较小批次。');
       if (step.action === 'assert') {
         const frame = inspect();
@@ -89,9 +90,10 @@ export async function executeRuntimeBatch(
         const { action, dispatched, reason, ...input } = step;
         result = await dispatch({
           name: mouse || step.action === 'click' ? `uie.runtime.${step.action}` : 'uie.runtime.control',
-          arguments: { sessionId: args.sessionId, revision: args.revision, ...(mouse || step.action === 'click' ? input : { action: step.action }) },
+          arguments: { sessionId: args.sessionId, revision, ...(mouse || step.action === 'click' ? input : { action: step.action }) },
         });
-        verify();
+        if (step.action === 'run' && typeof result.revision === 'number') revision = result.revision;
+        verify(revision);
         if (!result.result?.ok) throw new Error(result.result?.error ?? '运行操作失败。');
         if (mouse || step.action === 'click') {
           if (step.dispatched !== undefined && result.dispatched !== step.dispatched) throw new Error('dispatched 状态不匹配。');

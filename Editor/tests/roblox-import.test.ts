@@ -95,3 +95,26 @@ test('legacy inheritance migrates only in generated source, without changing sav
   assert.match(result.scripts.source, /FX.Class\("CLegacyView", "CUIView"\)/);
   assert.equal(document.scripts.source, saved);
 });
+
+
+test('拆分文件保存与文件编辑不改变Roblox导出格式，也不导出example', async () => {
+  const { mkdtemp, writeFile } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { writeDocument, readDocument, documentScriptPaths } = await import('../electron/documents');
+  const root = await mkdtemp(join(tmpdir(), 'ui-export-bundle-'));
+  const path = join(root, 'RewardUI.json');
+  const document = strategy.createDocument('RewardUI');
+  const original = createRobloxImportPackage(document);
+  await writeDocument(path, document);
+  assert.deepEqual(createRobloxImportPackage(await readDocument(path)), original);
+  await writeFile(documentScriptPaths(path).integration, '-- example simulation only');
+  assert.deepEqual(createRobloxImportPackage(await readDocument(path)), original);
+  await writeFile(documentScriptPaths(path).source, document.scripts.source + '\n-- external view');
+  const changed = createRobloxImportPackage(await readDocument(path));
+  assert.deepEqual(Object.keys(changed), Object.keys(original));
+  assert.deepEqual(changed.model, original.model);
+  assert.equal(changed.scripts.shared, original.scripts.shared);
+  assert.match(changed.scripts.source, /external view/);
+  assert.equal(JSON.stringify(changed).includes('example simulation only'), false);
+});

@@ -1,7 +1,8 @@
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
+import { readDocument, documentFiles } from '../electron/documents';
 import { readTemplateStyle, projectStylePath, relocateStyleFile, readAgentPackage } from '../electron/template-styles';
 
 const packaged = process.argv.includes('--packaged');
@@ -82,17 +83,23 @@ try {
   await screenshot('style-dialog.png');
   await dialog.getByRole('button', { name: '下一步', exact: true }).click();
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
-  for (const file of snapshot.files) assert.deepEqual(await readFile(join(workspace, projectStylePath(file.path))), relocateStyleFile(file).content, file.path);
+  for (const file of snapshot.files) {
+    if (file.path.startsWith(`template-references${sep}`) && file.path.endsWith('.json')) {
+      for (const output of documentFiles(join(workspace, projectStylePath(file.path)), await readDocument(join(library, '多彩棋格风格', file.path)))) {
+        assert.equal(await readFile(output.path, 'utf8'), output.content);
+      }
+    } else assert.deepEqual(await readFile(join(workspace, projectStylePath(file.path))), relocateStyleFile(file).content, file.path);
+  }
   assert.ok((await readdir(workspace)).includes('interfaces'));
   const typeRoot = packaged ? join(dirname(executable), 'resources', 'ProjectTypes', 'Roblox') : resolve('../ProjectTypes/Roblox');
   for (const file of await readAgentPackage(typeRoot, ['AGENTS.md'])) {
-    assert.deepEqual(await readFile(join(workspace, 'AgentWorkspace', file.path)), file.content, file.path);
+    assert.deepEqual(await readFile(join(workspace, file.path)), file.content, file.path);
   }
   await page.getByRole('button', { name: '模板参考', exact: true }).click();
   await page.getByRole('button', { name: 'UI 资产 SmallWindow', exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: 'UI 资产 TemplatePage', exact: true }).count(), 0);
   await page.getByRole('button', { name: 'UI 资产 SmallWindow', exact: true }).click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '打开副本', exact: true }).click();
+  await page.getByRole('menuitem', { name: '打开', exact: true }).click();
   const artboard = page.getByTestId('ui-artboard');
   const title = artboard.locator('.preview-text-fill').getByText('SMALL', { exact: true });
   await title.waitFor();
@@ -123,10 +130,10 @@ try {
   await dialog.getByRole('button', { name: '下一步', exact: true }).click();
   await page.getByRole('button', { name: '创建工程', exact: true }).waitFor({ state: 'visible' });
 
-  const agents = join(workspace, 'AgentWorkspace', 'AGENTS.LOCAL.md');
+  const agents = join(workspace, 'AGENTS.LOCAL.md');
   await writeFile(agents, '# 用户的项目定制入口\n绝不覆盖。');
-  await writeFile(join(workspace, 'AgentWorkspace', 'AGENTS.md'), '# 过期公共入口');
-  await writeFile(join(workspace, 'AgentWorkspace', 'Docs', 'runtime-api.md'), '# 过期接口');
+  await writeFile(join(workspace, 'AGENTS.md'), '# 过期公共入口');
+  await writeFile(join(workspace, 'Docs', 'runtime-api.md'), '# 过期接口');
   // Choosing a style for an already-existing project must only open it.
   await pick(source);
   dialog = await createDialog();
@@ -134,8 +141,8 @@ try {
   await dialog.getByRole('button', { name: '下一步', exact: true }).click();
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
   assert.equal(await readFile(agents, 'utf8'), '# 用户的项目定制入口\n绝不覆盖。');
-  assert.deepEqual(await readFile(join(workspace, 'AgentWorkspace', 'AGENTS.md')), await readFile(join(typeRoot, 'AGENTS.md')));
-  assert.deepEqual(await readFile(join(workspace, 'AgentWorkspace', 'Docs', 'runtime-api.md')), await readFile(join(typeRoot, 'Docs', 'runtime-api.md')));
+  assert.deepEqual(await readFile(join(workspace, 'AGENTS.md')), await readFile(join(typeRoot, 'AGENTS.md')));
+  assert.deepEqual(await readFile(join(workspace, 'Docs', 'runtime-api.md')), await readFile(join(typeRoot, 'Docs', 'runtime-api.md')));
   await hub();
   await application.close();
   await launch();
@@ -143,8 +150,8 @@ try {
   await page.getByRole('button', { name: '打开工程', exact: true }).click();
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
   assert.equal(await readFile(agents, 'utf8'), '# 用户的项目定制入口\n绝不覆盖。');
-  assert.deepEqual(await readFile(join(workspace, 'AgentWorkspace', 'AGENTS.md')), await readFile(join(typeRoot, 'AGENTS.md')));
-  assert.deepEqual(await readFile(join(workspace, 'AgentWorkspace', 'Docs', 'runtime-api.md')), await readFile(join(typeRoot, 'Docs', 'runtime-api.md')));
+  assert.deepEqual(await readFile(join(workspace, 'AGENTS.md')), await readFile(join(typeRoot, 'AGENTS.md')));
+  assert.deepEqual(await readFile(join(workspace, 'Docs', 'runtime-api.md')), await readFile(join(typeRoot, 'Docs', 'runtime-api.md')));
   await hub();
   const unknown = await page.evaluate(() => window.projects.create({ kind: 'style', id: '../outside' }));
   assert.ok(!unknown.ok && unknown.error.includes('标识无效'));

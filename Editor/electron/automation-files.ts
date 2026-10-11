@@ -1,13 +1,13 @@
 import { realpath, mkdir, stat, readdir, open, unlink, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { resolve, join, relative, isAbsolute, dirname } from 'node:path';
-import { readDocument, writeDocument, documentAssetDirectory } from './documents';
+import { readDocument, documentAssetDirectory, documentFiles, documentScriptPaths, documentStem, documentBundlePath, saveDocumentBundle } from './documents';
 import type { UIDocument } from '../src/shared/uiDocument';
 
 export async function interfacePath(projectPath: string, target: unknown, library: 'project' | 'templates' = 'project') {
   if (!['project', 'templates'].includes(library)) throw new Error('不支持写入此 UI 资产库。');
   if (typeof target !== 'string' || !target || isAbsolute(target) || target.includes(':') || target.split(/[\\/]/).some(part => part === '..' || part === '' || part === '.')) throw new Error('必须使用 UI 资产库内的相对文件路径。');
-  if (!target.toLowerCase().endsWith('.rbxui.json')) throw new Error('界面文件必须使用 .rbxui.json 扩展名。');
+  if (!target.toLowerCase().endsWith('.json')) throw new Error('界面文件必须使用 .json 扩展名。');
   const project = await realpath(projectPath), root = documentAssetDirectory(project, library);
   // Check existing ancestors before mkdir, including linked workspace/style directories.
   let ancestor = root;
@@ -30,22 +30,35 @@ export async function interfacePath(projectPath: string, target: unknown, librar
   }
   return file;
 }
-export async function fileVersion(path: string) { return createHash('sha256').update(await readFile(path)).digest('hex'); }
+export async function fileVersion(path: string) {
+  const hash = createHash('sha256');
+  for (const file of [path, ...Object.values(documentScriptPaths(path))]) {
+    const bytes = await readFile(file).catch((error: NodeJS.ErrnoException) => { if (file !== path && error.code === 'ENOENT') return null; throw error; });
+    hash.update(bytes ? `present:${bytes.length}:` : 'missing:');
+    if (bytes) hash.update(bytes);
+  }
+  return hash.digest('hex');
+}
 export async function saveInterface(projectPath: string, target: unknown, document: UIDocument, create: boolean, library: 'project' | 'templates' = 'project', expectedVersion?: string) {
-  const file = await interfacePath(projectPath, target, library);
+  const requested = await interfacePath(projectPath, target, library);
+  const file = create ? documentBundlePath(requested) : requested;
   if (!create && library === 'templates') {
     const current = await fileVersion(file).catch((error: NodeJS.ErrnoException) => { if (error.code === 'ENOENT') return null; throw error; });
     if (!expectedVersion || current !== expectedVersion) throw new Error('模板已被外部修改、移动或删除，请保留当前修改并重新打开模板。');
   }
-  if (!create) { await stat(file); return { path: file, document: await writeDocument(file, document) }; }
+  if (!create) { await stat(file); return saveDocumentBundle(file, document); }
   // Exclusive creation is necessary: checking existence before rename would overwrite a racing writer.
-  const content = JSON.stringify(document, null, 2) + '\n';
-  if (Buffer.byteLength(content) > 32 * 1024 * 1024) throw new Error('界面文件超过 32 MiB。');
   await mkdir(dirname(file), { recursive: true });
-  const handle = await open(file, 'wx');
-  try { await handle.writeFile(content, 'utf8'); }
-  catch (error) { await handle.close(); await unlink(file).catch(() => {}); throw error; }
-  await handle.close(); return { path: file, document };
+  const created: string[] = [];
+  try {
+    for (const entry of documentFiles(file, document)) {
+      const handle = await open(entry.path, 'wx');
+      created.push(entry.path);
+      try { await handle.writeFile(entry.content, 'utf8'); }
+      finally { await handle.close(); }
+    }
+  } catch (error) { await Promise.all(created.map(path => unlink(path))); throw error; }
+  return { path: file, document };
 }
 export async function openInterface(projectPath: string, target: unknown, library: 'project' | 'templates' = 'project') {
   const path = await interfacePath(projectPath, target, library);
@@ -64,7 +77,7 @@ export async function listInterfaces(projectPath: string) {
       const file = join(directory, entry.name);
       if (entry.isSymbolicLink()) continue;
       if (entry.isDirectory()) await visit(file);
-      else if (entry.isFile() && entry.name.toLowerCase().endsWith('.rbxui.json')) result.push({ name: entry.name.slice(0, -11), relativePath: relative(root, file).replaceAll('\\', '/') });
+      else if (entry.isFile() && entry.name.toLowerCase().endsWith('.json')) result.push({ name: documentStem(entry.name), relativePath: relative(root, file).replaceAll('\\', '/') });
     }
   }
   await visit(root); return result.sort((a, b) => a.relativePath.localeCompare(b.relativePath, 'zh-CN'));

@@ -1,6 +1,6 @@
 import { lstat, readdir, readFile, realpath } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { robloxStrategy } from '../src/editor/roblox';
+import { readDocument, documentStem, documentBundlePath } from './documents';
 import type { TemplateStyle, TemplateStylePreview } from '../src/shared/project';
 import type { UIDocument } from '../src/shared/uiDocument';
 
@@ -21,15 +21,21 @@ export function styleDirectory(root: string, id: unknown): string {
   return join(root, id);
 }
 
+// Style source packages keep their original sibling template-reference link layout.
 function packageDocumentPath(path: string): string {
   return path.startsWith(`template-references${sep}`) ? path : join('AgentWorkspace', path);
 }
 
 export function projectStylePath(path: string): string {
   const parts = path.split(sep);
-  if (parts[0] === 'template-references') return join('AgentWorkspace', 'styles', 'templates', ...parts.slice(1));
-  if (parts[0] === '.agents' && parts[1] === 'skills') return join('AgentWorkspace', 'styles', 'skills', ...parts.slice(2));
-  return join('AgentWorkspace', 'styles', path);
+  if (parts[0] === 'template-references') {
+    const target = join('styles', 'templates', ...parts.slice(1));
+    if (path.toLowerCase().endsWith('.json')) return documentBundlePath(documentStem(target) + '.json');
+    const scriptStem = basename(target).replace(/\.(view|example)\.luau$/i, '');
+    return scriptStem !== basename(target) ? join(dirname(target), scriptStem, basename(target)) : target;
+  }
+  if (parts[0] === '.agents' && parts[1] === 'skills') return join('styles', 'skills', ...parts.slice(2));
+  return join('styles', path);
 }
 
 // Only relocate Markdown links. Template bytes and all other author content stay intact.
@@ -130,13 +136,13 @@ export async function readAgentPackage(directory: string, required: string[]): P
 // and resources are copied byte-for-byte; user-authored prompts are never rewritten.
 export async function readTemplateStyle(directory: string): Promise<{ files: StyleFile[]; description: string; templateCount: number; preview: UIDocument; templates: TemplateStylePreview['templates'] }> {
   const files = await readAgentPackage(directory, ['Game-DESIGN.md']);
-  const templates = files.filter(file => file.path.startsWith(`template-references${sep}`) && file.path.toLowerCase().endsWith('.rbxui.json'));
-  if (!templates.length) throw new Error('风格没有可读取的 .rbxui.json 模板。');
+  const templates = files.filter(file => file.path.startsWith(`template-references${sep}`) && file.path.toLowerCase().endsWith('.json'));
+  if (!templates.length) throw new Error('风格没有可读取的 .json 模板。');
   const documents = new Map<string, UIDocument>();
   for (const file of templates) {
     try {
       if (file.content.length > 32 * 1024 * 1024) throw new Error('界面文件超过 32 MiB。');
-      const document = robloxStrategy.validate(JSON.parse(file.content.toString('utf8')));
+      const document = await readDocument(join(directory, file.path));
       const visit = (node: typeof document.root) => {
         // A catalog-only reference would depend on the author's global/project
         // image library. Templates must carry their own editable image snapshot.

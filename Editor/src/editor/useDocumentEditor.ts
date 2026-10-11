@@ -7,6 +7,7 @@ import { useHistoryShortcuts } from '../history/useHistoryShortcuts';
 import { projectStrategy } from './roblox';
 import { deleteNode, documentCommand, duplicateNode, insertNode, pasteNode, reparentNode } from './commands';
 import { useRuntime } from './useRuntime';
+import { mergeSavedDocument } from './reloadDocument';
 import { useAutomation } from './useAutomation';
 import { convertToBakedImage, type BakedNodeClass } from './imageBake';
 import { applyImageAsset, normalizeRobloxId, resolveImageAssets, type ImageAsset, type ImageAssetUpdate, type ImageLibrary } from '../shared/imageAssets';
@@ -93,13 +94,36 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   }
   async function save(saveAs = false, projectUI = false): Promise<boolean> {
     if (!hasDocument) return false;
+    const document = await refreshSavedDocument();
     const result = await window.documents.save(document, saveAs, projectUI);
     if (!result.ok) { setError(result.error); return false; }
     if (!result.value) return false;
-    if (result.value.document.id !== document.id) history.reset(result.value.document);
+    if (JSON.stringify(result.value.document) !== JSON.stringify(document)) history.reset(result.value.document);
     fileState.current = { path: result.value.path, saved: JSON.stringify(result.value.document) };
     setPath(result.value.path); setSaved(JSON.stringify(result.value.document)); setError('');
     return true;
+  }
+  async function refreshSavedDocument(): Promise<UIDocument> {
+    const current = resolveImageAssets(history.inspect().state, liveImageAssets.current);
+    const file = fileState.current;
+    if (!file.path) return current;
+    const revision = history.inspect().revision;
+    const result = await window.documents.reload();
+    if (!result.ok) throw new Error(result.error);
+    if (!result.value || result.value.path !== file.path || revision !== history.inspect().revision) throw new Error('编辑会话已变化，请重试。');
+    const disk = resolveImageAssets(strategy.validate(result.value.document), liveImageAssets.current);
+    const merged = strategy.validate(mergeSavedDocument(JSON.parse(file.saved), current, disk));
+    if (JSON.stringify(merged) !== JSON.stringify(current)) history.reset(merged);
+    fileState.current = { path: file.path, saved: JSON.stringify(disk) };
+    setSaved(fileState.current.saved); setError('');
+    return merged;
+  }
+  async function startRuntime() {
+    if (operating.current) return { ok: false, error: '当前正在处理操作。' };
+    operating.current = true; setBusy(true);
+    try { return await runtime.start(await refreshSavedDocument()); }
+    catch (cause) { const error = cause instanceof Error ? cause.message : '读取界面文件失败'; setError(error); return { ok: false, error }; }
+    finally { operating.current = false; setBusy(false); }
   }
   async function consent(): Promise<boolean> {
     if (!clearAssetInspection()) return false;
@@ -140,6 +164,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   });
   const saveTemplate = (folder?: string) => run(async () => {
     if (!hasDocument) return;
+    const document = await refreshSavedDocument();
     const result = await window.documents.saveTemplate(document, folder);
     if (!result.ok) { setError(result.error); return; }
     if (result.value) {
@@ -279,7 +304,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
     moveImage: (id: string, folder: string) => changeProjectImages(() => window.imageAssets.move(id, folder)),
     removeImage: (id: string) => changeProjectImages(() => window.imageAssets.remove(id)),
     location: documentLocation(project.path, path), newDocument, openDocument, openTemplate, saveTemplate, moveAsset, save: (saveAs = false) => run(async () => { await save(saveAs); }),
-    saveProjectUI: () => run(async () => { await save(false, true); }), back, dirty, path, error, busy: busy || runtime.active || assetsLoading, runtime };
+    saveProjectUI: () => run(async () => { await save(false, true); }), refreshSavedDocument, startRuntime, back, dirty, path, error, busy: busy || runtime.active || assetsLoading, runtime };
   useAutomation(editor, { reset, saved: () => fileState.current.saved, path: () => fileState.current.path, busy: value => { operating.current = value; setBusy(value); }, markSaved: (value, file) => { fileState.current = { path: file, saved: JSON.stringify(value) }; setPath(file); setSaved(fileState.current.saved); } });
   return editor;
 }

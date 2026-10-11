@@ -1,6 +1,6 @@
 # 交互与模拟接入
 
-文档 scripts.source 返回交互类，scripts.integration 返回继承交互类的模拟接入类。两份源码通过制作 API 写入；App 内运行，不是实际游戏接入。
+文档 scripts.source 返回交互类，scripts.integration 返回继承交互类的模拟接入类。两份源码保存于同名 .view.luau 与 .example.luau，可通过文件工具直接修改；App 内运行，不是实际游戏接入。
 
 交互类继承 CUIView：OnReady 先用 `local root = FX.Loader:PlayerGui("ExampleUI")` 获取实际命名的 ScreenGui，再用 `FX.Loader:Here(root, "Panel.HintTxt")` 查子节点。也可直接调用 `FX.Loader:PlayerGui("ExampleUI.Panel.HintTxt")`。PlayerGui 仅模拟当前文档的界面；Here 从指定节点的子节点开始，PlayerGui 从界面名开始。只接受 `.` 分隔，斜杠、空路径和空段报错。生成代码不通过 GetRootNode 获取节点。TrackConnection 管理 Activated:Connect；Render(state) 更新支持属性；EmitUIAction(name,payload) 交给接入类。
 

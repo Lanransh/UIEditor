@@ -20,7 +20,7 @@ function StylePreview({ document, path }: { document: UIDocument; path: string }
     return () => observer.disconnect();
   }, [bounds]);
   return <section className="style-preview" aria-label="画风模板预览">
-    <div className="style-preview-toolbar"><strong title={path}>{path.replace(/\.rbxui\.json$/i, '')}</strong><div>
+    <div className="style-preview-toolbar"><strong title={path}>{path.replace(/(?:\.rbxui)?\.json$/i, '')}</strong><div>
       <button onClick={fit}>适应窗口</button>
       <select aria-label="画风预览缩放" value={zoom} onChange={event => setZoom(Number(event.target.value))}>
         <option value={zoom}>{Math.round(zoom * 100)}%</option>
@@ -97,7 +97,7 @@ export function StyleLibraryDialog({ onClose }: { onClose: () => void }) {
         {previewError && <p role="alert">{previewError}</p>}
         {selected && !selected.problem && !preview && !previewError && <p role="status">正在读取模板…</p>}
         {preview?.templates.map(item => <button key={item.path} aria-pressed={item.path === templatePath} onClick={() => setTemplatePath(item.path)}>
-          <strong title={item.path}>{item.path.replace(/\.rbxui\.json$/i, '')}</strong><small>{item.document.name} · {item.path}</small>
+          <strong title={item.path}>{item.path.replace(/(?:\.rbxui)?\.json$/i, '')}</strong><small>{item.document.name} · {item.path}</small>
         </button>)}
       </nav>
       {template ? <StylePreview key={`${refresh}:${styleId}:${templatePath}`} document={template.document} path={template.path} /> : <div className="style-library-placeholder">选择画风与模板以查看预览</div>}

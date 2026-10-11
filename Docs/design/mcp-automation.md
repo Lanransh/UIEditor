@@ -54,6 +54,9 @@ runtime.batch 接收同名鼠标步骤，支持 dispatched/reason 预期；asser
 
 ## 运行与文件
 
+工作区 AI 入口位于 UIEditorWorkspace 根目录，agentWorkspacePath 与 workspacePath 相同。界面保存为同目录 `.json`、`.view.luau`、`.example.luau`，脚本允许文件工具直接修改；Run/Save 前读取并合并磁盘更新，同一部分双侧修改冲突时拒绝覆盖。MCP 的 scripts.get/set 继续支持内存脚本编辑及撤销；外部文件编辑不属于撤销事务。Roblox 导出格式保持不变。
+
+
 `uie.runtime.batch` 将已知验证步骤合并为一次 MCP 往返，要求当前 sessionId/revision。
 steps 为 1–32 个顺序执行的 `run / reset / stop / click / hover / scroll / drag / assert`，不接受任意
 代码、设计修改、文件操作或嵌套批次。click 使用稳定节点 id，可断言 dispatched
@@ -86,7 +89,7 @@ document.save 无路径时保存当前绑定的项目 UI 或模板原件；带 r
 
 Hub 右上角“设置”提供 Codex MCP 配置，不提供 AI 工作区打开按钮。配置管理 CODEX_HOME/config.toml（未设置时为用户 .codex/config.toml）中的 ui-editor command/args/enabled，保留其他配置并验证 TOML。启动路径包含显式发现文件地址，不依赖 Codex 工作目录；写入前检查配置是否变化，再原子替换。
 
-开发构建输出 Editor/mcp-dist/server.mjs；打包复制到 resources/mcp-dist，ASAR 外由 Node 启动，原生宿主位于 resources/native-bin。Hub 检查服务文件与 Node。所有新工程拥有独立 AgentWorkspace，由 ProjectTypes/Roblox 提供公共入口、节点与代码技能，TemplateStyles/Roblox 提供可选视觉规范、模板和风格专项技能。制作和保存仍通过 MCP，重开不覆盖提示词；流程见 [模板风格与项目 AI 工作区](template-styles.md)。旧全局 AI 入口已退役，历史视觉示例仅作为仓库参考资料保留。
+开发构建输出 Editor/mcp-dist/server.mjs；打包复制到 resources/mcp-dist，ASAR 外由 Node 启动，原生宿主位于 resources/native-bin。Hub 检查服务文件与 Node。所有新工程在 UIEditorWorkspace 根目录拥有公共入口、Docs、.agents/skills 和 styles，由 ProjectTypes/Roblox 提供公共入口、节点与代码技能，TemplateStyles/Roblox 提供可选视觉规范、模板和风格专项技能。节点制作和运行通过 MCP，源码也可通过文件工具修改；重开同步公共说明并保留项目 LOCAL/styles；流程见 [模板风格与项目 AI 工作区](template-styles.md)。旧全局 AI 入口已退役，历史视觉示例仅作为仓库参考资料保留。
 
 ## 验证
 

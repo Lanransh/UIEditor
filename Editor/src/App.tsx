@@ -259,7 +259,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
           <div className="runtime-controls">
             <button className={editor.runtime.active ? 'runtime-stop' : 'runtime-start'} disabled={!editor.hasDocument || (!editor.runtime.active && editor.busy)} onClick={() => {
               if (editor.runtime.active) void editor.runtime.stop();
-              else { setWorkspaceTab('design'); void editor.runtime.start(); }
+              else { setWorkspaceTab('design'); void editor.startRuntime(); }
             }}>{editor.runtime.active ? <Square size={12} aria-hidden="true" /> : <Play size={12} aria-hidden="true" />}{editor.runtime.active ? '停止' : '运行'}</button>
             {editor.runtime.active && <button title="重新开始，恢复初始状态" disabled={!editor.runtime.ready} onClick={() => void editor.runtime.reset()}><RotateCcw size={12} aria-hidden="true" />重置</button>}
           </div>

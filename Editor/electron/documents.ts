@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, rename, unlink, stat, readdir, copyFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rename, unlink, stat, readdir, copyFile, lstat, rmdir } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { dirname, basename, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -7,7 +7,7 @@ import type { UIDocument } from '../src/shared/uiDocument';
 import type { DocumentAsset, DocumentLibrary } from '../src/shared/documents';
 
 export function documentAssetDirectory(rootPath: string, library: DocumentLibrary): string {
-  return join(rootPath, { project: 'interfaces', templates: join('AgentWorkspace', 'styles', 'templates'), permanent: 'ui-assets' }[library]);
+  return join(rootPath, { project: 'interfaces', templates: join('styles', 'templates'), permanent: 'ui-assets' }[library]);
 }
 
 export async function listDocumentAssets(rootPath: string, library: DocumentLibrary = 'project'): Promise<DocumentAsset[]> {
@@ -21,8 +21,8 @@ export async function listDocumentAssets(rootPath: string, library: DocumentLibr
     for (const entry of entries) {
       const path = join(directory, entry.name);
       if (entry.isDirectory()) assets.push(...await collect(path));
-      else if (entry.isFile() && entry.name.toLowerCase().endsWith('.rbxui.json')) {
-        assets.push({ name: entry.name.slice(0, -11), path });
+      else if (entry.isFile() && entry.name.toLowerCase().endsWith('.json')) {
+        assets.push({ name: documentStem(entry.name), path });
       }
     }
     return assets;
@@ -39,16 +39,37 @@ export async function openDocumentAsset(rootPath: string, path: unknown, library
 export async function moveDocumentAsset(sourceRoot: string, path: unknown, sourceLibrary: DocumentLibrary, targetRoot: string, targetLibrary: DocumentLibrary): Promise<DocumentAsset> {
   if (sourceLibrary === targetLibrary) throw new Error('请选择其他资产文件夹。');
   const source = await openDocumentAsset(sourceRoot, path, sourceLibrary);
-  const target = join(documentAssetDirectory(targetRoot, targetLibrary), basename(source.path));
-  await mkdir(dirname(target), { recursive: true });
-  try { await copyFile(source.path, target, constants.COPYFILE_EXCL); }
-  catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error('目标文件夹已有同名UI，请先改名后再移动。');
+  const target = documentBundlePath(join(documentAssetDirectory(targetRoot, targetLibrary), basename(source.path)));
+  await mkdir(dirname(dirname(target)), { recursive: true });
+  try { await mkdir(dirname(target)); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error('目标文件夹已有同名UI，请先改名后再移动。'); throw error; }
+  const sources = [source.path, ...Object.values(documentScriptPaths(source.path))];
+  const targets = [target, ...Object.values(documentScriptPaths(target))];
+  const copied: string[] = [];
+  const originals: string[] = [];
+  try {
+    for (let index = 0; index < sources.length; index++) {
+      if (!(await fileInfo(sources[index]))) continue;
+      await copyFile(sources[index], targets[index], constants.COPYFILE_EXCL);
+      copied.push(targets[index]); originals.push(sources[index]);
+    }
+  } catch (error) {
+    await Promise.all(copied.map(path => unlink(path)));
+    await rmdir(dirname(target));
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error('目标文件夹已有同名UI或脚本，请先改名后再移动。');
     throw error;
   }
-  try { await unlink(source.path); }
-  catch (error) { await unlink(target); throw error; }
-  return { path: target, name: basename(target).slice(0, -11) };
+  // Restore already removed sources if a later removal fails.
+  const removed: string[] = [];
+  try { for (const path of originals) { await unlink(path); removed.push(path); } }
+  catch (error) {
+    for (const path of removed) await copyFile(targets[sources.indexOf(path)], path, constants.COPYFILE_EXCL);
+    await Promise.all(copied.map(path => unlink(path)));
+    await rmdir(dirname(target));
+    throw error;
+  }
+  if (basename(dirname(source.path)) === documentStem(basename(source.path))) await rmdir(dirname(source.path)).catch((error: NodeJS.ErrnoException) => { if (error.code !== 'ENOTEMPTY') throw error; });
+  return { path: target, name: documentStem(basename(target)) };
 }
 
 export function safeFileName(name: string): string {
@@ -64,22 +85,115 @@ export async function listTemplateFolders(root: string): Promise<string[]> {
     if (error.code === 'ENOENT') return [];
     throw error;
   });
-  return entries.filter(entry => entry.isDirectory()).map(entry => entry.name).sort((a, b) => a.localeCompare(b, 'zh-CN'));
+  const folders: string[] = [];
+  for (const entry of entries.filter(entry => entry.isDirectory())) {
+    const bundle = join(documentAssetDirectory(root, 'templates'), entry.name, `${entry.name}.json`);
+    if (!await fileInfo(bundle)) folders.push(entry.name);
+  }
+  return folders.sort((a, b) => a.localeCompare(b, 'zh-CN'));
+}
+export function documentStem(path: string): string {
+  return path.replace(/(?:\.rbxui)?\.json$/i, '');
+}
+/** Each saved UI owns a directory named after its file stem. */
+export function documentBundlePath(path: string): string {
+  const stem = documentStem(basename(path));
+  return basename(dirname(path)) === stem ? path : join(dirname(path), stem, basename(path));
+}
+export async function saveDocumentBundle(path: string, source: unknown) {
+  const document = robloxStrategy.validate(source);
+  const oldStem = documentStem(basename(path));
+  const oldDirectory = dirname(path);
+  if (basename(oldDirectory) !== oldStem || document.name === (await readDocument(path)).name || safeFileName(document.name) === oldStem) {
+    return { path, document: await writeDocument(path, document) };
+  }
+  const name = safeFileName(document.name);
+  const directory = join(dirname(oldDirectory), name);
+  const target = join(directory, `${name}.json`);
+  const info = await lstat(oldDirectory);
+  if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('UI 目录必须是普通目录。');
+  const sameCase = process.platform === 'win32' && oldDirectory.toLowerCase() === directory.toLowerCase();
+  if (!sameCase && await lstat(directory).then(() => true, (error: NodeJS.ErrnoException) => { if (error.code === 'ENOENT') return false; throw error; })) throw new Error('已有同名 UI 目录，请使用其他名称。');
+  const oldFiles = [path, ...Object.values(documentScriptPaths(path))];
+  const newFiles = [target, ...Object.values(documentScriptPaths(target))];
+  for (const file of oldFiles) await fileInfo(file);
+  for (const file of newFiles) {
+    const oldLocation = join(oldDirectory, basename(file));
+    if (!oldFiles.some(old => process.platform === 'win32' ? old.toLowerCase() === oldLocation.toLowerCase() : old === oldLocation) && await fileInfo(oldLocation)) throw new Error('UI 目录内已有改名目标文件，未覆盖。');
+  }
+  // Renaming the directory keeps project-authored companion files together.
+  const temporary = sameCase ? join(dirname(oldDirectory), `ui-${randomUUID()}.tmp`) : null;
+  if (temporary) { await rename(oldDirectory, temporary); await rename(temporary, directory).catch(async error => { await rename(temporary, oldDirectory); throw error; }); }
+  else await rename(oldDirectory, directory);
+  const moved: { from: string; to: string }[] = [];
+  try {
+    for (let index = 0; index < oldFiles.length; index++) {
+      const from = join(directory, basename(oldFiles[index])), to = newFiles[index];
+      await rename(from, to); moved.push({ from, to });
+    }
+    return { path: target, document: await writeDocument(target, document) };
+  } catch (error) {
+    for (const file of moved.reverse()) await rename(file.to, file.from);
+    await rename(directory, oldDirectory);
+    throw error;
+  }
+}
+export function documentScriptPaths(path: string) {
+  const stem = documentStem(path);
+  return { source: `${stem}.view.luau`, integration: `${stem}.example.luau` };
+}
+async function fileInfo(path: string) {
+  const info = await lstat(path).catch((error: NodeJS.ErrnoException) => { if (error.code === 'ENOENT') return null; throw error; });
+  if (info && (!info.isFile() || info.isSymbolicLink())) throw new Error(`界面文件或脚本必须是普通文件：${path}`);
+  return info;
+}
+export function documentFiles(path: string, source: unknown): { path: string; content: string }[] {
+  const document = robloxStrategy.validate(source);
+  const { scripts, ...ui } = document;
+  const paths = documentScriptPaths(path);
+  const content = JSON.stringify({ ...ui, version: 4 }, null, 2) + '\n';
+  if (Buffer.byteLength(content) > 32 * 1024 * 1024) throw new Error('界面文件超过 32 MiB。');
+  return [{ path: paths.source, content: scripts.source }, { path: paths.integration, content: scripts.integration }, { path, content }];
 }
 export async function readDocument(path: string): Promise<UIDocument> {
-  if ((await stat(path)).size > 32 * 1024 * 1024) throw new Error('界面文件超过 32 MiB。');
+  if ((await fileInfo(path) ?? await stat(path)).size > 32 * 1024 * 1024) throw new Error('界面文件超过 32 MiB。');
   let source: unknown;
   try { source = JSON.parse(await readFile(path, 'utf8')); } catch { throw new Error('界面 JSON 无法解析，请检查文件。'); }
-  return robloxStrategy.validate(source);
+  const split = !!source && typeof source === 'object' && (source as { version?: unknown }).version === 4;
+  if (!split) return robloxStrategy.validate(source);
+  const ui = source as Record<string, unknown>;
+  if (Object.hasOwn(ui, 'scripts')) throw new Error('版本 4 的界面 JSON 不应包含 scripts，请使用同名 Luau 文件。');
+  const scripts = {} as UIDocument['scripts'];
+  for (const [kind, scriptPath] of Object.entries(documentScriptPaths(path))) {
+    const info = await fileInfo(scriptPath);
+    if (!info) throw new Error(`缺少界面脚本：${scriptPath}`);
+    if (info.size > 1024 * 1024) throw new Error('单份脚本不能超过 1 MiB。');
+    scripts[kind as keyof typeof scripts] = await readFile(scriptPath, 'utf8');
+  }
+  return robloxStrategy.validate({ ...ui, version: 3, scripts });
 }
 export async function writeDocument(path: string, source: unknown): Promise<UIDocument> {
   const document = robloxStrategy.validate(source);
-  const content = JSON.stringify(document, null, 2) + '\n';
-  if (Buffer.byteLength(content) > 32 * 1024 * 1024) throw new Error('界面文件超过 32 MiB。');
+  const files = documentFiles(path, document);
+  // Stage all three before replacing any destination; restore earlier replacements on failure.
   await mkdir(dirname(path), { recursive: true });
-  const temporary = join(dirname(path), `ui-${randomUUID()}.tmp`);
-  try { await writeFile(temporary, content, { flag: 'wx' }); await rename(temporary, path); }
-  finally { await unlink(temporary).catch(() => {}); }
+  const staged: { path: string; temporary: string; previous: Buffer | null }[] = [];
+  const committed: typeof staged = [];
+  try {
+    for (const file of files) {
+      const previous = await fileInfo(file.path) ? await readFile(file.path) : null;
+      const temporary = join(dirname(path), `ui-${randomUUID()}.tmp`);
+      staged.push({ path: file.path, temporary, previous });
+      await writeFile(temporary, file.content, { flag: 'wx' });
+    }
+    for (const file of staged) { await rename(file.temporary, file.path); committed.push(file); }
+  } catch (error) {
+    for (const file of committed.reverse()) {
+      if (file.previous === null) await unlink(file.path);
+      else await writeFile(file.path, file.previous);
+    }
+    throw error;
+  } finally { await Promise.all(staged.map(file => unlink(file.temporary).catch(() => {}))); }
   return document;
 }
 export async function readPreviewImage(path: string) {

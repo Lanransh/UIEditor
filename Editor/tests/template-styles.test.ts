@@ -6,7 +6,17 @@ import { join, resolve, sep } from 'node:path';
 import { createProject, describeError, openProject } from '../electron/projects';
 import { listTemplateStyles, previewTemplateStyle, projectStylePath, relocateStyleFile, readTemplateStyle, styleDirectory, templateStylesDirectory } from '../electron/template-styles';
 import { robloxStrategy } from '../src/editor/roblox';
-import { writeDocument } from '../electron/documents';
+import { writeDocument, readDocument, documentFiles } from '../electron/documents';
+
+async function assertInstalledFile(workspace: string, style: string, file: { path: string; content: Buffer }) {
+  if (file.path.startsWith(`template-references${sep}`) && file.path.endsWith('.json')) {
+    for (const output of documentFiles(join(workspace, projectStylePath(file.path)), await readDocument(join(style, file.path)))) {
+      assert.equal(await readFile(output.path, 'utf8'), output.content, output.path);
+    }
+  } else {
+    assert.deepEqual(await readFile(join(workspace, projectStylePath(file.path))), relocateStyleFile(file).content, file.path);
+  }
+}
 
 async function fixture(t: TestContext) {
   await mkdir(resolve('test-results'), { recursive: true });
@@ -97,28 +107,28 @@ test('整套独立复制：模板子目录、提示词原始字节、文字规�
   const { root, style, parent, agents, design } = await fixture(t);
   const { files } = await readTemplateStyle(style);
   const { project } = await createProject(parent, undefined, style);
-  assert.deepEqual((await readdir(project.path)).sort(), ['.gitignore', 'AgentWorkspace', 'interfaces', 'project.json']);
-  for (const file of files) assert.deepEqual(await readFile(join(project.path, projectStylePath(file.path))), relocateStyleFile(file).content, file.path);
-  assert.equal(await readFile(join(project.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), await readFile(resolve('../ProjectTypes/Roblox/AGENTS.md'), 'utf8'));
-  assert.equal(await readFile(join(project.path, 'AgentWorkspace', 'styles', 'Game-DESIGN.md'), 'utf8'), design.replace('../template-references/', 'templates/').replace('.agents/skills/', 'skills/'));
+  assert.deepEqual((await readdir(project.path)).sort(), ['.agents', '.gitignore', 'AGENTS.LOCAL.md', 'AGENTS.md', 'Docs', 'interfaces', 'project.json', 'styles']);
+  for (const file of files) await assertInstalledFile(project.path, style, file);
+  assert.equal(await readFile(join(project.path, 'AGENTS.md'), 'utf8'), await readFile(resolve('../ProjectTypes/Roblox/AGENTS.md'), 'utf8'));
+  assert.equal(await readFile(join(project.path, 'styles', 'Game-DESIGN.md'), 'utf8'), design.replace('../template-references/', 'templates/').replace('.agents/skills/', 'skills/').replaceAll('.rbxui.json', '.json').replace('Small.json', 'Small/Small.json'));
   assert.ok(files.every(file => !file.path.includes('Runtime') && !file.path.includes('node_modules') && !file.path.endsWith('.log') && file.path !== 'unrelated.txt'));
 
   const secondParent = join(root, '另一个项目');
   await mkdir(secondParent);
   const second = (await createProject(secondParent, undefined, style)).project;
-  await writeFile(join(project.path, 'AgentWorkspace', 'AGENTS.md'), '项目定制入口');
+  await writeFile(join(project.path, 'AGENTS.md'), '项目定制入口');
   await writeFile(join(style, 'AGENTS.md'), '全局定制入口');
-  assert.equal(await readFile(join(second.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), await readFile(resolve('../ProjectTypes/Roblox/AGENTS.md'), 'utf8'));
-  assert.equal(await readFile(join(project.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), '项目定制入口');
+  assert.equal(await readFile(join(second.path, 'AGENTS.md'), 'utf8'), await readFile(resolve('../ProjectTypes/Roblox/AGENTS.md'), 'utf8'));
+  assert.equal(await readFile(join(project.path, 'AGENTS.md'), 'utf8'), '项目定制入口');
   assert.equal((await openProject(project.path)).manifest.id, project.manifest.id);
   const existing = await createProject(parent, undefined, join(root, 'nonexistent-style'));
   assert.equal(existing.kind, 'existing');
-  assert.equal(await readFile(join(project.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), '项目定制入口');
+  assert.equal(await readFile(join(project.path, 'AGENTS.md'), 'utf8'), '项目定制入口');
   await rename(parent, join(root, '移动后'));
   const moved = await openProject(join(root, '移动后', 'UIEditorWorkspace'));
   assert.deepEqual(moved.manifest, project.manifest);
-  assert.equal(await readFile(resolve(moved.path, 'AgentWorkspace', 'styles/templates/窗口/Small.rbxui.json'), 'utf8'), files.find(file => file.path.endsWith('Small.rbxui.json'))!.content.toString());
-  assert.equal(await readFile(join(moved.path, 'AgentWorkspace', 'styles', 'skills', 'check', 'references', 'rules.md'), 'utf8'), '自检规则');
+  assert.deepEqual(await readDocument(resolve(moved.path, 'styles/templates/窗口/Small/Small.json')), await readDocument(join(style, 'template-references', '窗口', 'Small.rbxui.json')));
+  assert.equal(await readFile(join(moved.path, 'styles', 'skills', 'check', 'references', 'rules.md'), 'utf8'), '自检规则');
 });
 
 test('来源缺失、必要文档为空、模板损坏或无模板时回滚；已存在无效目录不覆盖', async t => {
@@ -244,12 +254,12 @@ test('打包画风更新后新建工程读取新版，不使用外置旧副本�
   const nextParent = join(root, 'next');
   await mkdir(nextParent);
   const next = (await createProject(nextParent, undefined, styleDirectory(active, '定制 风格'))).project;
-  assert.equal(await readFile(join(next.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), await readFile(resolve('../ProjectTypes/Roblox/AGENTS.md'), 'utf8'));
-  assert.equal(await readFile(join(next.path, 'AgentWorkspace', 'styles', 'Game-DESIGN.md'), 'utf8'), updatedDesign);
+  assert.equal(await readFile(join(next.path, 'AGENTS.md'), 'utf8'), await readFile(resolve('../ProjectTypes/Roblox/AGENTS.md'), 'utf8'));
+  assert.equal(await readFile(join(next.path, 'styles', 'Game-DESIGN.md'), 'utf8'), updatedDesign);
   assert.deepEqual(await readFile(join(next.path, projectStylePath(templatePath))), await readFile(join(resources, '定制 风格', templatePath)));
   await openProject(first.path);
-  assert.equal(await readFile(join(first.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), await readFile(resolve('../ProjectTypes/Roblox/AGENTS.md'), 'utf8'));
-  assert.equal(await readFile(join(first.path, 'AgentWorkspace', 'styles', 'Game-DESIGN.md'), 'utf8'), design.replace('../template-references/', 'templates/').replace('.agents/skills/', 'skills/'));
+  assert.equal(await readFile(join(first.path, 'AGENTS.md'), 'utf8'), await readFile(resolve('../ProjectTypes/Roblox/AGENTS.md'), 'utf8'));
+  assert.equal(await readFile(join(first.path, 'styles', 'Game-DESIGN.md'), 'utf8'), design.replace('../template-references/', 'templates/').replace('.agents/skills/', 'skills/').replaceAll('.rbxui.json', '.json').replace('Small.json', 'Small/Small.json'));
   assert.deepEqual(await readFile(join(first.path, projectStylePath(templatePath))), originalTemplate);
   assert.equal(await readFile(join(external, '定制 风格', 'Game-DESIGN.md'), 'utf8'), design);
 });
@@ -278,8 +288,8 @@ test('随应用提供的 多彩棋格风格：7 个鲜明配色模板和完整�
   assert.equal(styles[0].preview?.root.name, 'SmallWindowUI');
   const { files } = await readTemplateStyle(style);
   const project = (await createProject(parent, undefined, style)).project;
-  assert.deepEqual((await readdir(join(project.path, 'AgentWorkspace', 'styles', 'templates'))).sort(), ['CloseButton.rbxui.json', 'LargeWindow.rbxui.json', 'MediumWindow.rbxui.json', 'OperationButtonExamples.rbxui.json', 'ProgressBar.rbxui.json', 'SmallWindow.rbxui.json', 'Title.rbxui.json']);
-  for (const file of files) assert.deepEqual(await readFile(join(project.path, projectStylePath(file.path))), relocateStyleFile(file).content);
+  assert.deepEqual((await readdir(join(project.path, 'styles', 'templates'))).sort(), ['CloseButton', 'LargeWindow', 'MediumWindow', 'OperationButtonExamples', 'ProgressBar', 'SmallWindow', 'Title']);
+  for (const file of files) await assertInstalledFile(project.path, style, file);
   const colors: Record<string, string> = {
     TitleImg: '#df1a23', CloseSurfaceImg: '#55ce35',
     ConfirmBtn: '#67ed14', CancelBtn: '#638079', BuyBtn: '#67ed14',
@@ -309,13 +319,13 @@ test('随应用提供的 多彩棋格风格：7 个鲜明配色模板和完整�
     };
     checkStyle(document.root);
   }
-  const design = await readFile(join(project.path, 'AgentWorkspace', 'styles', 'Game-DESIGN.md'), 'utf8');
+  const design = await readFile(join(project.path, 'styles', 'Game-DESIGN.md'), 'utf8');
   for (const rule of ['GothamBold', '30', 'CloseSurfaceImg', 'CloseBtn', 'PaidPurchaseBtn', '#FFD633', '#E58A25', '#DF1A23', '标题不固定红色', 'Current / Target']) assert.ok(design.includes(rule), rule);
-  const agents = await readFile(join(project.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8');
+  const agents = await readFile(join(project.path, 'AGENTS.md'), 'utf8');
   for (const content of [design]) {
     for (const rule of ['默认只参考布局', '只有用户明确要求参考配色', '不保留', '英文', '按钮语义色']) assert.ok(content.includes(rule), rule);
   }
-  const check = await readFile(join(project.path, 'AgentWorkspace', 'styles', 'skills', 'ui-editor-style-check', 'SKILL.md'), 'utf8');
+  const check = await readFile(join(project.path, 'styles', 'skills', 'ui-editor-style-check', 'SKILL.md'), 'utf8');
   for (const content of [design, check]) {
     for (const color of ['#FFD633', '#E58A25']) assert.ok(content.includes(color), color);
     assert.doesNotMatch(content, /付费紫色|紫色用于付费|#D03BF2|#691582/i);
@@ -329,8 +339,8 @@ test('工程类型与风格技能并存；目录或声明同名均拒绝，不�
   const type = join(root, 'ProjectTypes', 'Roblox');
   await fs.cp(resolve('../ProjectTypes/Roblox'), type, { recursive: true });
   const created = (await createProject(parent, undefined, style, type)).project;
-  assert.ok((await readFile(join(created.path, 'AgentWorkspace', '.agents', 'skills', 'roblox-ui-authoring', 'SKILL.md'), 'utf8')).includes('name: roblox-ui-authoring'));
-  assert.ok((await readFile(join(created.path, 'AgentWorkspace', 'styles', 'skills', 'check', 'SKILL.md'), 'utf8')).includes('name: check'));
+  assert.ok((await readFile(join(created.path, '.agents', 'skills', 'roblox-ui-authoring', 'SKILL.md'), 'utf8')).includes('name: roblox-ui-authoring'));
+  assert.ok((await readFile(join(created.path, 'styles', 'skills', 'check', 'SKILL.md'), 'utf8')).includes('name: check'));
   assert.ok(!(await readTemplateStyle(style)).files.some(file => file.path === 'AGENTS.md'));
   const target = join(root, 'conflict');
   await mkdir(target);
@@ -350,14 +360,14 @@ test('空白与历史克隆都有独立平台包；公共包更新只影响新�
   const type = join(root, 'ProjectTypes', 'Roblox');
   await fs.cp(resolve('../ProjectTypes/Roblox'), type, { recursive: true });
   const first = (await createProject(parent, undefined, undefined, type)).project;
-  const entry = join(first.path, 'AgentWorkspace', 'AGENTS.md');
+  const entry = join(first.path, 'AGENTS.md');
   const original = await readFile(entry, 'utf8');
-  await assert.rejects(readFile(join(first.path, 'AgentWorkspace', 'styles', 'Game-DESIGN.md')), /ENOENT/);
+  await assert.rejects(readFile(join(first.path, 'styles', 'Game-DESIGN.md')), /ENOENT/);
   await writeFile(join(type, 'AGENTS.md'), '# Updated platform entry');
   const nextParent = join(root, 'next');
   await mkdir(nextParent);
   const next = (await createProject(nextParent, first.path, undefined, type)).project;
-  assert.equal(await readFile(join(next.path, 'AgentWorkspace', 'AGENTS.md'), 'utf8'), '# Updated platform entry');
+  assert.equal(await readFile(join(next.path, 'AGENTS.md'), 'utf8'), '# Updated platform entry');
   await openProject(first.path);
   assert.equal(await readFile(entry, 'utf8'), original);
   const target = join(root, 'rejected');

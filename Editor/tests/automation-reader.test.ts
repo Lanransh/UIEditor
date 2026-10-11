@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { AutomationReader } from '../electron/automation-reader';
 import { RecentProjects, createProject } from '../electron/projects';
-import { writeDocument } from '../electron/documents';
+import { writeDocument, documentFiles } from '../electron/documents';
 import { robloxStrategy } from '../src/editor/roblox';
 import { getNode, nodeTree } from '../src/shared/automation';
 import { validateTool } from '../src/shared/automation-tools';
@@ -28,16 +28,18 @@ async function fixture() {
 test('UUID reads default to current project, support other projects/global library and survive file rename', async () => {
   const f = await fixture();
   try {
-    const path = join(f.first.path, 'AgentWorkspace', 'styles', 'templates', '奖励', 'Reward.rbxui.json');
+    const path = join(f.first.path, 'styles', 'templates', '奖励', 'Reward.json');
     await writeDocument(path, f.document);
-    await writeDocument(join(f.second.path, 'interfaces', 'Reward.rbxui.json'), { ...f.document, name: 'Other' });
-    await writeDocument(join(f.runtime, 'ui-assets', 'Reward.rbxui.json'), f.document);
+    await writeDocument(join(f.second.path, 'interfaces', 'Reward.json'), { ...f.document, name: 'Other' });
+    await writeDocument(join(f.runtime, 'ui-assets', 'Reward.json'), f.document);
     const listing = await f.reader.listDocuments({ library: 'templates', limit: 1 });
     assert.equal(listing.interfaces[0].documentId, f.document.id);
-    assert.equal(listing.interfaces[0].relativePath, '奖励/Reward.rbxui.json');
+    assert.equal(listing.interfaces[0].relativePath, '奖励/Reward.json');
     assert.equal((await f.reader.read({ library: 'templates', documentId: f.document.id })).document.name, 'Reward');
     assert.equal((await f.reader.read({ projectId: f.second.manifest.id.toUpperCase(), documentId: f.document.id })).document.name, 'Other');
-    await rename(path, join(f.first.path, 'AgentWorkspace', 'styles', 'templates', '奖励', 'Renamed.rbxui.json'));
+    const renamed = join(f.first.path, 'styles', 'templates', '奖励', 'Renamed.json');
+    const oldFiles = documentFiles(path, f.document), newFiles = documentFiles(renamed, f.document);
+    for (let index = 0; index < oldFiles.length; ++index) await rename(oldFiles[index].path, newFiles[index].path);
     assert.equal((await f.reader.read({ library: 'templates', documentId: f.document.id })).document.id, f.document.id);
     const hub = new AutomationReader(f.runtime, f.recent, () => null);
     await assert.rejects(hub.listDocuments({}), /打开工程/);
@@ -51,10 +53,10 @@ test('UUID reads default to current project, support other projects/global libra
 test('lists isolate broken files and reject ambiguous document/project UUIDs and linked libraries', async () => {
   const f = await fixture();
   try {
-    const library = join(f.first.path, 'AgentWorkspace', 'styles', 'templates');
-    await writeDocument(join(library, 'A.rbxui.json'), f.document);
-    await writeDocument(join(library, 'B.rbxui.json'), f.document);
-    await writeFile(join(library, 'Broken.rbxui.json'), '{bad');
+    const library = join(f.first.path, 'styles', 'templates');
+    await writeDocument(join(library, 'A.json'), f.document);
+    await writeDocument(join(library, 'B.json'), f.document);
+    await writeFile(join(library, 'Broken.json'), '{bad');
     const listing = await f.reader.listDocuments({ library: 'templates', offset: 1, limit: 1 });
     assert.equal(listing.total, 3); assert.equal(listing.nextOffset, 2);
     assert.match(listing.interfaces[0].problem!, /UUID 重复/);
@@ -78,7 +80,7 @@ test('saved nodes resolve images from the source project, and global reads work 
     await store.update({ id: asset.id, name: asset.name, tags: '', robloxId: '123456' });
     const image = robloxStrategy.createNode('ImageLabel'); image.imageAssetId = asset.id;
     f.document.root.children.push(image);
-    await writeDocument(join(f.second.path, 'AgentWorkspace', 'styles', 'templates', 'Reward.rbxui.json'), f.document);
+    await writeDocument(join(f.second.path, 'styles', 'templates', 'Reward.json'), f.document);
     const saved = await f.reader.read({ projectId: f.second.manifest.id, library: 'templates', documentId: f.document.id });
     assert.equal(saved.document.root.children[1].properties.Image, 'rbxassetid://123456');
     assert.equal((await f.reader.images({ projectId: f.second.manifest.id, library: 'project' })).assets[0].id, asset.id);

@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('projects', api);
 const documents: DocumentAPI = {
   newDocument: () => ipcRenderer.invoke('document:new'),
   open: path => ipcRenderer.invoke('document:open', path),
+  reload: () => ipcRenderer.invoke('document:reload'),
   listAssets: (library = 'project') => ipcRenderer.invoke('document:list-assets', library),
   previewAsset: (path, library = 'project') => ipcRenderer.invoke('document:preview-asset', { path, library }),
   openTemplate: (path, library = 'templates') => ipcRenderer.invoke('document:open-template', { path, library }),

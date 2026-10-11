@@ -18,7 +18,7 @@ description: 在 UIEditor 的 Roblox 工程中制作、修改和验证可编辑 
 ## 制作流程
 
 1. 用 uie.editor.get_state 和 get_capabilities({detail:"summary"}) 确认当前会话与 API；
-   操作节点前按需用 get_capabilities({className:"Frame"}) 读取相关类型约束。工作区父目录就是本工程；
+   操作节点前按需用 get_capabilities({className:"Frame"}) 读取相关类型约束。工作区根目录就是本工程；
    用 uie.project.list 与返回的工程身份核对当前工程，不猜测最近工程。身份不匹配时先纠正。
 2. 用 uie.document.list({library:"templates"}) 列出工程模板，按 nextOffset 翻页。
    用返回的 UUID 构造 target={library:"templates",documentId:...}，读取 nodes.get/find、
@@ -36,7 +36,10 @@ description: 在 UIEditor 的 Roblox 工程中制作、修改和验证可编辑 
    同一素材复用同一资产 ID；应用已有节点时保留位置、尺寸、层级及原有样式。
    游戏数据决定的动态图可先使用占位图；静态图缺少资源时也使用占位图（如重生图标）。
    保留可替换的图片节点，具体遵循业务接入参考的贴图与占位图约定。
-4. code.execute、scripts.set 等写操作携带最新 sessionId/revision；冲突后重读。
+4. 已保存界面的交互与模拟接入代码优先通过文件工具直接读写同目录
+   `<名称>.view.luau` 与 `<名称>.example.luau`；不把源码放进 UI JSON。
+   文件编辑后通过运行或重新打开读取更新；如 App 与文件两侧都有修改，处理冲突再继续。
+   code.execute、scripts.set 等 MCP 写操作携带最新 sessionId/revision；冲突后重读。
    事务整体进入 App 撤销历史，MCP 没有 undo/redo。制作 VM 不读文件，不编造 API。
 5. 静态视觉保存在设计节点中；source 负责展示与交互，integration 提供模拟业务。
    可变列表的原型集中放在界面内隐藏的 Templates 下，由 source 在运行时克隆到显示容器，
@@ -63,3 +66,10 @@ description: 在 UIEditor 的 Roblox 工程中制作、修改和验证可编辑 
 - 交付列明占位图节点、用途及动态/静态替换方式。
 - 交付说明模板来源、保存位置、视觉差异、实际检查，以及 Config/State、必需与可选
   覆写方法、动作参数和初始化顺序。Studio/设备和真实业务接入未验证时明确说明。
+
+## UI 改名后的代码检查
+
+修改界面名称并保存后，App 会联动改名独立目录、UI JSON、view 和 example 文件，保留 UI/节点 ID 和脚本原文。先重新读取 get_state 的 relativePath，使用新路径；不要另存一份来代替改名。
+App 不自动替换 Luau 类名。用户需要代码名称跟随 UI 改名时，由 AI 先读取两份源码，确认实际 FX.Class 声明、局部变量、返回值和继承关系，再按语义修改 View 与模拟接入类及全部相互引用；不要对整个工作区做字符串全局替换。
+标准新建类名可参考 scriptClassNames 约定，例如 OnlineRewardUI 对应 COnlineRewardView 和 COnlineRewardPreview；example 是文件职责命名，不强制将现有 Preview 类改为 Example。保留自定义父类、业务标识和任务外内容。
+ScreenGui 节点名称与 UI 文档名称是不同字段，只有需求涉及它时才调整，并同步检查 FXLoader:PlayerGui、Here 路径及导出接入引用。完成后通过 Run、日志和动作验证两份源码的继承与运行，确认 Roblox 导出仅保留 View；App 测试不代表游戏业务和设备验证通过。

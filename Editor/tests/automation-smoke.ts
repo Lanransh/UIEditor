@@ -97,7 +97,7 @@ try {
   panel.properties.BackgroundColor3 = '#12ab34';
   reference.root.children.push(panel);
   reference.scripts.source = 'error("Saved screenshot must not execute scripts")';
-  const referencePath = join(projectPath, 'AgentWorkspace', 'styles', 'templates', '奖励', 'Reference.rbxui.json');
+  const referencePath = join(projectPath, 'styles', 'templates', '奖励', 'Reference.json');
   await writeDocument(referencePath, reference);
   const targets = await call('uie.document.list', { library: 'templates' });
   assert.equal(targets.interfaces[0].documentId, reference.id);
@@ -132,7 +132,7 @@ try {
   const other = (await createProject(otherParent)).project;
   await new RecentProjects(runtime).record(other.path);
   const otherReference = { ...reference, id: crypto.randomUUID(), name: 'OtherReference' };
-  await writeDocument(join(other.path, 'interfaces', 'Other.rbxui.json'), otherReference);
+  await writeDocument(join(other.path, 'interfaces', 'Other.json'), otherReference);
   const images = new ImageAssetStore(runtime, other.path);
   const otherImage = await images.import('project', { name: 'other.png', dataUrl: 'data:image/png;base64,YQ==' });
   assert.equal((await call('uie.project.list')).projects.length, 2);
@@ -140,7 +140,7 @@ try {
   assert.equal((await call('uie.nodes.get', { target: { projectId: other.manifest.id, documentId: otherReference.id } })).node.id, reference.root.id);
   assert.equal((await call('uie.assets.search', { projectId: other.manifest.id, library: 'project' })).assets[0].id, otherImage.id);
   assert.equal((await raw('uie.assets.get', { projectId: other.manifest.id, id: otherImage.id })).content[0].type, 'image');
-  await writeDocument(join(runtime, 'ui-assets', 'Reference.rbxui.json'), reference);
+  await writeDocument(join(runtime, 'ui-assets', 'Reference.json'), reference);
   assert.equal((await call('uie.document.list', { library: 'permanent' })).interfaces[0].documentId, reference.id);
   assert.equal((await call('uie.nodes.get', { target: { library: 'permanent', documentId: reference.id }, format: 'tree' })).target.projectId, undefined);
   assert.deepEqual(await state('full'), initial);
@@ -185,7 +185,7 @@ print("Created reward UI")`;
   assert.deepEqual((await state('full')).document, created.document);
   const button = (await call('uie.nodes.find', { name: 'ClaimButton', className: 'TextButton' })).nodes[0];
   assert.ok(button.id); assert.equal((await call('uie.nodes.get', { id: button.id })).node.name, 'ClaimButton');
-  await mutate('uie.document.save', { relativePath: 'reward.rbxui.json' }); assert.equal((await state()).dirty, false);
+  await mutate('uie.document.save', { relativePath: 'reward.json' }); assert.equal((await state()).dirty, false);
   await uiHistory('undo'); assert.equal((await state()).dirty, true);
   await uiHistory('redo'); assert.equal((await state()).dirty, false);
   // Interleave a real UI edit with MCP history.
@@ -251,7 +251,7 @@ print("Created reward UI")`;
   assert.ok((await call('uie.debug.get_diagnostics')).logs.some((log: any) => log.kind === 'error'));
   await uiHistory('undo');
   await mutate('uie.document.new', { name: 'Another' });
-  await mutate('uie.document.open', { relativePath: 'reward.rbxui.json' });
+  await mutate('uie.document.open', { relativePath: 'reward.json' });
   assert.deepEqual((await state('full')).document, created.document); assert.equal('history' in (await state()), false);
   assert.equal((await call('uie.document.list')).interfaces.length, 1);
   assert.notEqual(initial.sessionId, (await state()).sessionId);

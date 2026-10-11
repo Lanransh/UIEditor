@@ -76,6 +76,22 @@ test('hidden clicks can be asserted without dispatch', async () => {
   assert.equal(report.success, true);
 });
 
+test('Run reloading an external script advances the revision for later batch steps', async () => {
+  const f = fixture();
+  let revision = stamp.revision;
+  const report = await executeRuntimeBatch({ ...stamp, steps: [
+    { action: 'run' }, { action: 'click', id: f.button.id },
+    { action: 'assert', id: f.button.id, properties: { Text: 'Claimed' } }, { action: 'stop' },
+  ] }, async request => {
+    if (request.name !== 'uie.debug.get_diagnostics') assert.equal(request.arguments.revision, revision);
+    const result = await f.dispatch(request);
+    if (request.arguments.action === 'run') ++revision;
+    return { ...result, revision };
+  }, f.inspect, expected => { assert.equal(expected, revision); });
+  assert.equal(report.success, true);
+  assert.equal(report.results.length, 4);
+});
+
 test('assertions stop on first failure, preserve evidence and skip later stop', async () => {
   const f = fixture();
   const report = await executeRuntimeBatch({ ...stamp, steps: [{ action: 'run' }, { action: 'assert', id: f.button.id, properties: { Text: 'Wrong' } }, { action: 'stop' }] }, f.dispatch, f.inspect, () => {});

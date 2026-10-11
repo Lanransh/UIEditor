@@ -2,7 +2,7 @@ import { lstat, mkdir, readdir, readFile, writeFile, unlink, rmdir } from 'node:
 import { dirname, join, sep } from 'node:path';
 import { readAgentPackage, validateDocumentLinks, validateSkillNames } from './template-styles';
 
-export const AGENT_IGNORE_RULES = ['/Run.bat', '/AgentWorkspace/AGENTS.md', '/AgentWorkspace/Docs/', '/AgentWorkspace/.agents/skills/'];
+export const AGENT_IGNORE_RULES = ['/Run.bat', '/AGENTS.md', '/Docs/', '/.agents/skills/'];
 export const LOCAL_INSTRUCTIONS = `# 项目补充要求
 
 本文件由项目维护并提交到 Git，编辑器仅在缺失时创建，不覆盖已有内容。
@@ -52,9 +52,9 @@ export async function syncAgentWorkspace(workspace: string, packageRoot: string)
       throw new Error(`公共提示词包包含非编辑器管理文件：${file.path}`);
     }
   }
-  const agent = join(workspace, 'AgentWorkspace');
+  const agent = workspace;
   const agentInfo = await info(agent);
-  if (agentInfo && (agentInfo.isSymbolicLink() || !agentInfo.isDirectory())) throw new Error('AgentWorkspace 必须是普通目录。');
+  if (agentInfo && (agentInfo.isSymbolicLink() || !agentInfo.isDirectory())) throw new Error('UIEditorWorkspace 必须是普通目录。');
   const dotAgents = await info(join(agent, '.agents'));
   if (dotAgents && (dotAgents.isSymbolicLink() || !dotAgents.isDirectory())) throw new Error('.agents 必须是普通目录。');
   const skills = join(agent, '.agents', 'skills');

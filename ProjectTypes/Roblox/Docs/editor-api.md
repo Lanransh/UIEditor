@@ -68,3 +68,7 @@ library 也可明确选择 permanent；导入只读取 PNG/JPEG/WebP/GIF 普通�
 save 不带路径保存当前绑定文件（包括模板原件），带 relativePath 在 interfaces 新建文件且拒绝覆盖。模板原件保存检查磁盘版本，发生外部修改、移动或删除时保留编辑内容并报冲突；不要盲目重试。所有变更工具要求 sessionId/revision。切换脏文档需先保存或明确 discardChanges=true。
 
 运行中禁止制作和历史操作。停止后才能修改。普通运行属性变化不会写回设计文档。
+
+保存格式为 XXUI.json（version=4，无 scripts）、XXUI.view.luau（交互）、XXUI.example.luau（模拟接入）。文件工具可直接编辑 Luau，运行、保存或重开读取磁盘更新；两侧同一部分修改冲突时拒绝覆盖。workspacePath 与 agentWorkspacePath 均为工作区根目录。Roblox 导出格式不变，不包含 example。
+
+每份 UI 使用独立同名目录，例如 `interfaces/OnlineRewardUI/OnlineRewardUI.json`，同目录保存 `.view.luau` 与 `.example.luau`。模板安装、历史克隆和库间移动沿用此结构。修改界面名称后普通保存同步改名目录、JSON 和两份 Luau 文件，保留文档及节点 ID；同名目录或目标文件冲突时拒绝覆盖。App 不修改脚本类名、继承、引用或 ScreenGui 节点名称；这些源码与节点变更由 AI 根据用户需求另行完成。文件目录改名在保存时落盘，不属于撤销历史；撤销名称后再次保存可以改回目录与文件名。
