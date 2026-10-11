@@ -82,7 +82,7 @@ export function ImageUploadDialog({ image, saveId, onClose, initialTargetId = ''
       disabled={busy || !!task} onChange={event => { setTargetId(event.target.value); onTargetSelected?.(event.target.value); }}>
       <option value="">选择工程</option>{targets.map(target => <option key={target.id} value={target.id}>{target.name} · PlaceId {target.placeId}</option>)}
     </select></label> : targetId && <p>目标工程：{targets.find(target => target.id === targetId)?.name}</p>}
-    <p role="status">{message}</p>
+    {!error && <p role={task?.status === 'failed' ? 'alert' : 'status'}>{message}</p>}
     {task?.robloxId && <p>Roblox 资源 ID：{task.robloxId}</p>}
     {error && <p role="alert">{error}</p>}
     {waiting && <p>关闭后停止查询，不取消 Toolkit 已提交的上传；再次上传同一图片会复用已有操作。</p>}

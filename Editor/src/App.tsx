@@ -122,7 +122,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
   const editor = useDocumentEditor(project, onBack);
   const history = editor.history;
   const [creatingInterface, setCreatingInterface] = useState(false);
-  const [importingRoblox, setImportingRoblox] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [uiLibrary, setUiLibrary] = useState('项目UI');
   const [imageLibrary, setImageLibrary] = useState('永久图片');
   const [bottomTab, setBottomTab] = useState<'assets' | 'images' | 'output'>('assets');
@@ -224,7 +224,6 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
           <button disabled={editor.busy || !editor.hasDocument} onClick={() => void editor.saveProjectUI()}>保存为项目UI</button>
           <button disabled={editor.busy || !editor.hasDocument} onClick={() => void editor.saveTemplate()}>保存为模板参考</button>
           <button aria-label="另存为" disabled={editor.busy || !editor.hasDocument} onClick={() => void editor.save(true)}>另存为 <span>Ctrl+Shift+S</span></button>
-          <button disabled={editor.busy || !editor.hasDocument} onClick={() => setImportingRoblox(true)}>导入 Roblox</button>
           <button disabled={editor.busy} onClick={() => void editor.back()}><ArrowLeft size={15} />返回 Hub</button>
         </div>
       </details>
@@ -244,9 +243,9 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
       </details>
     </header>
     {creatingInterface && <NewInterfaceDialog onCancel={() => setCreatingInterface(false)} onCreate={name => { setCreatingInterface(false); void editor.newDocument(name); }} />}
-    {importingRoblox && <RobloxImportDialog document={editor.document} imageAssets={editor.imageAssets}
+    {importing && !editor.runtime.active && project.manifest.mode === 'roblox' && <RobloxImportDialog document={editor.document} imageAssets={editor.imageAssets}
       saveAssetId={async (id, robloxId) => { await editor.configureImageRobloxId(id, robloxId); }}
-      assignNodeIds={editor.assignRobloxImageId} onClose={() => setImportingRoblox(false)} />}
+      assignNodeIds={editor.assignRobloxImageId} onClose={() => setImporting(false)} />}
     {editor.error && <div className="editor-error" role="alert">{editor.error}</div>}
     <div className="workspace-content" ref={content}>
     <div className="workspace-body">
@@ -271,6 +270,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
               <button title="隐藏当前界面，保留运行状态" disabled={!editor.runtime.ready} onClick={() => void editor.runtime.hide()}><EyeOff size={12} aria-hidden="true" />隐藏</button>
             </div>
           </div>}
+          {!editor.runtime.active && <button className="runtime-import" disabled={!editor.hasDocument || editor.busy} onClick={() => setImporting(true)}>导入</button>}
         </div>
         {editor.location?.library === 'templates' && <div className="template-editing-banner" role="status" title={editor.path ?? undefined}>编辑模板 · {editor.location.relativePath}{editor.dirty ? ' · 未保存' : ''}</div>}
         <nav className="workspace-tabs" aria-label="工作区页签">{(['design', 'source', 'integration'] as const).map((tab, index) => <button key={tab} aria-pressed={workspaceTab === tab} disabled={!editor.hasDocument} onClick={() => setWorkspaceTab(tab)}>{['界面', '交互脚本', '接入脚本'][index]}</button>)}</nav>

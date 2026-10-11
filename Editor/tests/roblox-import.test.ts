@@ -23,6 +23,22 @@ test('import preserves node paths, scripts, scale/offset and gradient sequences 
   const properties = result.model.children[0].children[0].properties;
   assert.ok(properties.Color); assert.ok(properties.Transparency); assert.equal(properties.ColorStart, undefined);
 });
+test('import disables the root without changing editor visibility or descendant properties', () => {
+  const document = strategy.createDocument('Rewards');
+  const frame = strategy.createNode('Frame');
+  const stroke = strategy.createNode('UIStroke');
+  frame.children.push(stroke); document.root.children.push(frame);
+  for (const enabled of [true, false]) {
+    document.root.properties.Enabled = enabled;
+    const before = JSON.stringify(document);
+    const result = createRobloxImportPackage(document);
+    assert.equal(result.model.properties.Enabled, false);
+    assert.equal(result.model.children[0].properties.Visible, true);
+    assert.equal(result.model.children[0].children[0].properties.Enabled, true);
+    assert.equal(JSON.stringify(document), before);
+  }
+});
+
 test('import rejects ambiguous paths, local-only pictures and fractional offsets', () => {
   const document = strategy.createDocument(); document.root.name = 'RewardsUI';
   const first = strategy.createNode('Frame'); const second = strategy.createNode('Frame'); document.root.children.push(first, second);

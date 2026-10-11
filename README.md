@@ -115,4 +115,4 @@ npm run dev
 
 工程数据存放在用户选择的目录。最近记录及 Electron 数据集中保存在 `ToolRuntime/Runtime/`，构建不会清除该目录；应用所在位置需可写。
 
-通过文件菜单「导入 Roblox」选择 Toolkit 当前打开且配置了 PlaceId 的游戏工程，提交当前 UI 和交互脚本；接入脚本只用于编辑器模拟预览。Toolkit 用 Rojo 构建并投递模型；生成脚本写入 Client/UI/Generated，游戏业务类继承生成交互类。首次使用需更新并重启 Toolkit/Studio 插件，接入与验证命令见 [导入设计](Docs/design/roblox-import.md)。
+通过运行控制栏最右侧的「导入」使用 Toolkit 唯一已连接且配置了 PlaceId 的游戏工程（运行期间隐藏入口），提交当前 UI 和交互脚本；接入脚本只用于编辑器模拟预览。Toolkit 用 Rojo 构建并投递模型；生成脚本写入 Client/UI/Generated，游戏业务类继承生成交互类。首次使用需更新并重启 Toolkit/Studio 插件，接入与验证命令见 [导入设计](Docs/design/roblox-import.md)。

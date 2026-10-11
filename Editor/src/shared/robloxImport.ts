@@ -69,7 +69,7 @@ export function createRobloxImportPackage(source: unknown): RobloxImportPackage 
       ] } };
     }
     if (nodeDefinitions[node.className].category === 'object') { properties.BorderSizePixel = 0; properties.AutoLocalize = true; }
-    if (node.className === 'ScreenGui') { properties.IgnoreGuiInset = true; properties.ResetOnSpawn = false; properties.AutoLocalize = true; }
+    if (node.className === 'ScreenGui') { properties.Enabled = false; properties.IgnoreGuiInset = true; properties.ResetOnSpawn = false; properties.AutoLocalize = true; }
     return { name: node.name, className: node.className, properties,
       attributes: { UIEditorNodeId: { String: node.id } }, children: node.children.map(child => build(child, `${path}.${child.name}`)) };
   }

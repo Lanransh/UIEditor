@@ -71,10 +71,23 @@ try {
   await page.getByRole('button', { name: '编辑', exact: true }).click();
   await page.getByRole('button', { name: /重做/ }).click();
   await page.getByText('界面已保存', { exact: true }).waitFor();
+  const importButton = page.getByRole('button', { name: '导入', exact: true });
+  await importButton.waitFor({ state: 'visible' });
+  assert.equal(await page.locator('.workspace-menu-items').getByRole('button', { name: '导入 Roblox', exact: true }).count(), 0);
+  const importBounds = await importButton.boundingBox();
+  const toolbarBounds = await page.locator('.runtime-toolbar').boundingBox();
+  assert.ok(importBounds && toolbarBounds && toolbarBounds.x + toolbarBounds.width - importBounds.x - importBounds.width < 20, '导入位于运行栏最右边');
   await page.getByRole('button', { name: '运行', exact: true }).click();
   await page.getByRole('button', { name: '重置', exact: true }).waitFor({ state: 'visible' });
+  assert.equal(await importButton.count(), 0, '运行时隐藏导入');
   await page.waitForFunction(() => !document.querySelector('.runtime-toolbar button:last-child')?.disabled);
   await page.getByRole('button', { name: '停止', exact: true }).click();
+  await importButton.waitFor({ state: 'visible' });
+  if (process.argv.includes('--import-toolbar')) {
+    assert.deepEqual(errors, []);
+    await page.screenshot({ path: resolve('test-results/import-toolbar.png') });
+    console.log('PASS: import toolbar position, menu removal, hidden during runtime and restored after stop.');
+  } else {
   await page.getByRole('button', { name: '交互脚本', exact: true }).click();
   await page.getByRole('button', { name: '载入奖励示例', exact: true }).click();
   await page.getByRole('button', { name: '文件', exact: true }).click();
@@ -185,7 +198,7 @@ try {
     await page.waitForFunction(() => document.querySelector('[role="button"][aria-label="ClaimButton"]')?.textContent === 'Discard on stop');
     await page.getByRole('button', { name: '停止', exact: true }).click();
     await page.getByRole('button', { name: '运行', exact: true }).waitFor({ state: 'visible' });
-    assert.equal(await page.locator('.runtime-toolbar button').count(), 1);
+    assert.equal(await page.locator('.runtime-toolbar button').count(), 2);
     assert.equal(await page.getByRole('button', { name: 'ClaimButton', exact: true }).count(), 0);
     assert.equal(await readFile(file, 'utf8'), original);
     assert.equal(await textProperty.inputValue(), saved.root.children.find(node => node.name === 'ClaimButton').properties.Text, '停止恢复设计属性');
@@ -247,4 +260,5 @@ try {
   assert.equal(await readFile(file, 'utf8'), original);
   assert.deepEqual(errors, []);
   console.log(`PASS: ${packaged ? 'packaged offline' : 'development'} Luau, class inheritance, button action, integration state, temporary runtime properties, cloned node inspection, reset, errors, clean stop.`);
+  }
 } finally { await app.close(); }

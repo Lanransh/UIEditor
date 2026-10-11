@@ -188,6 +188,7 @@ svg { flex-shrink: 0; }
 .runtime-toolbar button:hover:not(:disabled) { background: #e9f1ee; border-color: #a5c2bb; }
 .runtime-toolbar .runtime-start { border-color: #168b85; background: #168b85; color: white; }
 .runtime-toolbar .runtime-start:hover:not(:disabled) { background: #107a74; }
+.runtime-toolbar .runtime-import { margin-left: auto; }
 .runtime-toolbar .runtime-stop { border-color: #efc5c3; background: #fff0ee; color: #b14b45; }
 .runtime-toolbar .runtime-stop:hover:not(:disabled) { border-color: #dfa39f; background: #ffe2df; }
 .runtime-device-modes button { min-height: 22px; padding: 2px 6px; border-color: transparent; background: transparent; color: #748780; }
@@ -201,8 +202,7 @@ svg { flex-shrink: 0; }
 .script-code { position: relative; }
 .script-code > .monaco-editor { position: absolute; inset: 0; }
 .new-interface-dialog { width: 460px; border: 1px solid #cedbda; border-radius: 8px; padding: 24px; color: #263a3a; }
-.roblox-import-dialog { width: min(660px, calc(100vw - 48px)); max-height: calc(100vh - 40px); overflow: auto; }
-.roblox-import-dialog .roblox-import-error { color: #c62828; white-space: pre-wrap; overflow-wrap: anywhere; }
+.roblox-import-dialog { width: min(480px, calc(100vw - 48px)); max-height: calc(100vh - 40px); overflow: auto; }
 .new-interface-dialog::backdrop { background: #263a3a55; }
 .new-interface-dialog h2 { margin: 0 0 20px; font-size: 18px; }
 .roblox-import-images h3 { margin: 0 0 8px; font-size: 15px; }
@@ -230,6 +230,11 @@ svg { flex-shrink: 0; }
 .new-interface-classes { display: flex; flex-direction: column; gap: 8px; font: 12px Consolas, monospace; overflow-wrap: anywhere; }
 .new-interface-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
 .new-interface-actions button { border: 1px solid #cedbda; border-radius: 4px; background: white; color: inherit; padding: 6px 16px; }
+.new-interface-actions .import-primary { background: var(--accent); border-color: var(--accent); color: white; }
+.import-result { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 6px; background: #f0f5f4; font-size: 14px; overflow-wrap: anywhere; }
+.import-result.succeeded { background: #edf7f4; color: #167764; }
+[role="alert"], .new-interface-dialog [role="alert"] { padding: 12px 14px; border: 1px solid #dc8b8b; border-left: 4px solid #c53030; border-radius: 6px; background: #fff0f0; color: #a51d1d; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+[role="alert"] > strong, [role="alert"] > span { display: block; }
 .script-logs { overflow: auto; flex: 1; font-size: 12px; }
 .script-logs pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .script-logs .error { color: #b33434; }
