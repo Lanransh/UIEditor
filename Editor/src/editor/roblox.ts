@@ -13,12 +13,12 @@ const dimension = (offset = 0): PropertyDefinition => ({ kind: 'udim', value: di
 const dimensions = (width: number, height: number): PropertyDefinition => ({ kind: 'udim2', value: dim2(width, height) });
 const vector = (x: number, y: number, min?: number, max?: number): PropertyDefinition => ({ kind: 'vector', value: { x, y }, min, max });
 const common = {
+  AutoLocalize: bool(true),
   Position: dimensions(0, 0), Size: dimensions(200, 100), AnchorPoint: vector(0, 0, 0, 1),
   Rotation: number(0), Visible: bool(true), ZIndex: number(1, undefined, undefined, true), LayoutOrder: number(0, undefined, undefined, true),
   BackgroundColor3: color('#ffffff'), BackgroundTransparency: number(0, 0, 1), ClipsDescendants: bool(false),
 };
 const text = {
-  AutoLocalize: bool(true),
   Text: string('文字'), TextColor3: color('#263a3a'), TextSize: number(24, 1, 100), TextTransparency: number(0, 0, 1),
   Font: enumeration('SourceSans', ['SourceSans', 'Arial', 'Gotham', 'GothamBold']), TextWrapped: bool(true), TextScaled: bool(false),
   TextXAlignment: enumeration('Center', ['Left', 'Center', 'Right']), TextYAlignment: enumeration('Center', ['Top', 'Center', 'Bottom']),
@@ -31,7 +31,7 @@ const alignment = {
 const object = (properties = {}): NodeDefinition => ({ category: 'object', properties: { ...common, ...properties } });
 const component = (properties: NodeDefinition['properties']): NodeDefinition => ({ category: 'component', properties });
 export const nodeDefinitions: Record<string, NodeDefinition> = {
-  ScreenGui: { category: 'root', properties: { Enabled: bool(true), DisplayOrder: number(0, undefined, undefined, true) } },
+  ScreenGui: { category: 'root', properties: { AutoLocalize: bool(true), Enabled: bool(true), DisplayOrder: number(0, undefined, undefined, true) } },
   Frame: object(),
   ScrollingFrame: object({ CanvasSize: dimensions(400, 400), CanvasPosition: vector(0, 0, 0), ScrollBarThickness: number(8, 0, 100), ScrollingDirection: enumeration('XY', ['X', 'Y', 'XY']) }),
   CanvasGroup: object({ GroupTransparency: number(0, 0, 1), GroupColor3: color('#ffffff') }),

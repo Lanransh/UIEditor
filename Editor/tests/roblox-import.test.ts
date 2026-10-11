@@ -84,7 +84,7 @@ test('import enables automatic localization on root and visual descendants only'
   assert.equal(result.model.children[0].properties.AutoLocalize, true);
   for (const child of result.model.children[0].children) assert.equal(child.properties.AutoLocalize, true);
   assert.equal(result.model.children[0].children[0].children[0].properties.AutoLocalize, undefined);
-  assert.equal(document.root.properties.AutoLocalize, undefined);
+  assert.equal(document.root.properties.AutoLocalize, true);
 });
 
 test('legacy inheritance migrates only in generated source, without changing saved scripts', () => {

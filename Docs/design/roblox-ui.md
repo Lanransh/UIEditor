@@ -72,7 +72,7 @@ UIGradient 首版使用 ColorStart/ColorEnd 和 TransparencyStart/TransparencyEn
 
 ## 保存与加载
 
-TextLabel、TextButton、TextBox 提供 AutoLocalize（自动翻译）布尔属性，属性面板与 MCP 共用，创建默认开启，可手动取消或由 AI 设置为 false。旧文本节点缺少该属性时加载补入 true，文件版本保持 3；保存和 Roblox 导入保留关闭状态。App 不模拟 Roblox 翻译服务。
+ScreenGui 和全部可视节点（包括文本、图片和容器）提供 AutoLocalize（自动翻译）布尔属性，属性面板、MCP 与运行脚本共用，创建默认开启，可手动取消或由 AI 设置为 false。根节点关闭可停止整页及后代的自动翻译。旧节点缺少该属性时加载补入 true，文件版本保持 3；保存和 Roblox 导入保留关闭状态。App 不模拟 Roblox 翻译服务。
 
 进入工程时不自动新建或打开界面，中央显示“请打开一个工程”，节点树与节点属性为空，项目UI仅列出已有文件；保存、运行和导入在打开或新建界面后可用。“新建界面”先输入名称，实时显示交互类与接入类名称；取消或未保存提示被取消时保留当前文档。名称按脚本标识符校验，规则见 [交互脚本与接入运行时](ui-runtime.md)。一个工程可保存多个界面。
 默认保存位置为 `UIEditorWorkspace/interfaces/<自定义名称>.rbxui.json`，首次保存和

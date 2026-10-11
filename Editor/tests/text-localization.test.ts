@@ -5,8 +5,38 @@ import { robloxStrategy as strategy } from '../src/editor/roblox';
 import { createRobloxImportPackage } from '../src/shared/robloxImport';
 import { getCapabilities } from '../src/editor/automationCapabilities';
 import { executeCode, robloxCodeAdapter } from '../electron/code-executor';
+import { LuauSession } from '../electron/runtime';
 
 const textClasses = ['TextLabel', 'TextButton', 'TextBox'];
+
+test('runtime OnReady can disable localization on the root and visual descendants', async () => {
+  const document = strategy.createDocument('Localization');
+  const classes = ['Frame', 'ScrollingFrame', 'CanvasGroup', 'ImageLabel', 'ImageButton', ...textClasses];
+  for (const className of classes) document.root.children.push(strategy.createNode(className));
+  document.scripts.source = `local UI = _G.FX.Class("CLocalizationView", "CUIView")
+function UI:OnReady()
+    local root = self:GetRootNode()
+    assert(typeof(root) == "Instance")
+    root.AutoLocalize = false
+    for _, node in ipairs(root:GetChildren()) do
+        node.AutoLocalize = false
+    end
+end
+return UI`;
+  const original = JSON.stringify(document);
+  const { session, frame } = await LuauSession.start(resolve('native-bin'), document);
+  try {
+    assert.equal(frame.document.root.properties.AutoLocalize, false);
+    for (const node of frame.document.root.children) assert.equal(node.properties.AutoLocalize, false);
+    assert.equal(JSON.stringify(document), original);
+    const imported = createRobloxImportPackage(frame.document);
+    assert.equal(imported.model.properties.AutoLocalize, false);
+    for (const node of imported.model.children) assert.equal(node.properties.AutoLocalize, false);
+  } finally { await session.stop(); }
+  for (const node of [document.root, ...document.root.children]) delete node.properties.AutoLocalize;
+  const legacy = strategy.validate(document);
+  for (const node of [legacy.root, ...legacy.root.children]) assert.equal(node.properties.AutoLocalize, true);
+});
 
 test('text localization defaults and legacy migration preserve explicit opt-out on save and import', () => {
   const document = strategy.createDocument('Localization');
