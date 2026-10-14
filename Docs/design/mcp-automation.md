@@ -87,7 +87,7 @@ document.save 无路径时保存当前绑定的项目 UI 或模板原件；带 r
 
 ## Hub、工作区与打包
 
-Hub 右上角“设置”提供 Codex MCP 配置，不提供 AI 工作区打开按钮。配置管理 CODEX_HOME/config.toml（未设置时为用户 .codex/config.toml）中的 ui-editor command/args/enabled，保留其他配置并验证 TOML。启动路径包含显式发现文件地址，不依赖 Codex 工作目录；写入前检查配置是否变化，再原子替换。
+Hub 右上角“设置”提供 Codex 与 Cursor MCP 配置，不提供 AI 工作区打开按钮。配置管理 CODEX_HOME/config.toml（未设置时为用户 .codex/config.toml）中的 ui-editor command/args/enabled，保留其他配置并验证 TOML。启动路径包含显式发现文件地址，不依赖 Codex 工作目录；写入前检查配置是否变化，再原子替换。Cursor 提供独立启用/禁用开关及启动路径修复，固定读写用户主目录 `~/.cursor/mcp.json`，不写工程目录。启用时添加或更新 `mcpServers.ui-editor` 的 Node 启动命令与绝对路径参数，禁用时移除该服务；保留其他服务及顶层字段。JSON 或配置结构无效时拒绝写入；同样检查外部修改并原子替换。Cursor 开关表示全局文件中是否注册该服务，不读取客户端内部的连接或工具开关状态。
 
 开发构建输出 Editor/mcp-dist/server.mjs；打包复制到 resources/mcp-dist，ASAR 外由 Node 启动，原生宿主位于 resources/native-bin。Hub 检查服务文件与 Node。所有新工程在 UIEditorWorkspace 根目录拥有公共入口、Docs、.agents/skills 和 styles，由 ProjectTypes/Roblox 提供公共入口、节点与代码技能，TemplateStyles/Roblox 提供可选视觉规范、模板和风格专项技能。节点制作和运行通过 MCP，源码也可通过文件工具修改；重开同步公共说明并保留项目 LOCAL/styles；流程见 [模板风格与项目 AI 工作区](template-styles.md)。旧全局 AI 入口已退役，历史视觉示例仅作为仓库参考资料保留。
 

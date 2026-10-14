@@ -19,6 +19,7 @@ import { startBridge } from './automation-bridge';
 import { executeCode, getCodeAdapter } from './code-executor';
 import { openInterface, saveInterface, fileVersion } from './automation-files';
 import { createCodexMcpSettingsStore } from './codex-mcp-settings.cjs';
+import { createCursorMcpSettingsStore } from './cursor-mcp-settings.cjs';
 import { ImageAssetStore, permanentImageRoot } from './image-assets';
 import { watchAssetDirectory } from './asset-watcher';
 import { syncAgentWorkspace } from './agent-workspace';
@@ -143,6 +144,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     const nativeDirectory = join(__dirname, app.isPackaged ? '../../native-bin' : '../native-bin');
     const discoveryPath = join(runtime, 'ui-editor-automation.json');
     const mcpSettings = createCodexMcpSettingsStore({ serverPath: app.isPackaged ? join(process.resourcesPath, 'mcp-dist/server.mjs') : join(__dirname, '../mcp-dist/server.mjs'), discoveryPath });
+    const cursorMcpSettings = createCursorMcpSettingsStore({ serverPath: app.isPackaged ? join(process.resourcesPath, 'mcp-dist/server.mjs') : join(__dirname, '../mcp-dist/server.mjs'), discoveryPath });
     let automationReady = false;
     const pending = new Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
     const consoleLogs: { cursor: number; level: string; message: string }[] = []; let consoleCursor = 0;
@@ -222,6 +224,8 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       switch (input?.operation) {
         case 'settings:get': return mcpSettings.getStatus();
         case 'settings:set': return mcpSettings.setEnabled(argument);
+        case 'settings:cursor:get': return cursorMcpSettings.getStatus();
+        case 'settings:cursor:set': return cursorMcpSettings.setEnabled(argument);
         case 'code': {
           if (!activeProject || !automationReady) throw new Error('请先打开工程。');
           const assets = await new ImageAssetStore(runtime, activeProject.path, permanentImages).list();

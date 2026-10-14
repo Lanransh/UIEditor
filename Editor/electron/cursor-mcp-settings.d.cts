@@ -1,0 +1,1 @@
+export function createCursorMcpSettingsStore(options: { filePath?: string; serverPath: string; discoveryPath: string }): { getStatus(): Promise<{ configPath: string; configured: boolean; enabled: boolean; available: boolean }>; setEnabled(enabled: boolean): Promise<{ configPath: string; configured: boolean; enabled: boolean; available: boolean }> };
