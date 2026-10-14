@@ -39,6 +39,14 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   const liveImageAssets = useRef<ImageAsset[]>([]);
   function replaceImages(assets: ImageAsset[]) { liveImageAssets.current = assets; setImageAssets(assets); }
   const [assetsLoading, setAssetsLoading] = useState(true);
+  const [imageAssetRevision, setImageAssetRevision] = useState(0);
+  const [documentAssetRevision, setDocumentAssetRevision] = useState(0);
+  useEffect(() => window.projects.onAssetsChanged(event => {
+    if (event.path !== project.path) return;
+    if (event.error) { setError(event.error); return; }
+    if (event.kind === 'images') setImageAssetRevision(value => value + 1);
+    else setDocumentAssetRevision(value => value + 1);
+  }), [project.path]);
   const document = useMemo(() => resolveImageAssets(history.state, imageAssets), [history.state, imageAssets]);
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +55,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
       if (result.ok) replaceImages(result.value); else setError(result.error);
     }).catch(cause => { if (!cancelled) setError(String(cause)); }).finally(() => { if (!cancelled) setAssetsLoading(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [project.path, imageAssetRevision]);
   const runtime = useRuntime(document);
   useHistoryShortcuts({ ...history, canUndo: !busy && !runtime.active && history.canUndo, canRedo: !busy && !runtime.active && history.canRedo });
   const dirty = hasDocument && JSON.stringify(document) !== saved;
@@ -300,7 +308,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   }
   const editor = { projectId: project.manifest.id, projectName: project.name, projectPath: project.path, strategy, document, inspectionDocument, inspectionBusy: busy || assetsLoading || (runtime.active && !runtime.ready), hasDocument, history, selected, select, editNode, editProperty, execute, add, reparent, pickImage,
     inspectedAssetId, inspectAsset, clearAssetInspection, setAssetConfigurationDirty,
-    imageAssets, inspectImages: () => liveImageAssets.current, assetsLoading, refreshImages, configureImage, configureImageRobloxId, assignRobloxImageId, importImage, useImage, bakeImage,
+    imageAssetRevision, documentAssetRevision, imageAssets, inspectImages: () => liveImageAssets.current, assetsLoading, refreshImages, configureImage, configureImageRobloxId, assignRobloxImageId, importImage, useImage, bakeImage,
     moveImage: (id: string, folder: string) => changeProjectImages(() => window.imageAssets.move(id, folder)),
     removeImage: (id: string) => changeProjectImages(() => window.imageAssets.remove(id)),
     location: documentLocation(project.path, path), newDocument, openDocument, openTemplate, saveTemplate, moveAsset, save: (saveAs = false) => run(async () => { await save(saveAs); }),

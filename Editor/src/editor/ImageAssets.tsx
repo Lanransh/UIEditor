@@ -20,16 +20,20 @@ export function ImageAssets({ editor, library, selectedId, select }: {
   const subfolders = folders.filter(path => path.startsWith(folder ? `${folder}/` : '') && !path.slice(folder ? folder.length + 1 : 0).includes('/'));
   const asset = assets.find(a => a.id === menu?.id);
   useEffect(() => { setMenu(null); }, [library, editor.busy]);
+  useEffect(() => { setFolder(''); setMenu(null); }, [scope]);
   useEffect(() => {
-    setFolder(''); setMenu(null);
     setFolders([]);
     let alive = true;
     if (scope === 'project') void window.imageAssets.listFolders().then(result => {
       if (!alive) return;
-      if (result.ok) setFolders(result.value); else setError(result.error);
+      if (result.ok) {
+        setFolders(result.value);
+        setFolder(current => result.value.includes(current) ? current : '');
+        setError('');
+      } else setError(result.error);
     }).catch(cause => { if (alive) setError(String(cause)); });
     return () => { alive = false; };
-  }, [scope]);
+  }, [scope, editor.imageAssetRevision]);
   useEffect(() => {
     if (scope !== 'project' || editor.inspectedAssetId !== selectedId) return;
     const selected = editor.imageAssets.find(asset => asset.id === selectedId && asset.library === 'project');

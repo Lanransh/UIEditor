@@ -49,7 +49,7 @@ export function DocumentAssets({ editor, library }: { editor: DocumentEditor; li
     }).catch(() => { if (!cancelled) setError('无法读取界面资产，请重试。'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [editor.busy, editor.path, revision, library, assetLibrary]);
+  }, [editor.busy, editor.path, revision, library, assetLibrary, editor.documentAssetRevision]);
 
   useEffect(() => { setMenu(null); }, [library, editor.busy]);
   useEffect(() => {

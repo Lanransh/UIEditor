@@ -90,6 +90,7 @@ npm run dev
 | `npm run build:mcp` | 构建独立 stdio MCP 服务，普通 build 已包含 |
 | `npm run test:mcp` | 构建并通过真实 stdio MCP 验证制作、查询、历史、运行与保存 |
 | `npm run test:mcp:packaged` | 验证已打包程序的 MCP 完整链路，需先 package |
+| `npm run test:asset-refresh` | 构建并验证外部 UI、模板、图片与目录变化后的自动刷新及监听清理 |
 | `npm run test:assets` | 构建并验证图片库、共用属性面板、单一 Roblox ID、保存重开及资产 MCP |
 | `npm run test:bake` | 构建并验证节点烘焙、透明 PNG、项目资产落盘、转换撤销及保存重开 |
 | `npm run test:templates` | 构建并验证项目模板与文件夹隔离、缩略图、独立副本、重启持久化、UI库互移与保存路径 |

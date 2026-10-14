@@ -20,6 +20,7 @@ import { executeCode, getCodeAdapter } from './code-executor';
 import { openInterface, saveInterface, fileVersion } from './automation-files';
 import { createCodexMcpSettingsStore } from './codex-mcp-settings.cjs';
 import { ImageAssetStore, permanentImageRoot } from './image-assets';
+import { watchAssetDirectory } from './asset-watcher';
 import { syncAgentWorkspace } from './agent-workspace';
 import { ensureWorkspaceLauncher } from './workspace-launcher';
 import { listTemplateStyles, previewTemplateStyle, styleDirectory, templateStylesDirectory } from './template-styles';
@@ -79,6 +80,9 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       return listTemplateStyles(stylesRoot);
     }
     let activeProject: Project | null = null;
+    let assetWatchers: (() => void)[] = [];
+    function stopAssetWatchers() { assetWatchers.forEach(stop => stop()); assetWatchers = []; }
+    window.on('closed', stopAssetWatchers);
     const reader = new AutomationReader(runtime, recent, () => automationReady ? activeProject : null, permanentImages);
     const previews = new Map<Electron.WebContents, { document: UIDocument; bake?: BakePreviewConfig; ready(): void; fail?(error: Error): void }>();
     async function savedScreenshot(document: UIDocument, target: object) {
@@ -320,20 +324,32 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     }
     let busy = false;
     function handle<T>(channel: string, action: (argument: unknown) => Promise<T>) {
+      const assetRead = ['images:list', 'images:folders', 'document:list-assets', 'document:preview-asset'].includes(channel);
       ipcMain.handle(channel, async (event, argument): Promise<Result<T>> => {
         if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || event.senderFrame.url !== source) return { ok: false, error: '无效的操作来源。' };
-        if (busy) return { ok: false, error: '正在处理工程，请稍后重试。' };
-        busy = true;
+        if (!assetRead && busy) return { ok: false, error: '正在处理工程，请稍后重试。' };
+        if (!assetRead) busy = true;
         try { return { ok: true, value: await action(argument) }; }
         catch (error) { return { ok: false, error: describeError(error) }; }
-        finally { busy = false; }
+        finally { if (!assetRead) busy = false; }
       });
     }
     async function remember(project: Project): Promise<Project> {
       await syncAgentWorkspace(project.path, join(app.isPackaged ? process.resourcesPath : dirname(app.getAppPath()), 'ProjectTypes', 'Roblox'));
       await ensureWorkspaceLauncher(project.path, process.execPath, app.isPackaged ? undefined : app.getAppPath());
       stopRuntime();
+      stopAssetWatchers();
       activeProject = project; documentPath = null; dirty = false;
+      for (const [directory, kind] of [
+        [documentAssetDirectory(project.path, 'project'), 'documents'],
+        [documentAssetDirectory(project.path, 'templates'), 'documents'],
+        [join(dirname(project.path), 'ArtSource', 'UI'), 'images'],
+      ] as const) {
+        const notify = (error?: string) => {
+          if (!window.isDestroyed()) window.webContents.send('project:assets-changed', { path: project.path, kind, ...(error ? { error } : {}) });
+        };
+        assetWatchers.push(watchAssetDirectory(directory, () => notify(), error => notify(`资产目录监听失败：${error.message}`)));
+      }
       try { await recent.record(project.path); }
       catch (error) {
         await dialog.showMessageBox(window, { type: 'warning', title: '无法保存最近记录', message: '工程已打开，但无法更新最近工程列表。', detail: describeError(error) });

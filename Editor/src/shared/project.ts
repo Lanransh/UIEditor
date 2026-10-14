@@ -43,7 +43,10 @@ export type CreateProjectSource = { kind: 'style'; id: string } | { kind: 'recen
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
+export interface ProjectAssetsChanged { path: string; kind: 'documents' | 'images'; error?: string }
+
 export interface ProjectAPI {
+  onAssetsChanged(callback: (event: ProjectAssetsChanged) => void): () => void;
   openStartup(): Promise<Result<Project | null>>;
   onActivated(callback: (project: Project) => void): () => void;
   create(source?: string | CreateProjectSource): Promise<Result<Project | null>>;

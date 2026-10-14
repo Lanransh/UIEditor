@@ -5,6 +5,11 @@ import type { RuntimeAPI } from '../src/shared/runtime';
 import type { ImageAssetAPI } from '../src/shared/imageAssets';
 
 const api: ProjectAPI = {
+  onAssetsChanged: callback => {
+    const listener = (_event: Electron.IpcRendererEvent, event: import('../src/shared/project').ProjectAssetsChanged) => callback(event);
+    ipcRenderer.on('project:assets-changed', listener);
+    return () => ipcRenderer.removeListener('project:assets-changed', listener);
+  },
   openStartup: () => ipcRenderer.invoke('project:open-startup'),
   onActivated: callback => {
     const listener = (_event: Electron.IpcRendererEvent, project: import('../src/shared/project').Project) => callback(project);
