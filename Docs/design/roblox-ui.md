@@ -150,6 +150,7 @@ Image 保存 Roblox 资源标识；节点的 previewImage 分别保存本地文�
 UICorner 只圆角化节点自身的背景、图片与渐变，不按圆角裁剪子节点；
 ClipsDescendants 按矩形边界裁剪子节点。
 GothamBold 在本机以 Segoe UI 粗体替代。UIStroke 在文本节点上描画文字，在其他节点上画外边框。
+Roblox 私用字符 U+E000–U+E003 使用随 App 内嵌的 RobloxEmoji 字体预览；普通文字继续使用替代字体。Text 和 PlaceholderText 属性提供“插入 Robux 图标”，在光标或选区处插入 U+E002，支持撤销重做。图标随字号、颜色、描边与渐变显示，画布、运行预览、资产缩略图共用。JSON 和 Roblox 导入保留原始 Unicode 字符，不转换为图片；运行脚本可用 `utf8.char(0xE002)` 设置。字体来源见 [特殊字符字体](../../Editor/src/assets/roblox-symbols.md)，最终排版仍需在 Roblox 确认。
 UIGradient 分别插值颜色和透明度，并与背景、文字或图片的颜色及透明度相乘；
 旋转渐变的中心线控制点落在节点边界上。
 ScrollingFrame 通过 CanvasSize 与 CanvasPosition 展示滚动区域，位置按原生规则

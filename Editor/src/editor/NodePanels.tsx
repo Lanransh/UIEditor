@@ -188,7 +188,19 @@ function NumberInput({ value, onChange, label, definition, disabled }: { value: 
 }
 function StringInput({ value, onChange, label, disabled }: { value: string; onChange: (value: string) => void; label: string; disabled?: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
-  return <input aria-label={label} disabled={disabled} value={draft ?? value} onChange={event => setDraft(event.target.value)} onBlur={event => { onChange(event.target.value); setDraft(null); }} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} />;
+  const input = useRef<HTMLInputElement>(null);
+  const field = <input ref={input} aria-label={label} disabled={disabled} value={draft ?? value} onChange={event => setDraft(event.target.value)} onBlur={event => { onChange(event.target.value); setDraft(null); }} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} />;
+  if (label !== 'Text' && label !== 'PlaceholderText') return field;
+  return <div>
+    {field}
+    <button type="button" disabled={disabled} title="在光标处插入 Robux 字符 U+E002，可随 TextSize 缩放" onMouseDown={event => event.preventDefault()} onClick={() => {
+      const field = input.current!;
+      const start = field.selectionStart ?? field.value.length, end = field.selectionEnd ?? start;
+      onChange(`${field.value.slice(0, start)}\uE002${field.value.slice(end)}`);
+      setDraft(null);
+      requestAnimationFrame(() => { field.focus(); field.setSelectionRange(start + 1, start + 1); });
+    }}>插入 Robux 图标</button>
+  </div>;
 }
 function PropertyField({ name, definition, value, change, disabled }: { name: string; definition: PropertyDefinition; value: PropertyValue; change: (value: PropertyValue) => void; disabled: boolean }) {
   let input: ReactNode;

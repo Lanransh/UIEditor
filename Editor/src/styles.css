@@ -1,4 +1,6 @@
-:root { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; color: #263a3a; background: #edf2f2; font-synthesis: none; text-rendering: optimizeLegibility; --muted: #718181; --accent: #168b85; }
+@import './assets/roblox-symbols.css';
+
+:root { font-family: "Roblox Symbols", "Segoe UI", "Microsoft YaHei", sans-serif; color: #263a3a; background: #edf2f2; font-synthesis: none; text-rendering: optimizeLegibility; --muted: #718181; --accent: #168b85; }
 * { box-sizing: border-box; }
 body { margin: 0; }
 button { font: inherit; cursor: pointer; }
