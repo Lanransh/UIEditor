@@ -33,6 +33,7 @@ const fields: Record<string, string[]> = {
   'uie.assets.search': ['query', 'library', 'offset', 'limit', 'projectId'], 'uie.assets.get': ['id', 'library', 'projectId'],
   'uie.assets.configure': ['sessionId', 'revision', 'id', 'name', 'tags', 'robloxId'],
   'uie.assets.import': ['sessionId', 'revision', 'library', 'filePath'],
+  'uie.document.export': [],
 };
 const descriptions = [
   'Read active project/session, revision, current file library/path/mode, absolute workspacePath/agentWorkspacePath/gameDesignPath and gameDesignExists, and optionally full design document. Read/edit Game-DESIGN.md using filesystem tools.',
@@ -57,6 +58,7 @@ const descriptions = [
   'Scroll a ScrollingFrame by ID. Supply exactly one of to or delta in canvas pixels; to preserves unspecified axes. Returns clamped position and range.',
   'Drag a runtime node using normalized local from/to points (0–1), with 1–32 moves (default 8). Sends mouse begin/change/end without activating a button.',
   'Import a local PNG/JPEG/WebP/GIF (up to 8 MiB) by absolute filePath into the current project or permanent image library. Saves immediately, without uploading or assigning a Roblox ID; not a document undo operation. Read fresh state after importing, then use ui.assets.apply(nodeId,assetId) in code.execute.',
+  'Export the current design snapshot and interaction script to Roblox through the existing Toolkit flow. Takes no arguments and exports the latest current design, including unsaved changes. Requires edit mode, configured Roblox image IDs and exactly one connected target. Does not save, upload images or change history. Returns target and task receipt; awaiting_studio is not success and Studio must still save the scene.',
 ];
 export const definitions = toolNames.map((name, index) => ({ name, description: descriptions[index], inputSchema: { type: 'object', properties: Object.fromEntries(fields[name].map(key => [key, name === 'uie.runtime.hover' && key === 'id' ? { type: ['string', 'null'] } : name === 'uie.runtime.drag' && key === 'steps' ? { type: 'integer', minimum: 1, maximum: 32 } : name === 'uie.document.list' && key === 'library' ? { enum: ['project', 'templates', 'permanent'] } : properties[key as keyof typeof properties]])), additionalProperties: false, required: fields[name].filter(key => ['sessionId', 'revision'].includes(key) || (name === 'uie.assets.import' && ['library', 'filePath'].includes(key)) || (name === 'uie.runtime.batch' && key === 'steps') || (name === 'uie.runtime.drag' && ['from', 'to'].includes(key)) || (name === 'uie.code.execute' && ['language', 'source'].includes(key)) || (['uie.runtime.click', 'uie.runtime.hover', 'uie.runtime.scroll', 'uie.runtime.drag', 'uie.assets.get', 'uie.assets.configure'].includes(name) && key === 'id') || (name === 'uie.runtime.control' && key === 'action') || (name === 'uie.document.new' && key === 'name')) } }));
 

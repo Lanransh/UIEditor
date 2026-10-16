@@ -36,7 +36,7 @@ let app: Awaited<ReturnType<typeof electron.launch>> | undefined;
 try {
   assert.equal((await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'test', version: '1' } })).serverInfo.name, 'ui-editor');
   const listed = (await rpc('tools/list')).tools;
-  assert.equal(listed.length, 24); assert.ok(listed.some((tool: any) => tool.name === 'uie.assets.import')); assert.ok(listed.some((tool: any) => tool.name === 'uie.runtime.batch')); assert.ok(listed.some((tool: any) => tool.name === 'uie.scripts.set')); assert.ok(!listed.some((tool: any) => tool.name.startsWith('uie.history.')));
+  assert.equal(listed.length, 25); assert.ok(listed.some((tool: any) => tool.name === 'uie.document.export')); assert.ok(listed.some((tool: any) => tool.name === 'uie.assets.import')); assert.ok(listed.some((tool: any) => tool.name === 'uie.runtime.batch')); assert.ok(listed.some((tool: any) => tool.name === 'uie.scripts.set')); assert.ok(!listed.some((tool: any) => tool.name.startsWith('uie.history.')));
   assert.equal((await raw('uie.history.undo')).isError, true);
   assert.equal((await raw('uie.editor.get_state')).isError, true);
   const parent = join(root, 'project'); await mkdir(parent);
@@ -68,11 +68,11 @@ try {
   assert.ok(settingsBounds && titleBounds && settingsBounds.x > titleBounds.x + titleBounds.width && settingsBounds.y < titleBounds.y);
   await page.screenshot({ path: join(root, 'hub.png') });
   await settings.click();
-  await page.getByRole('button', { name: '启用 MCP', exact: true }).click();
-  await page.getByRole('button', { name: '禁用 MCP', exact: true }).waitFor();
+  await page.getByRole('region', { name: 'Codex MCP', exact: true }).getByRole('button', { name: '启用 MCP', exact: true }).click();
+  await page.getByRole('region', { name: 'Codex MCP', exact: true }).getByRole('button', { name: '禁用 MCP', exact: true }).waitFor();
   assert.match(await readFile(join(root, 'codex/config.toml'), 'utf8'), /mcp_servers.ui-editor/);
-  await page.getByRole('button', { name: '禁用 MCP', exact: true }).click();
-  await page.getByRole('button', { name: '启用 MCP', exact: true }).waitFor();
+  await page.getByRole('region', { name: 'Codex MCP', exact: true }).getByRole('button', { name: '禁用 MCP', exact: true }).click();
+  await page.getByRole('region', { name: 'Codex MCP', exact: true }).getByRole('button', { name: '启用 MCP', exact: true }).waitFor();
   await page.getByRole('button', { name: '关闭', exact: true }).click();
   await app.evaluate(({ dialog }, parent) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [parent] }); dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false }); }, parent);
   await page.getByRole('button', { name: '创建工程', exact: true }).click();
@@ -87,6 +87,7 @@ try {
   assert.equal((await raw('uie.editor.get_capabilities', { className: 'Missing' })).isError, true);
   const initial = await state('full');
   assert.equal(initial.document, null);
+  assert.equal((await raw('uie.document.export')).isError, true);
   assert.equal((await state()).nodeCount, 0);
   // Read saved references while the current editor has no document.
   const projectPath = join(parent, 'UIEditorWorkspace');
@@ -134,7 +135,7 @@ try {
   const otherReference = { ...reference, id: crypto.randomUUID(), name: 'OtherReference' };
   await writeDocument(join(other.path, 'interfaces', 'Other.json'), otherReference);
   const images = new ImageAssetStore(runtime, other.path);
-  const otherImage = await images.import('project', { name: 'other.png', dataUrl: 'data:image/png;base64,YQ==' });
+  const otherImage = await images.import('project', { name: 'other.png', dataUrl: `data:image/png;base64,${(await readFile(resolve('src/assets/images/Placeholder.png'))).toString('base64')}` });
   assert.equal((await call('uie.project.list')).projects.length, 2);
   assert.equal((await call('uie.document.list', { projectId: other.manifest.id })).interfaces[0].documentId, otherReference.id);
   assert.equal((await call('uie.nodes.get', { target: { projectId: other.manifest.id, documentId: otherReference.id } })).node.id, reference.root.id);
@@ -158,7 +159,58 @@ print("Created reward UI")`;
   const dry = await mutate('uie.code.execute', { language: 'luau', source: build, dryRun: true }); assert.equal(dry.success, true);
   assert.deepEqual((await state('full')).document, blank.document);
   await mutate('uie.code.execute', { language: 'luau', source: build, label: '制作奖励界面' });
-  const created = await state('full'); assert.equal(created.document.root.children.length, 3);
+  let created = await state('full'); assert.equal(created.document.root.children.length, 3);
+  // Replace only the isolated app's Toolkit IPC handlers: never deliver to a real Studio.
+  await app.evaluate(({ ipcMain }) => {
+    const qa = { targets: [{ id: 'export-target', name: 'Test game', placeId: '123' }], discoverError: '', submitError: '', delayMs: 0, discoveries: 0, submissions: [] as any[] };
+    (globalThis as any).exportQA = qa;
+    ipcMain.removeHandler('toolkit:discover'); ipcMain.removeHandler('toolkit:submit');
+    ipcMain.handle('toolkit:discover', async () => {
+      ++qa.discoveries;
+      return qa.discoverError ? { ok: false, error: qa.discoverError } : { ok: true, value: qa.targets };
+    });
+    ipcMain.handle('toolkit:submit', async (_event, value) => {
+      qa.submissions.push(value);
+      if (qa.delayMs) await new Promise(resolve => setTimeout(resolve, qa.delayMs));
+      return qa.submitError ? { ok: false, error: qa.submitError } : { ok: true, value: {
+        id: 'a'.repeat(32), deliveryId: 'delivery', name: 'Reward', status: 'awaiting_studio', message: '等待 Studio 回执', scriptPath: 'Generated/CRewardView.luau', sourceClass: 'CRewardView',
+      } };
+    });
+  });
+  for (const scenario of [
+    { targets: [], discoverError: '', message: /PlaceId/ },
+    { targets: [{ id: 'one' }, { id: 'two' }], discoverError: '', message: /多个游戏工程/ },
+    { targets: [], discoverError: 'Toolkit offline', message: /Toolkit offline/ },
+  ]) {
+    await app.evaluate((_electron, scenario) => Object.assign((globalThis as any).exportQA, scenario), { targets: scenario.targets, discoverError: scenario.discoverError });
+    const result = await raw('uie.document.export');
+    assert.equal(result.isError, true); assert.match(result.content[0].text, scenario.message);
+    assert.deepEqual(await state('full'), created);
+  }
+  await app.evaluate(() => Object.assign((globalThis as any).exportQA, { targets: [{ id: 'export-target', name: 'Test game', placeId: '123' }], discoverError: '' }));
+  await mutate('uie.code.execute', { language: 'luau', source: 'ui.nodes.create("ImageLabel", {name="MissingImage", previewImage={name="missing.png",dataUrl="data:image/png;base64,YQ=="}})' });
+  const missingExport = await raw('uie.document.export');
+  assert.equal(missingExport.isError, true); assert.match(missingExport.content[0].text, /MissingImage/);
+  assert.equal(await app.evaluate(() => (globalThis as any).exportQA.submissions.length), 0);
+  assert.equal(await app.evaluate(() => (globalThis as any).exportQA.discoveries), 3);
+  await uiHistory('undo');
+  assert.deepEqual((await state('full')).document, created.document);
+  await app.evaluate(() => { (globalThis as any).exportQA.submitError = 'Toolkit rejected export'; });
+  const failedExport = await raw('uie.document.export');
+  assert.equal(failedExport.isError, true); assert.match(failedExport.content[0].text, /Toolkit rejected export/);
+  const beforeExport = await state('full');
+  // Exceed both the former 12-second renderer and 15-second MCP timeouts.
+  await app.evaluate(() => Object.assign((globalThis as any).exportQA, { submitError: '', delayMs: 16000 }));
+  const exported = await call('uie.document.export');
+  assert.equal(exported.target.id, 'export-target'); assert.equal(exported.task.status, 'awaiting_studio');
+  assert.equal(exported.task.id, 'a'.repeat(32));
+  const submissions = await app.evaluate(() => (globalThis as any).exportQA.submissions);
+  assert.equal(submissions.length, 2);
+  assert.equal(submissions[1].targetId, 'export-target'); assert.deepEqual(submissions[1].document, created.document);
+  assert.deepEqual(await state('full'), beforeExport);
+  assert.equal(await page.getByRole('dialog', { name: '导出到 Roblox' }).count(), 0);
+  created = await state('full');
+
   await call('uie.nodes.get', { target, format: 'tree' });
   await call('uie.scripts.get', { target });
   assert.deepEqual(await state('full'), created);
@@ -228,6 +280,8 @@ print("Created reward UI")`;
   assert.ok(hiddenBatch.results[1].result.result.logs.some((log: any) => log.kind === 'action'));
   await uiHistory('undo');
   const run = await mutate('uie.runtime.control', { action: 'run' }); assert.equal(run.result.ok, true, JSON.stringify(run.result));
+  assert.equal((await raw('uie.document.export')).isError, true);
+  assert.equal(await app.evaluate(() => (globalThis as any).exportQA.submissions.length), 2);
   assert.equal((await call('uie.nodes.get', { id: button.id, view: 'runtime' })).node.properties.Text, 'Ready');
   assert.equal((await raw('uie.scripts.set', { sessionId: run.sessionId, revision: run.revision, source: fixture.scripts.source })).isError, true);
   assert.equal((await mutate('uie.runtime.click', { id: button.id })).dispatched, true);
@@ -251,7 +305,7 @@ print("Created reward UI")`;
   assert.ok((await call('uie.debug.get_diagnostics')).logs.some((log: any) => log.kind === 'error'));
   await uiHistory('undo');
   await mutate('uie.document.new', { name: 'Another' });
-  await mutate('uie.document.open', { relativePath: 'reward.json' });
+  await mutate('uie.document.open', { relativePath: 'reward/reward.json' });
   assert.deepEqual((await state('full')).document, created.document); assert.equal('history' in (await state()), false);
   assert.equal((await call('uie.document.list')).interfaces.length, 1);
   assert.notEqual(initial.sessionId, (await state()).sessionId);

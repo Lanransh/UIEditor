@@ -192,7 +192,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       }
       const requestId = randomUUID();
       const value = await new Promise<unknown>((resolve, reject) => {
-        const timer = setTimeout(() => { pending.delete(requestId); reject(new Error('编辑器操作超时。')); }, 12000);
+        const timer = setTimeout(() => { pending.delete(requestId); reject(new Error('编辑器操作超时。')); }, request.name === 'uie.document.export' ? 140000 : 12000);
         pending.set(requestId, { resolve, reject, timer }); window.webContents.send('automation:request', { ...request, requestId });
       });
       if (request.name === 'uie.editor.get_state') {

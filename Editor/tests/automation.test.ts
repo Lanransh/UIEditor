@@ -10,6 +10,7 @@ import { documentCommand } from '../src/editor/commands';
 import { interfacePath, saveInterface, openInterface } from '../electron/automation-files';
 import { updateManagedServer, createCodexMcpSettingsStore } from '../electron/codex-mcp-settings.cjs';
 import { definitions, callTool } from '../mcp/server';
+import { validateTool } from '../src/shared/automation-tools';
 import { startBridge } from '../electron/automation-bridge';
 import { getCapabilities } from '../src/editor/automationCapabilities';
 
@@ -121,8 +122,18 @@ test('Codex settings preserve unrelated entries and invalid TOML is never modifi
   const settings = createCodexMcpSettingsStore({ filePath, serverPath: resolve('mcp-dist/server.mjs'), discoveryPath: join(root, 'bridge.json') });
   await assert.rejects(settings.setEnabled(true), /TOML/); assert.equal(await readFile(filePath, 'utf8'), 'bad = [');
 });
+test('MCP export takes no arguments and accepts no alternate source or target', () => {
+  const tool = definitions.find(tool => tool.name === 'uie.document.export')!;
+  assert.deepEqual(tool.inputSchema.required, []);
+  assert.deepEqual(tool.inputSchema.properties, {});
+  validateTool(tool.name, {});
+  for (const invalid of [{ sessionId: 'session' }, { revision: 0 },
+    { targetId: 'other' }, { relativePath: 'other.json' }, { target: {} }]) {
+    assert.throws(() => validateTool(tool.name, invalid));
+  }
+});
 test('MCP directory is static and bridge authenticates forwarding and screenshots', async () => {
-  assert.equal(definitions.length, 24); assert.ok(!definitions.some(tool => tool.name.includes('selection')));
+  assert.equal(definitions.length, 25); assert.ok(!definitions.some(tool => tool.name.includes('selection')));
   for (const name of ['uie.assets.search', 'uie.assets.get', 'uie.assets.configure', 'uie.assets.import']) assert.ok(definitions.some(tool => tool.name === name));
   assert.deepEqual(definitions.find(tool => tool.name === 'uie.assets.import')!.inputSchema.required, ['sessionId', 'revision', 'library', 'filePath']);
   assert.ok(definitions.some(tool => tool.name === 'uie.scripts.get'));
@@ -133,6 +144,7 @@ test('MCP directory is static and bridge authenticates forwarding and screenshot
   try {
     assert.match((await callTool('uie.editor.get_state', {}, discovery)).content[0].text!, /get_state/);
     assert.equal((await callTool('uie.debug.screenshot', {}, discovery)).content[0].type, 'image');
+    assert.match((await callTool('uie.document.export', {}, discovery)).content[0].text!, /document.export/);
     const info = JSON.parse(await readFile(discovery, 'utf8'));
     assert.equal((await fetch(`http://127.0.0.1:${info.port}/call`, { method: 'POST' })).status, 403);
   } finally { bridge.close(); }

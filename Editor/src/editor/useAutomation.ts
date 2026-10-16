@@ -8,6 +8,7 @@ import { getCapabilities } from './automationCapabilities';
 import { documentCommand } from './commands';
 import { resolveImageAssets } from '../shared/imageAssets';
 import { executeRuntimeBatch } from '../shared/runtime-batch';
+import { findUnconfiguredRobloxImages } from '../shared/robloxImport';
 
 interface Files { reset(document: UIDocument, path: string | null): void; saved(): string; markSaved(document: UIDocument, path: string): void; path(): string | null; busy(value: boolean): void }
 export function useAutomation(editor: DocumentEditor, files: Files) {
@@ -26,7 +27,8 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
       if (assetsSignature.current !== signature) { assetsSignature.current = signature; sessionId.current = crypto.randomUUID(); }
       if (documentId.current !== h.state.id) { documentId.current = h.state.id; sessionId.current = crypto.randomUUID(); }
       const stamp = () => ({ sessionId: sessionId.current, revision: e.history.inspect().revision });
-      const verify = (revision = a.revision) => { if (!alive || a.sessionId !== sessionId.current || revision !== e.history.inspect().revision || signature !== JSON.stringify(current.current.editor.inspectImages())) throw new Error('编辑会话、资产配置或 revision 已变化，请重新读取状态。'); };
+      const guard = request.name === 'uie.document.export' ? { sessionId: sessionId.current, revision: h.revision } : a;
+      const verify = (revision = guard.revision) => { if (!alive || guard.sessionId !== sessionId.current || revision !== e.history.inspect().revision || signature !== JSON.stringify(current.current.editor.inspectImages())) throw new Error('编辑会话、资产配置或 revision 已变化，请重新读取状态。'); };
       const writable = () => { verify(); if (e.runtime.inspect().sessionId || e.runtime.active || e.busy) throw new Error('当前正在运行或处理操作，请停止后编辑。'); };
       const resolved = () => resolveImageAssets(e.history.inspect().state, e.inspectImages());
       const dirty = () => e.hasDocument && JSON.stringify(resolved()) !== f.saved();
@@ -116,6 +118,23 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
             try {
               const document = await e.refreshSavedDocument(), revision = e.history.inspect().revision;
               const result = await window.automation.invoke('file:save', { document, relativePath: a.relativePath }); verify(revision); f.markSaved(result.document, result.path); return state();
+            } finally { f.busy(false); }
+          }
+          case 'uie.document.export': {
+            writable(); f.busy(true);
+            try {
+              const snapshot = structuredClone(resolved());
+              const missing = findUnconfiguredRobloxImages(snapshot, e.inspectImages());
+              if (missing.length) throw new Error(`请先上传所有未配置 Roblox ID 的图片：${missing.flatMap(image => image.nodePaths).join('、')}`);
+              const targets = await window.toolkit.discover();
+              if (!targets.ok) throw new Error(targets.error);
+              verify();
+              if (!targets.value.length) throw new Error('请在 Toolkit 打开目标游戏工程，并在项目设置填写 PlaceId。');
+              if (targets.value.length !== 1) throw new Error('Toolkit 连接了多个游戏工程，请在 Toolkit 仅保留本次导入的工程连接。');
+              const target = targets.value[0];
+              const result = await window.toolkit.submit(target.id, snapshot);
+              if (!result.ok) throw new Error(result.error);
+              return { ...stamp(), target, task: result.value };
             } finally { f.busy(false); }
           }
           case 'uie.runtime.control': {
