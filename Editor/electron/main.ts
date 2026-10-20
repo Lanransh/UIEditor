@@ -100,7 +100,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
         });
         // Attach the readiness wait before navigation so a load failure cannot leave a rejected promise unhandled.
         await Promise.all([preview.loadURL(url.href), ready]);
-        const captured = await preview.webContents.capturePage({ x: 0, y: 0, width: 1280, height: 720 });
+        const captured = await preview.webContents.capturePage({ x: 0, y: 0, width: 1280, height: 720 }, { stayHidden: true, stayAwake: true });
         const image = captured.resize({ width: 1280, height: 720, quality: 'best' });
         return { png: image.toPNG().toString('base64'), metadata: { width: image.getSize().width, height: image.getSize().height, zoom: 1, target, view: 'saved-design' } };
       } finally { if (timer) clearTimeout(timer); previews.delete(preview.webContents); preview.destroy(); }
@@ -191,10 +191,19 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
         throw new Error('请先打开工程，当前没有编辑会话。');
       }
       const requestId = randomUUID();
-      const value = await new Promise<unknown>((resolve, reject) => {
-        const timer = setTimeout(() => { pending.delete(requestId); reject(new Error('编辑器操作超时。')); }, request.name === 'uie.document.export' ? 140000 : 12000);
-        pending.set(requestId, { resolve, reject, timer }); window.webContents.send('automation:request', { ...request, requestId });
-      });
+      const screenshot = request.name === 'uie.debug.screenshot';
+      const throttling = window.webContents.getBackgroundThrottling();
+      let value: unknown;
+      try {
+        // Resume animation frames before the renderer waits for screenshot preparation.
+        if (screenshot) window.webContents.setBackgroundThrottling(false);
+        value = await new Promise<unknown>((resolve, reject) => {
+          const timer = setTimeout(() => { pending.delete(requestId); reject(new Error('编辑器操作超时。')); }, request.name === 'uie.document.export' ? 140000 : 12000);
+          pending.set(requestId, { resolve, reject, timer }); window.webContents.send('automation:request', { ...request, requestId });
+        });
+      } finally {
+        if (screenshot && !window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.setBackgroundThrottling(throttling);
+      }
       if (request.name === 'uie.editor.get_state') {
         const workspacePath = activeProject!.path, agentWorkspacePath = workspacePath;
         const gameDesignPath = join(agentWorkspacePath, 'styles', 'Game-DESIGN.md');
@@ -265,7 +274,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
           if (!automationReady) throw new Error('请先打开工程。');
           const { x, y, width, height } = argument.rect;
           if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) throw new Error('画布区域不可见。');
-          const image = await window.webContents.capturePage({ x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) });
+          const image = await window.webContents.capturePage({ x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) }, { stayHidden: true, stayAwake: true });
           return { png: image.toPNG().toString('base64'), metadata: { width: image.getSize().width, height: image.getSize().height, zoom: argument.zoom } };
         }
         default: throw new Error('不支持的自动化操作。');
