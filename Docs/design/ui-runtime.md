@@ -16,6 +16,22 @@
 
 ## 文档与类继承
 
+### 项目文本接口模拟
+
+App 运行时通过 `FX.Loader:RequireShared("Scripts/Game/Shared/Text")` 提供冻结的 Text
+兼容模块，仅允许这一模块路径。`Text.Tr(definition, arguments?)` 校验非空 Key/Source，
+按 Source 展开参数；支持普通和数字索引占位符、int、fixed、num 及 string/translate
+原值替换，itemDefinition 按原文求值得到 item。无参数时返回 Source，不改变定义与参数。
+`Text.TrSource(source)` 返回原文，不展开参数。ValidateDefinition/FromConfig 保持项目定义合同。
+不加载真实译文，不模拟日期格式或语言切换，非法定义、缺失参数及未支持格式明确报错。
+保存和导出保留源码，由游戏真实 Text 接口处理翻译；不将模拟实现导出到游戏。
+
+公共制作提示词要求各 Luau 顶层独立定义 TranslationTexts，Key 在收集范围唯一；
+静态节点与配置引用不补表，View 已处理的动态文案不在模拟或游戏接入中重复翻译。
+详细作者合同见 [UI 文本与翻译接口](../../ProjectTypes/Roblox/Docs/text-localization.md)。
+
+### 脚本格式
+
 version=3 的 scripts 只包含 source（交互源码）和 integration（接入源码）。两份脚本都返回自己的类，每份最多 256 KiB 字符。允许带语法错误保存，运行前必须编译成功。已有 version=2 文件加载时，将配置、模拟状态和节点引用转为两份类脚本中的代码，后续保存为 version=3；不支持 version=1。
 
 新建名称去除首尾空格后必须满足 `^[A-Za-z_][A-Za-z0-9_]*$`，并排除 Luau 保留字及编辑器保留的上下文关键字。输入 `OnlineReward` 时，交互类和变量名为 `COnlineRewardView`，接入类和变量名为 `COnlineRewardPreview`。接入类继承对应交互基类；初始 Config/State 为空，函数与条件语句采用四空格缩进的多行写法，不包含示例业务和打印。模板仅在创建时生成；后续修改文档名称不重写源码，加载旧文件也不套用新命名。

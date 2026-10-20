@@ -9,6 +9,54 @@ import { LuauSession } from '../electron/runtime';
 
 const textClasses = ['TextLabel', 'TextButton', 'TextBox'];
 
+test('Text module formats source parameters in View and Preview without translating or changing definitions', async () => {
+  const document = strategy.createDocument('TextPreview');
+  document.root.children.push(strategy.createNode('TextLabel'));
+  document.scripts.source = `local FX = _G.FX
+local Text = FX.Loader:RequireShared("Scripts/Game/Shared/Text")
+local TranslationTexts = {
+    Reward = { Key = "TextPreview.Reward", Source = "{player} received {count:int} {item}: {value}" },
+}
+local UI = FX.Class("CTextPreviewView", "CUIView")
+function UI:Render(state)
+    local arguments = {player = "Player%1", count = 99.8, itemDefinition = {Key = "TextPreview.Item", Source = "Coins"}, value = "1.2K"}
+    self:GetRootNode():GetChildren()[1].Text = Text.Tr(TranslationTexts.Reward, arguments)
+    assert(arguments.item == nil)
+    assert(TranslationTexts.Reward.Source == "{player} received {count:int} {item}: {value}")
+end
+return UI`;
+  document.scripts.integration = `local FX = _G.FX
+local Text = FX.Loader:RequireShared("Scripts/Game/Shared/Text")
+local Preview = FX.Class("CTextPreviewPreview", "CTextPreviewView")
+function Preview:Ctor(owner)
+    Preview.Super.Ctor(self, owner)
+    self.State = {}
+    assert(Text.TrSource("Hello {name}") == "Hello {name}")
+    assert(Text.TrSource("") == "")
+    assert(Text.Tr({Key = "TextPreview.Raw", Source = "{count:int}"}) == "{count:int}")
+    assert(Text.Tr(Text.FromConfig("{1} / {2:int}"), {"Coins", 12}) == "Coins / 12")
+    assert(Text.Tr({Key = "TextPreview.Format", Source = "{a:fixed} / {b:num} / {c:int}"}, {a = 12.5, b = -1234567.5, c = 0}) == "12.50 / -1,234,567.50 / 0")
+    assert(Text.Tr({Key = "TextPreview.Name", Source = "{name:translate}"}, {name = "Coins"}) == "Coins")
+    assert(not pcall(Text.Tr, "Old literal"))
+    assert(not pcall(Text.Tr, {Key = " ", Source = "text"}))
+    assert(not pcall(Text.Tr, {Key = "TextPreview.Missing", Source = "{count}"}, {}))
+    assert(not pcall(Text.Tr, {Key = "TextPreview.Unsupported", Source = "{date:datetime}"}, {date = 0}))
+    assert(not pcall(function() FX.Loader:RequireShared("Other/Module") end))
+    assert(not pcall(function() Text.Tr = function() end end))
+end
+return Preview`;
+  const original = JSON.stringify(document);
+  const { session, frame } = await LuauSession.start(resolve('native-bin'), document);
+  try {
+    assert.equal(frame.document.root.children[0].properties.Text, 'Player%1 received 100 Coins: 1.2K');
+    assert.equal(JSON.stringify(document), original);
+    const exported = createRobloxImportPackage(document);
+    assert.ok(JSON.stringify(exported).includes('Scripts/Game/Shared/Text'));
+    assert.ok(JSON.stringify(exported).includes('TranslationTexts'));
+    assert.ok(!JSON.stringify(exported).includes('TextPreview.Format'));
+  } finally { await session.stop(); }
+});
+
 test('runtime OnReady can disable localization on the root and visual descendants', async () => {
   const document = strategy.createDocument('Localization');
   const classes = ['Frame', 'ScrollingFrame', 'CanvasGroup', 'ImageLabel', 'ImageButton', ...textClasses];

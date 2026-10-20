@@ -262,6 +262,62 @@ makeProxy = function(id)
     return proxy
 end
 local Loader = {}
+local Text = {}
+function Text.ValidateDefinition(definition)
+    assert(type(definition) == "table", "Text: expected a Key/Source definition")
+    assert(type(definition.Key) == "string" and string.find(definition.Key, "%S"),
+        "Text: definition.Key must be a non-empty string")
+    assert(type(definition.Source) == "string" and string.find(definition.Source, "%S"),
+        "Text: definition.Source must be a non-empty string")
+    return definition
+end
+function Text.FromConfig(source)
+    return Text.ValidateDefinition({ Key = source, Source = source })
+end
+-- 只模拟英文回退和参数展开，不加载游戏翻译器或查询译文。
+function Text.Tr(definition, arguments)
+    Text.ValidateDefinition(definition)
+    if arguments == nil then return definition.Source end
+    assert(type(arguments) == "table", "Text: arguments must be a table")
+    if arguments.itemDefinition then
+        arguments = table.clone(arguments)
+        arguments.item = Text.Tr(arguments.itemDefinition)
+    end
+    local result = string.gsub(definition.Source, "{([%w_]+):?([%w_]*)}", function(name, format)
+        local argument = arguments[name]
+        if argument == nil then argument = arguments[tonumber(name)] end
+        assert(argument ~= nil, "Text: missing argument " .. name)
+        if format == "int" then
+            return string.format("%.0f", math.round(number(argument)))
+        elseif format == "fixed" or format == "num" then
+            local formatted = string.format("%.2f", number(argument))
+            if format == "num" then
+                local integer, fraction = string.match(formatted, "^(%-?%d+)(%.%d+)$")
+                while true do
+                    local grouped, count = string.gsub(integer, "^(%-?%d+)(%d%d%d)", "%1,%2")
+                    integer = grouped
+                    if count == 0 then break end
+                end
+                formatted = integer .. fraction
+            end
+            return formatted
+        end
+        assert(format == "" or format == "string" or format == "translate", "Text: unsupported format " .. format)
+        assert(type(argument) == "string" or type(argument) == "number", "Text: argument must be a string or number")
+        return tostring(argument)
+    end)
+    return result
+end
+function Text.TrSource(source)
+    assert(type(source) == "string", "Text: source must be a string")
+    return source
+end
+table.freeze(Text)
+-- 白名单入口，不能借此加载任意游戏模块。
+function Loader:RequireShared(path)
+    assert(path == "Scripts/Game/Shared/Text", "Unsupported shared module: " .. tostring(path))
+    return Text
+end
 -- 校验固定路径，避免空段或斜杠被静默解析为其他节点。
 -- @param path string 点分隔路径
 local function validatePath(path)

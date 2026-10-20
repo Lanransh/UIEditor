@@ -14,6 +14,9 @@ description: 在 UIEditor 的 Roblox 工程中制作、修改和验证可编辑 
 [运行接口](../../../Docs/runtime-api.md)、[展示与业务接入](../../../Docs/presentation-contract.md)
 [脚本数据契约示例](../../../Docs/script-contract-example.md) 和
 [Luau 编码规范](../roblox-luau-standards/SKILL.md)。接口以当前 MCP 返回的能力为准。
+编写动态文字时同时读取 [UI 文本与翻译接口](../../../Docs/text-localization.md)：
+View 使用本文件 TranslationTexts 和 Text.Tr 定义模板及参数；静态节点与配置引用不补表，
+模拟接入不重复翻译。App 只模拟英文格式化，真实翻译由游戏 Text 接口负责。
 
 ## 制作流程
 
