@@ -11,6 +11,12 @@ AGENTS.LOCAL.md 和 styles/ 由项目维护并提交；不修改编辑器维护�
 编写 Luau 时同时读取 [编码规范](.agents/skills/roblox-luau-standards/SKILL.md)。
 涉及 UI 文本时同时读取 [本地化规范](.agents/skills/roblox-localization/SKILL.md)，
 新增动态文案使用顶层 `local TranslationTexts = Text.Define(...)`，不手写 Key/Source 表。
+由运行时脚本填充的文本节点保存为 `Text=""`，不预填物品名、描述、价格、进度或倒计时样例；
+模拟数据放在 example，实际显示由 View 写入。固定标题、按钮和说明保留真实文案，详见本地化规范。
+纯数值、图标及代码已翻译的文本优先在具体节点与原型上保存 `AutoLocalize=false`，克隆继承，
+代码无需重复管理；依赖自动翻译的文案保持开启，不关闭父容器或整页，具体例外见本地化规范。
+交付前必须按本地化技能执行文本属性验收脚本及运行态检查，覆盖隐藏原型；失败修复后重验，
+未执行或未通过须明确报告，不能仅凭截图宣称通过。
 
 工程类型决定节点、脚本、运行与导出合同。若本工作区存在 styles/Game-DESIGN.md，先读取其中的
 视觉规范及链接的风格专项技能，再选择匹配模板。风格只补充视觉制作方法，不改写平台接口。
