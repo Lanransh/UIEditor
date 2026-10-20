@@ -293,6 +293,40 @@ end
 function Text.FromConfig(source)
     return Text.ValidateDefinition({ Key = source, Source = source })
 end
+local dateFormats = { datetime = true, iso8601 = true, shorttime = true, shortdatetime = true, shortdate = true }
+-- 英文预览固定 UTC，直接计算公历日期，避免宿主时区和 Windows 对 epoch 前时间的限制。
+local function formatDate(timestamp, format)
+    timestamp = math.floor(timestamp)
+    assert(timestamp >= -62135596800 and timestamp <= 253402300799, "Text: timestamp must be in years 1..9999")
+    local days = math.floor(timestamp / 86400) + 719162
+    local function daysBeforeYear(year)
+        local y = year - 1
+        return 365 * y + math.floor(y / 4) - math.floor(y / 100) + math.floor(y / 400)
+    end
+    local year = math.floor(days / 365.2425) + 1
+    while daysBeforeYear(year) > days do year -= 1 end
+    while daysBeforeYear(year + 1) <= days do year += 1 end
+    local day = days - daysBeforeYear(year) + 1
+    local monthDays = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
+    if year % 4 == 0 and (year % 100 ~= 0 or year % 400 == 0) then monthDays[2] = 29 end
+    local month = 1
+    while day > monthDays[month] do
+        day -= monthDays[month]
+        month += 1
+    end
+    local seconds = timestamp % 86400
+    local hour, minute, second = math.floor(seconds / 3600), math.floor(seconds % 3600 / 60), seconds % 60
+    if format == "datetime" or format == "iso8601" then
+        local date = string.format("%04d-%02d-%02d", year, month, day)
+        local time = string.format("%02d:%02d:%02d", hour, minute, second)
+        return date .. (format == "iso8601" and "T" or " ") .. time .. (format == "iso8601" and "Z" or "")
+    end
+    local date = string.format("%d/%d/%04d", month, day, year)
+    local time = string.format("%d:%02d %s", hour % 12 == 0 and 12 or hour % 12, minute, hour < 12 and "AM" or "PM")
+    if format == "shortdate" then return date end
+    if format == "shorttime" then return time end
+    return date .. " " .. time
+end
 -- 只模拟英文回退和参数展开，不加载游戏翻译器或查询译文。
 function Text.Tr(definition, arguments)
     Text.ValidateDefinition(definition)
@@ -302,10 +336,20 @@ function Text.Tr(definition, arguments)
         arguments = table.clone(arguments)
         arguments.item = Text.Tr(arguments.itemDefinition)
     end
+    local specifierType
     local result = string.gsub(definition.Source, "{([%w_]+):?([%w_]*)}", function(name, format)
         local argument = arguments[name]
         if argument == nil then argument = arguments[tonumber(name)] end
         assert(argument ~= nil, "Text: missing argument " .. name)
+        if format ~= "" then
+            assert(format == "translate" or format == "int" or format == "fixed" or format == "num"
+                or format == "hex" or format == "HEX" or dateFormats[format], "Text: unsupported format " .. format)
+            local kind = format == "translate" and "string" or "number"
+            assert(specifierType == nil or specifierType == kind, "Text: cannot mix string and number format specifiers")
+            specifierType = kind
+            if kind == "number" then argument = number(argument)
+            else assert(type(argument) == "string", "Text: translate argument must be a string") end
+        end
         if format == "int" then
             return string.format("%.0f", math.round(number(argument)))
         elseif format == "fixed" or format == "num" then
@@ -320,8 +364,12 @@ function Text.Tr(definition, arguments)
                 formatted = integer .. fraction
             end
             return formatted
+        elseif format == "hex" or format == "HEX" then
+            assert(argument >= -2^63 and argument < 2^64, "Text: hexadecimal argument is outside the 64-bit range")
+            return string.format(format == "HEX" and "%X" or "%x", argument)
+        elseif dateFormats[format] then
+            return formatDate(argument, format)
         end
-        assert(format == "" or format == "string" or format == "translate", "Text: unsupported format " .. format)
         assert(type(argument) == "string" or type(argument) == "number", "Text: argument must be a string or number")
         return tostring(argument)
     end)

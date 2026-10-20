@@ -69,10 +69,35 @@ self.ProgressTxt.Text = Text.Tr(TranslationTexts.Progress, {
 ## 翻译与预览
 
 `Text.Tr(definition, arguments?)` 接收 Key/Source 定义和独立参数。App 使用 Source 展开参数；省略 arguments
-时返回 Source。支持 `{name}`、数字索引 `{1}`、`:int`（四舍五入，无千位分隔）、
-`:fixed`（两位小数）、`:num`（英文千位分隔与两位小数），以及 `:string`、`:translate`
-的原值替换。参数缺失、非法定义或不支持的格式会报错；不模拟日期和其他原生格式。
+时返回 Source。支持 `{name}`、数字索引 `{1}` 和 Roblox 官方的全部 11 个格式说明符：
+
+| 说明符 | 参数 | App 英文回退预览 |
+| --- | --- | --- |
+| `int` | number | 四舍五入的整数，无千位分隔 |
+| `fixed` | number | 两位小数 |
+| `num` | number | 英文千位分隔与两位小数 |
+| `hex` / `HEX` | number | 小写 / 大写十六进制，负数使用 64 位补码 |
+| `datetime` | number，Unix 秒 | UTC `YYYY-MM-DD HH:mm:ss` |
+| `iso8601` | number，Unix 秒 | UTC `YYYY-MM-DDTHH:mm:ssZ` |
+| `shorttime` | number，Unix 秒 | UTC 英文 12 小时制，如 `1:45 PM` |
+| `shortdatetime` | number，Unix 秒 | UTC 英文短日期和时间，如 `10/10/2017 1:45 PM` |
+| `shortdate` | number，Unix 秒 | UTC 英文短日期，如 `10/10/2017` |
+| `translate` | string | 原值替换，不加载真实译文 |
+
+游戏中的 `:translate` 按参数原文查询译文，不能用它代替普通字符串占位符。
+数字说明符只接收有限 number，不自动转换数字字符串；`:translate` 只接收 string。
+同条文案不能混用字符串类（`:translate`）与数字类说明符；未指定格式的 `{name}`
+仍可与数字说明符组合，例如 `{name}: {count:int}`。
+十六进制使用 Luau number 可表示的数值，范围为 `-2^63 <= value < 2^64`。
+日期参数使用 Unix 秒，不传毫秒或已经格式化的日期字符串。App 取整秒，支持公历
+1..9999 年，包括 epoch 前时间与闰日；预览固定英文与 UTC，不跟随开发机时区或语言。
+游戏中的本地化数字、短日期和时间样式由 Roblox 的玩家语言决定，App 不模拟语言切换。
+禁止使用 `{name:string}`：Roblox 不支持 `:string`，App 传参求值时也会报错。
+参数缺失、类型错误、非法定义或不支持的格式会报错。
 缩写数量由调用方提供显示字符串，模板用 `{value}`；整数数量用 `{count:int}`。
+倒计时模板使用 `{minutes}:{seconds}` 或 `Next reward in {time}`；在参数侧用
+`string.format("%02d", ...)` 或 `string.format("%02d:%02d", ...)` 补零，不使用 `:string`。
+离线时长可用 `You were away for {hours}h {minutes}m`，minutes 由调用方提供补零后的字符串。
 参数含 itemDefinition 时，App 用该定义的 Source 得到 item，不修改调用方参数。
 
 `Text.TrSource(source)` 独立按原文查询；App 直接返回原文，不登记文案，不展开参数。
@@ -81,6 +106,8 @@ self.ProgressTxt.Text = Text.Tr(TranslationTexts.Progress, {
 只提供上述固定模块的 RequireShared（兼容 `Scripts/Game/Shared/Text`），不代表 App
 支持任意游戏模块或完整 FXLoader。
 源码保存和导出保留 Text 调用与 TranslationTexts，游戏使用自己的真实 Text 模块。
+已有 View 出现 `:string` 时，先修正源模板、验证参数变化后重新导出；导出不会自动改写
+占位符。修改 Source 保留 Key，并复核已有译文中的同类格式。
 
 ## 节点与验证
 

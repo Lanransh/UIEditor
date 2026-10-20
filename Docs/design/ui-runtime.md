@@ -22,10 +22,15 @@ App 运行时通过 `FX.Loader:RequireShared("Scripts.Game.Shared.Text")` 提供
 兼容模块，仅允许这一模块（兼容旧斜杠路径）。`Text.Define(prefix, sources)` 将业务前缀与
 PascalCase 条目名展开为只读 Key/Source 定义，校验名称和非空原文，不翻译或全局登记。
 `Text.Tr(definition, arguments?)` 校验非空 Key/Source，
-按 Source 展开参数；支持普通和数字索引占位符、int、fixed、num 及 string/translate
-原值替换，itemDefinition 按原文求值得到 item。无参数时返回 Source，不改变定义与参数。
+按 Source 展开参数；支持普通和数字索引占位符，以及 Roblox 全部 11 个说明符：
+int、fixed、num、hex、HEX、datetime、iso8601、shorttime、shortdatetime、shortdate、translate。
+十六进制负数使用 64 位补码；日期时间按 Unix 秒计算公历 1..9999 年，固定 UTC 与
+英文短日期/12 小时制预览，不读取开发机时区。translate 仅原值替换。
+数字说明符要求有限 number，translate 要求 string；同条文案不混用字符串类与数字类说明符。
+拒绝 Roblox 不支持的 `:string`，字符串及已格式化值使用普通占位符。
+itemDefinition 按原文求值得到 item。无参数时返回 Source，不改变定义与参数。
 `Text.TrSource(source)` 返回原文，不展开参数。ValidateDefinition/FromConfig 保持项目定义合同。
-不加载真实译文，不模拟日期格式或语言切换，非法定义、缺失参数及未支持格式明确报错。
+不加载真实译文，不模拟玩家语言切换，非法定义、缺失参数及未支持格式明确报错。
 保存和导出保留源码，由游戏真实 Text 接口处理翻译；不将模拟实现导出到游戏。
 
 公共本地化 skill 要求新增动态原文在各 Luau 顶层独立用 Text.Define 声明 TranslationTexts，

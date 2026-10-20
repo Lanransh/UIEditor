@@ -38,10 +38,17 @@ function Preview:Ctor(owner)
     assert(Text.Tr(Text.FromConfig("{1} / {2:int}"), {"Coins", 12}) == "Coins / 12")
     assert(Text.Tr({Key = "TextPreview.Format", Source = "{a:fixed} / {b:num} / {c:int}"}, {a = 12.5, b = -1234567.5, c = 0}) == "12.50 / -1,234,567.50 / 0")
     assert(Text.Tr({Key = "TextPreview.Name", Source = "{name:translate}"}, {name = "Coins"}) == "Coins")
+    assert(Text.Tr({Key = "TextPreview.Countdown", Source = "{minutes}:{seconds}"}, {
+        minutes = string.format("%02d", 3), seconds = string.format("%02d", 7),
+    }) == "03:07")
+    assert(Text.Tr({Key = "TextPreview.NextReward", Source = "Next reward in {time}"}, {time = "03:07"}) == "Next reward in 03:07")
+    assert(Text.Tr({Key = "TextPreview.AwayDuration", Source = "You were away for {hours}h {minutes}m"}, {
+        hours = 2, minutes = string.format("%02d", 7),
+    }) == "You were away for 2h 07m")
     assert(not pcall(Text.Tr, "Old literal"))
     assert(not pcall(Text.Tr, {Key = " ", Source = "text"}))
     assert(not pcall(Text.Tr, {Key = "TextPreview.Missing", Source = "{count}"}, {}))
-    assert(not pcall(Text.Tr, {Key = "TextPreview.Unsupported", Source = "{date:datetime}"}, {date = 0}))
+    assert(not pcall(Text.Tr, {Key = "TextPreview.Unsupported", Source = "{date:unknown}"}, {date = 0}))
     assert(not pcall(function() FX.Loader:RequireShared("Other/Module") end))
     assert(not pcall(function() Text.Tr = function() end end))
 end
@@ -57,6 +64,121 @@ return Preview`;
     assert.ok(JSON.stringify(exported).includes('Text.Define'));
     assert.ok(!JSON.stringify(exported).includes('TextPreview.Format'));
   } finally { await session.stop(); }
+});
+
+test('Text.Tr rejects unsupported string specifiers in welfare text during preview', async () => {
+  const document = strategy.createDocument('InvalidTextFormat');
+  document.scripts.source = `local FX = _G.FX
+local Text = FX.Loader:RequireShared("Scripts.Game.Shared.Text")
+local UI = FX.Class("CInvalidTextFormatView", "CUIView")
+function UI:OnReady()
+    for _, source in ipairs({
+        "{minutes:string}:{seconds:string}",
+        "Next reward in {time:string}",
+        "You were away for {hours:int}h {minutes:string}m",
+    }) do
+        local ok, message = pcall(Text.Tr, {Key = "Welfare.Invalid", Source = source}, {
+            minutes = "07", seconds = "03", time = "07:03", hours = 2,
+        })
+        assert(not ok, "Unsupported :string was accepted: " .. source)
+        assert(string.find(tostring(message), "Text: unsupported format string", 1, true), tostring(message))
+    end
+end
+return UI`;
+  document.scripts.integration = 'return _G.FX.Class("CInvalidTextFormatPreview", "CInvalidTextFormatView")';
+  const { session } = await LuauSession.start(resolve('native-bin'), document);
+  await session.stop();
+});
+
+test('Text.Tr supports every Roblox format specifier and preserves templates on export', async () => {
+  const document = strategy.createDocument('RobloxTextFormats');
+  const label = strategy.createNode('TextLabel');
+  document.root.children.push(label);
+  document.scripts.source = `local FX = _G.FX
+local Text = FX.Loader:RequireShared("Scripts.Game.Shared.Text")
+local TranslationTexts = Text.Define("RobloxFormats", {
+    Timestamp = "{time:iso8601}",
+})
+local UI = FX.Class("CRobloxTextFormatsView", "CUIView")
+function UI:OnReady()
+    local cases = {
+        {"{value}", "Player%1", "Player%1"},
+        {"{value:int}", 99.8, "100"},
+        {"{value:fixed}", -12.5, "-12.50"},
+        {"{value:num}", 1234567.5, "1,234,567.50"},
+        {"{value:hex}", 1023, "3ff"},
+        {"{value:HEX}", 1023, "3FF"},
+        {"{value:hex}", 0, "0"},
+        {"{value:hex}", 4294967296, "100000000"},
+        {"{value:hex}", -1, "ffffffffffffffff"},
+        {"{value:HEX}", -1023, "FFFFFFFFFFFFFC01"},
+        {"{value:hex}", -9223372036854775808, "8000000000000000"},
+        {"{value:datetime}", 1507642690, "2017-10-10 13:38:10"},
+        {"{value:iso8601}", 1507845758, "2017-10-12T22:02:38Z"},
+        {"{value:shorttime}", 1507642690, "1:38 PM"},
+        {"{value:shortdatetime}", 1507642690, "10/10/2017 1:38 PM"},
+        {"{value:shortdate}", 1507642690, "10/10/2017"},
+        {"{value:translate}", "Coins", "Coins"},
+        {"{value:iso8601}", 0, "1970-01-01T00:00:00Z"},
+        {"{value:shorttime}", 0, "12:00 AM"},
+        {"{value:shorttime}", 43200, "12:00 PM"},
+        {"{value:iso8601}", -1, "1969-12-31T23:59:59Z"},
+        {"{value:iso8601}", 951782400, "2000-02-29T00:00:00Z"},
+        {"{value:iso8601}", 4107542400, "2100-03-01T00:00:00Z"},
+        {"{value:iso8601}", 0.9, "1970-01-01T00:00:00Z"},
+        {"{value:iso8601}", -62135596800, "0001-01-01T00:00:00Z"},
+        {"{value:iso8601}", 253402300799, "9999-12-31T23:59:59Z"},
+    }
+    for _, case in ipairs(cases) do
+        local arguments = {value = case[2]}
+        local result = Text.Tr({Key = "RobloxFormats.Case", Source = case[1]}, arguments)
+        assert(result == case[3], case[1] .. ": expected " .. case[3] .. ", got " .. result)
+        assert(arguments.value == case[2])
+    end
+    assert(Text.Tr({Key = "RobloxFormats.Index", Source = "{1:HEX} / {2:fixed}"}, {1023, 12.5}) == "3FF / 12.50")
+    assert(Text.Tr({Key = "RobloxFormats.MixedPlain", Source = "{name}: {count:int}"}, {name = "Coins", count = 12}) == "Coins: 12")
+    self:GetRootNode():GetChildren()[1].Text = Text.Tr(TranslationTexts.Timestamp, {time = 1507845758})
+end
+return UI`;
+  document.scripts.integration = 'return _G.FX.Class("CRobloxTextFormatsPreview", "CRobloxTextFormatsView")';
+  const original = JSON.stringify(document);
+  const { session, frame } = await LuauSession.start(resolve('native-bin'), document);
+  try {
+    assert.equal(frame.document.root.children[0].properties.Text, '2017-10-12T22:02:38Z');
+    assert.equal(JSON.stringify(document), original);
+    const loaded = strategy.validate(JSON.parse(original));
+    assert.equal(loaded.scripts.source, document.scripts.source);
+    const exported = createRobloxImportPackage(loaded);
+    assert.ok(JSON.stringify(exported).includes('{time:iso8601}'));
+    assert.ok(!JSON.stringify(exported).includes('CRobloxTextFormatsPreview'));
+  } finally { await session.stop(); }
+});
+
+test('Text.Tr validates format argument types, finite values and incompatible specifier types', async () => {
+  const document = strategy.createDocument('RobloxTextValidation');
+  document.scripts.source = `local FX = _G.FX
+local Text = FX.Loader:RequireShared("Scripts.Game.Shared.Text")
+local UI = FX.Class("CRobloxTextValidationView", "CUIView")
+function UI:OnReady()
+    for _, format in ipairs({"int", "fixed", "num", "hex", "HEX", "datetime", "iso8601", "shorttime", "shortdatetime", "shortdate"}) do
+        local definition = {Key = "RobloxFormats.Invalid", Source = "{value:" .. format .. "}"}
+        for _, argument in ipairs({"12", true, {}, math.huge, -math.huge, 0/0}) do
+            assert(not pcall(Text.Tr, definition, {value = argument}), "Accepted invalid " .. format .. " argument")
+        end
+        assert(not pcall(Text.Tr, definition, {}))
+    end
+    assert(not pcall(Text.Tr, {Key = "RobloxFormats.Invalid", Source = "{value:translate}"}, {value = 12}))
+    assert(not pcall(Text.Tr, {Key = "RobloxFormats.Invalid", Source = "{value:hex}"}, {value = 2^64}))
+    assert(not pcall(Text.Tr, {Key = "RobloxFormats.Invalid", Source = "{value:hex}"}, {value = -2^64}))
+    assert(not pcall(Text.Tr, {Key = "RobloxFormats.Invalid", Source = "{value:iso8601}"}, {value = 1e30}))
+    for _, source in ipairs({"{name:translate} {count:int}", "{count:num} {name:translate}"}) do
+        assert(not pcall(Text.Tr, {Key = "RobloxFormats.Invalid", Source = source}, {name = "Coins", count = 12}))
+    end
+end
+return UI`;
+  document.scripts.integration = 'return _G.FX.Class("CRobloxTextValidationPreview", "CRobloxTextValidationView")';
+  const { session } = await LuauSession.start(resolve('native-bin'), document);
+  await session.stop();
 });
 
 test('Text.Define expands stable keys, freezes results and validates names and sources without a global registry', async () => {
