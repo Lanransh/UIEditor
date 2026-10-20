@@ -102,7 +102,7 @@ export class RobloxProjectStrategy implements ProjectStrategy {
     let count = 0;
     const check = (value: unknown, depth: number): UINode => {
       if (++count > 5000 || depth > 64) throw new Error('界面最多支持 5000 个节点、64 层。');
-      if (!isRecord(value) || Object.keys(value).some(key => !['id', 'name', 'className', 'properties', 'children', 'previewImage', 'imageAssetId'].includes(key)) || typeof value.id !== 'string' || !value.id.trim() || ids.has(value.id) || typeof value.name !== 'string' || !value.name.trim() || typeof value.className !== 'string' || !Object.hasOwn(this.nodes, value.className) || !Array.isArray(value.children)) throw new Error('节点类型、名称、ID 或层级无效（ID 不可重复）。');
+      if (!isRecord(value) || Object.keys(value).some(key => !['id', 'name', 'className', 'properties', 'children', 'imageAssetId'].includes(key)) || typeof value.id !== 'string' || !value.id.trim() || ids.has(value.id) || typeof value.name !== 'string' || !value.name.trim() || typeof value.className !== 'string' || !Object.hasOwn(this.nodes, value.className) || !Array.isArray(value.children)) throw new Error('节点类型、名称、ID 或层级无效（ID 不可重复）。');
       if (Object.hasOwn(value, 'imageAssetId') && (!value.className.startsWith('Image') || typeof value.imageAssetId !== 'string' || !value.imageAssetId.trim() || value.imageAssetId.length > 160)) throw new Error('图片资产引用无效。');
       ids.add(value.id);
       const definition = this.nodes[value.className];
@@ -117,10 +117,6 @@ export class RobloxProjectStrategy implements ProjectStrategy {
       const p = value.properties;
       if (value.className === 'UISizeConstraint' && ((p.MinSize as Vector2).x > (p.MaxSize as Vector2).x || (p.MinSize as Vector2).y > (p.MaxSize as Vector2).y)) throw new Error('最小尺寸不能大于最大尺寸。');
       if (value.className === 'UITextSizeConstraint' && (p.MinTextSize as number) > (p.MaxTextSize as number)) throw new Error('最小字号不能大于最大字号。');
-      if (isRecord(value.previewImage) || Object.hasOwn(value, 'previewImage')) {
-        const preview = value.previewImage;
-        if (!value.className.startsWith('Image') || !exact(preview, ['name', 'dataUrl']) || typeof preview.name !== 'string' || typeof preview.dataUrl !== 'string' || preview.dataUrl.length > 14 * 1024 * 1024 || !/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/.test(preview.dataUrl)) throw new Error('本地预览图片无效，仅支持 PNG/JPEG/WebP/GIF。');
-      }
       const node = value as unknown as UINode;
       if (definition.category === 'component' && node.children.length) throw new Error('辅助节点不能包含子节点。');
       node.children.forEach(child => {

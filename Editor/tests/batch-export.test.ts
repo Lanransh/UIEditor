@@ -236,3 +236,12 @@ test('a failed retry preflight cannot discard an unresolved submission', async (
   assert.deepEqual(result.map(item => item.status), ['uncertain', 'skipped']);
   assert.equal(result[0].document, document);
 });
+
+
+test('freezing export snapshots cannot hide unconfigured image references', () => {
+  const document = strategy.createDocument('MissingImage');
+  const image = strategy.createNode('ImageLabel'); image.imageAssetId = 'missing';
+  document.root.children.push(image);
+  const snapshot = createBatchExportSnapshot(document, []);
+  assert.equal(snapshot.root.children[0].imageAssetId, 'missing');
+});

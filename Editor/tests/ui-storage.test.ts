@@ -95,16 +95,18 @@ test('模板参考保存于工程目录，与项目UI隔离且校验资产路径
   await assert.rejects(openDocumentAsset(project, path, 'templates'), /JSON/);
 });
 
-test('预览图片嵌入后不依赖原路径，拒绝非图片和外部 URL', async () => {
+test('节点拒绝旧预览字段，图片文件仍可供资产库读取', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'ui-image-'));
   const path = join(directory, '图标.png');
   await writeFile(path, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6ioAAAAASUVORK5CYII=', 'base64'));
   const preview = await readPreviewImage(path);
   const document = robloxStrategy.createDocument(), image = robloxStrategy.createNode('ImageLabel');
-  image.previewImage = preview; document.root.children.push(image);
-  const savedPath = join(directory, '界面.rbxui.json'); await writeDocument(savedPath, document);
-  assert.deepEqual((await readDocument(savedPath)).root.children[0].previewImage, preview);
-  image.previewImage.dataUrl = 'https://example.com/image.png'; assert.throws(() => robloxStrategy.validate(document));
+  Object.assign(image, { previewImage: preview }); document.root.children.push(image);
+  const savedPath = join(directory, '界面.rbxui.json');
+  assert.throws(() => robloxStrategy.validate(document));
+  await assert.rejects(writeDocument(savedPath, document));
+  await writeFile(savedPath, JSON.stringify(document));
+  await assert.rejects(readDocument(savedPath));
   await writeFile(path, 'not an image'); await assert.rejects(readPreviewImage(path));
   assert.equal(safeFileName('../在线:奖励'), '.._在线_奖励');
   assert.equal(safeFileName('CON'), '_CON');

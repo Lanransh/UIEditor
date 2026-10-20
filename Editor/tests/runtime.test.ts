@@ -402,7 +402,7 @@ test('runtime templates clone independently, attach, dispatch and destroy withou
   const template = robloxStrategy.createNode('ImageLabel');
   template.name = 'Template';
   template.imageAssetId = 'reward-icon';
-  template.previewImage = { name: 'reward.png', dataUrl: 'data:image/png;base64,YQ==' };
+  template.properties.Image = 'rbxassetid://123';
   const button = robloxStrategy.createNode('TextButton');
   button.name = 'Claim';
   template.children.push(button, robloxStrategy.createNode('UICorner'));
@@ -439,7 +439,8 @@ end`);
     const second = frame.document.root.children.find(node => node.name === 'online_10')!;
     assert.notEqual(first.id, template.id);
     assert.notEqual(first.children[0].id, second.children[0].id);
-    assert.deepEqual(first.previewImage, template.previewImage);
+    assert.equal('previewImage' in first, false);
+    assert.equal(first.properties.Image, template.properties.Image);
     assert.equal(first.imageAssetId, template.imageAssetId);
     assert.equal(first.children[0].properties.Text, 'online_5');
     assert.equal(second.children[0].properties.Text, 'online_10');

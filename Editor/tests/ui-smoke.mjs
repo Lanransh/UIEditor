@@ -108,8 +108,14 @@ try {
   assert.ok(await page.getByTestId('ui-artboard').getByText('缺少预览图片', { exact: true }).isVisible());
   const imageFile = join(root, '图标.png');
   await writeFile(imageFile, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6ioAAAAASUVORK5CYII=', 'base64'));
-  await dialogs(imageFile); await page.getByRole('button', { name: '选择预览图片', exact: true }).click();
-  await page.getByText('图标.png', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: '选择预览图片', exact: true }).count(), 0);
+  await page.getByRole('button', { name: '图片资产', exact: true }).click();
+  await dialogs(imageFile); await page.getByRole('button', { name: '导入本地图片', exact: true }).click();
+  await page.getByRole('button', { name: '图片资产 图标', exact: true }).waitFor();
+  await select('奖励图标');
+  await page.getByRole('button', { name: '图片资产 图标', exact: true }).click({button:'right'});
+  await page.getByRole('menuitem', { name: '应用到选中节点', exact: true }).click();
+  await page.getByRole('button', { name: 'UI 资产', exact: true }).click();
   await select('主面板'); await add('TextButton'); await input('节点名称', '领取'); await input('Text', '领取奖励'); await input('Position.y.offset', 260);
   // Selected nodes can be renamed inline from F2 or a double click.
   await select('领取');
@@ -137,7 +143,8 @@ try {
   await page.getByRole('button', { name: 'UI 资产 在线奖励', exact: true }).waitFor();
   assert.equal(saved.root.children[0].children.length, 4);
   assert.equal(saved.root.children[0].children[1].properties.AutoLocalize, false);
-  assert.equal(saved.root.children[0].children[2].previewImage.name, '图标.png');
+  assert.equal('previewImage' in saved.root.children[0].children[2], false);
+  assert.ok(saved.root.children[0].children[2].imageAssetId);
   assert.equal('state' in saved, false); assert.equal('config' in saved, false);
   // Compact icon/name rows and native tree drag, including collapsed destinations.
   assert.equal(await page.locator('.node-select img').count(), 6);

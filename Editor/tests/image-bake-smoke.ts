@@ -37,7 +37,11 @@ const env: Record<string, string> = { ...process.env, UI_EDITOR_BACKGROUND: '1',
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({ args: ['.'], env, timeout: 15000 });
 const page = await app.firstWindow();
-button.previewImage = { name: 'SolidBlue.png', dataUrl: await app.evaluate(({ nativeImage }) => nativeImage.createFromBitmap(Buffer.from([255, 0, 0, 255]), { width: 1, height: 1 }).toDataURL()) };
+const bluePreview = { name: 'SolidBlue.png', dataUrl: await app.evaluate(({ nativeImage }) => nativeImage.createFromBitmap(Buffer.from([255, 0, 0, 255]), { width: 1, height: 1 }).toDataURL()) };
+const blueAsset = { id: 'blue', platform: 'roblox', library: 'permanent', name: 'Blue', tags: '', usage: 'image', robloxId: 'rbxassetid://123', previewImage: bluePreview };
+await mkdir(join(temporary, 'SharedAssets', 'image-assets'), { recursive: true });
+await writeFile(join(temporary, 'SharedAssets', 'image-assets', 'catalog.json'), JSON.stringify({ version: 2, assets: [blueAsset] }));
+button.properties.Image = blueAsset.robloxId;
 await writeFile(file, JSON.stringify(document));
 page.setDefaultTimeout(15000);
 const errors: string[] = [];

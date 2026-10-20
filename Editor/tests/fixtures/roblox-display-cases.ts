@@ -1,3 +1,4 @@
+import type { ImageAsset } from '../../src/shared/imageAssets';
 import { robloxStrategy as strategy } from '../../src/editor/roblox';
 import { allNodes, dim, dim2, type UIDocument, type UINode } from '../../src/shared/uiDocument';
 import type { PropertyDefinition } from '../../src/editor/strategy';
@@ -15,7 +16,7 @@ function values(key: string, p: PropertyDefinition): unknown[] {
   }
 }
 
-export interface DisplayCase { id: string; className: string; property: string; value: unknown; document: UIDocument; targetId: string }
+export interface DisplayCase { id: string; className: string; property: string; value: unknown; document: UIDocument; targetId: string; imageAssets?: ImageAsset[] }
 export const displayCases: DisplayCase[] = [];
 for (const [className, definition] of Object.entries(strategy.nodes)) {
   const variants = [{ property: '(default)', value: null }, ...Object.entries(definition.properties).flatMap(([property, p]) => values(property, p).map(value => ({ property, value })))];
@@ -90,23 +91,23 @@ effect('UIGridLayout', 'constrained-scaled-cell', d => {
 });
 
 // Same 256px placeholder as rbxasset://textures/ui/GuiImagePlaceholder.png.
-const placeholder = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAAAAAB5Gfe6AAAD1klEQVR42u3d61biMBSGYe//2jaWo6DIsUgpVtvmCmZN4rBFSxaOrlWbvN/PAD/6kOwcqvTGRJ4bAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIA4AdLppLVM0/YBNtJqNq0D9KXV9FsHkJYDwK8A6CUtpPeLAKamhUwBAAAAAAAAAAAAAAAAAAAA+LUAZZauN0/HSAHq7URckodjhAC7gYjm/iUygHou50nyqADqiXzKU0wA9/I5vTwegI249BfZMU9n4pKUsQCUidisa2NTjMVmGQvA0nX5TEvC1LW8RgLgOkBqNNXQdYk4AHLbPDprO9i2cRwAa+0AGtcFanM5+fYYCMDcNn8Y74+2sXE9qG9YhwHgpr3GbpGbS9np61ECVH0tElEOgZW4pJEWwZeeuCRVnNOg7h2WsS2ElMyl9xLjUngkmlmEm6FUbFZik0e3Ha6c19zcafGI6kBkYV++LU0hNmlkR2JF71QgH7WnRHIoqtcyrLV4LKI6Fj+Izf598ShCuzEyP5rG6BLxzrg4tWlEt8a25995JjZZqDdH89WualoyPH6sCIECpCIyUYGmul+IzTZIgEJr/OXLXShJUAB6UtIrjK/Dl7c6KAIDOIiLfmAvNoemnUERHsBQ5PyCa9cy80yMIQGk4qJdfqNDomlpFBhAlcgp2/ejfXmhVgzrsACWorkt9fA0qS6dEK7DAdA930q3O89ik3o2yOEAaLfWpa/bKYx8RyQBAeSnwjZ8+9DedwC2OzGFAjA6TW3ZG8VAp0DP+wMB0G9U14N6CO7rMYEA6JjWcqhToLdmhAGwPKvqC/mXfmWM/2bZJgQAndf1DMBlZzSeqbCDAP7unIrL+JphEwBA/umYayw2+VWFs9sAerkToznalofrps5uA2iHf/749xDD8srFU8cBqn7TWH6ar16vrh2dBtAp0Bf/VNhpgFe9iK9GD0i7CqD3iQe18cc/FXYWwF/IvrCH6C7ARGyG/xuxuesswF5+JllXAe7lZzLvKsCsBYAgh8ChawAqMB18P7OMf54GAAAAAAAAAAAAAAAAAAAA4C8AP6zMT2sDIMLP6/OABR6xwUNWAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACiyx86V8OKVEbklQAAAABJRU5ErkJggg==';
+export const placeholder = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAAAAAB5Gfe6AAAD1klEQVR42u3d61biMBSGYe//2jaWo6DIsUgpVtvmCmZN4rBFSxaOrlWbvN/PAD/6kOwcqvTGRJ4bAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIA4AdLppLVM0/YBNtJqNq0D9KXV9FsHkJYDwK8A6CUtpPeLAKamhUwBAAAAAAAAAAAAAAAAAAAA+LUAZZauN0/HSAHq7URckodjhAC7gYjm/iUygHou50nyqADqiXzKU0wA9/I5vTwegI249BfZMU9n4pKUsQCUidisa2NTjMVmGQvA0nX5TEvC1LW8RgLgOkBqNNXQdYk4AHLbPDprO9i2cRwAa+0AGtcFanM5+fYYCMDcNn8Y74+2sXE9qG9YhwHgpr3GbpGbS9np61ECVH0tElEOgZW4pJEWwZeeuCRVnNOg7h2WsS2ElMyl9xLjUngkmlmEm6FUbFZik0e3Ha6c19zcafGI6kBkYV++LU0hNmlkR2JF71QgH7WnRHIoqtcyrLV4LKI6Fj+Izf598ShCuzEyP5rG6BLxzrg4tWlEt8a25995JjZZqDdH89WualoyPH6sCIECpCIyUYGmul+IzTZIgEJr/OXLXShJUAB6UtIrjK/Dl7c6KAIDOIiLfmAvNoemnUERHsBQ5PyCa9cy80yMIQGk4qJdfqNDomlpFBhAlcgp2/ejfXmhVgzrsACWorkt9fA0qS6dEK7DAdA930q3O89ik3o2yOEAaLfWpa/bKYx8RyQBAeSnwjZ8+9DedwC2OzGFAjA6TW3ZG8VAp0DP+wMB0G9U14N6CO7rMYEA6JjWcqhToLdmhAGwPKvqC/mXfmWM/2bZJgQAndf1DMBlZzSeqbCDAP7unIrL+JphEwBA/umYayw2+VWFs9sAerkToznalofrps5uA2iHf/749xDD8srFU8cBqn7TWH6ar16vrh2dBtAp0Bf/VNhpgFe9iK9GD0i7CqD3iQe18cc/FXYWwF/IvrCH6C7ARGyG/xuxuesswF5+JllXAe7lZzLvKsCsBYAgh8ChawAqMB18P7OMf54GAAAAAAAAAAAAAAAAAAAA4C8AP6zMT2sDIMLP6/OABR6xwUNWAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACiyx86V8OKVEbklQAAAABJRU5ErkJggg==';
 for (const className of ['ImageLabel', 'ImageButton']) {
   effect(className, 'image-stud-tile', d => {
     const image = d.root.children[0].children[0]; image.properties.ScaleType = 'Tile'; image.properties.TileSize = dim2(27, 27);
-    image.previewImage = { name: 'GuiImagePlaceholder.png', dataUrl: placeholder }; image.children = [];
+    image.properties.Image = 'rbxasset://textures/ui/GuiImagePlaceholder.png'; image.children = [];
   });
   for (const scaleType of ['Fit', 'Stretch', 'Crop', 'Tile']) effect(className, `image-${scaleType}`, d => {
     const image = d.root.children[0].children[0]; image.properties.Image = 'rbxasset://textures/ui/GuiImagePlaceholder.png'; image.properties.ScaleType = scaleType;
-    image.previewImage = { name: 'GuiImagePlaceholder.png', dataUrl: placeholder }; image.children = [];
+    image.properties.Image = 'rbxasset://textures/ui/GuiImagePlaceholder.png'; image.children = [];
   });
   effect(className, 'image-tint', d => {
     const image = d.root.children[0].children[0]; image.properties.Image = 'rbxasset://textures/ui/GuiImagePlaceholder.png'; image.properties.ImageColor3 = '#d84c72';
-    image.previewImage = { name: 'GuiImagePlaceholder.png', dataUrl: placeholder }; image.children = [];
+    image.properties.Image = 'rbxasset://textures/ui/GuiImagePlaceholder.png'; image.children = [];
   });
   effect(className, 'image-transparency', d => {
     const image = d.root.children[0].children[0]; image.properties.Image = 'rbxasset://textures/ui/GuiImagePlaceholder.png'; image.properties.ImageTransparency = .5;
-    image.previewImage = { name: 'GuiImagePlaceholder.png', dataUrl: placeholder }; image.children = [];
+    image.properties.Image = 'rbxasset://textures/ui/GuiImagePlaceholder.png'; image.children = [];
   });
 }
 
@@ -132,7 +133,7 @@ effect('UIGradient', 'color-alpha-interpolation', d => {
 });
 effect('ImageLabel', 'image-gradient', d => {
   const image = d.root.children[0].children[0]; image.properties.Image = 'rbxasset://textures/ui/GuiImagePlaceholder.png'; image.properties.ImageColor3 = '#d84c72';
-  image.previewImage = { name: 'GuiImagePlaceholder.png', dataUrl: placeholder }; image.children = [strategy.createNode('UIGradient')];
+  image.properties.Image = 'rbxasset://textures/ui/GuiImagePlaceholder.png'; image.children = [strategy.createNode('UIGradient')];
   image.children[0].properties.TransparencyStart = .2; image.children[0].properties.TransparencyEnd = .7;
 });
 for (const [name, width, height, canvasWidth, canvasHeight, x, y] of [

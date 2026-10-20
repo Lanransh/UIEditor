@@ -144,9 +144,8 @@ export async function readTemplateStyle(directory: string): Promise<{ files: Sty
       if (file.content.length > 32 * 1024 * 1024) throw new Error('界面文件超过 32 MiB。');
       const document = await readDocument(join(directory, file.path));
       const visit = (node: typeof document.root) => {
-        // A catalog-only reference would depend on the author's global/project
-        // image library. Templates must carry their own editable image snapshot.
-        if (node.imageAssetId) throw new Error(`图片节点 ${node.name} 仍关联来源图片库 imageAssetId；请使用嵌入 previewImage 与 Image 的独立快照。`);
+        // Templates keep platform image IDs, independent of the source catalog.
+        if (node.imageAssetId) throw new Error(`图片节点 ${node.name} 仍关联来源图片库 imageAssetId；请仅保存独立的 Image 资源 ID。`);
         node.children.forEach(visit);
       };
       visit(document.root);

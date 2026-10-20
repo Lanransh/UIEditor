@@ -88,15 +88,11 @@ function nodes.setProperties(id, properties)
     end
     changed()
 end
-function nodes.setPreviewImage(id, previewImage)
-    local node = required(id)
-    assert(node.className == "ImageLabel" or node.className == "ImageButton", "Preview images require an image node")
-    node.previewImage = previewImage and clone(previewImage) or nil
-    node.imageAssetId = nil
-    changed()
-end
 function nodes.create(className, options)
     options = options or {}
+    for key in pairs(options) do
+        assert(key == "parentId" or key == "name" or key == "properties", "Unsupported node option: " .. tostring(key))
+    end
     local definition = assert(definitions[className], "Unsupported node type")
     assert(definition.category ~= "root", "Cannot create another root")
     local parent = required(options.parentId or document.root.id)
@@ -104,7 +100,6 @@ function nodes.create(className, options)
     for key, property in pairs(definition.properties) do node.properties[key] = clone(property.value) end
     table.insert(parent.children, node)
     if options.properties then nodes.setProperties(node.id, options.properties) end
-    if options.previewImage then nodes.setPreviewImage(node.id, options.previewImage) end
     changed()
     return snapshot(node)
 end
@@ -151,7 +146,6 @@ function assets.apply(id, assetId)
     assert(node.className == "ImageLabel" or node.className == "ImageButton", "Assets require an image node")
     local asset = assert(imageAssets[assetId], "Unknown image asset ID")
     node.imageAssetId = asset.id
-    node.previewImage = nil -- Electron attaches the catalog preview after the transaction.
     node.properties.Image = asset.robloxId
     node.properties.BackgroundTransparency = 1
     node.properties.ScaleType = asset.usage == "tile" and "Tile" or "Fit"

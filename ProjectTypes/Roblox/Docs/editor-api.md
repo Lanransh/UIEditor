@@ -15,7 +15,7 @@
 | `ui.nodes.get(id)` | 节点快照，不能通过直接修改快照写入文档 |
 | `ui.nodes.children(id)` | 直属子节点快照数组 |
 | `ui.nodes.find(options)` | 分页查询，返回 nodes、total、nextOffset |
-| `ui.nodes.create(className, {parentId?,name?,properties?,previewImage?})` | 创建并返回节点快照，父节点缺省为根 |
+| `ui.nodes.create(className, {parentId?,name?,properties?})` | 创建并返回节点快照，父节点缺省为根 |
 | `ui.nodes.setProperties(id, properties)` | 更新传入属性，其他属性保留 |
 | `ui.nodes.setPreviewImage(id, {name,dataUrl} 或 nil)` | ImageLabel/ImageButton 附加嵌入式预览图；nil 清除。事务结束校验格式与长度 |
 | `ui.nodes.rename(id, name)` | 修改名称 |
@@ -27,7 +27,7 @@
 
 属性支持 UDim.new、UDim2.new/fromScale/fromOffset、Vector2.new、Color3.new/fromRGB/fromHex、Enum，以及现有 JSON 属性形式。没有隐式像素与 Scale 换算。
 
-平铺图片使用 ImageLabel 的 ScaleType=Enum.ScaleType.Tile，TileSize 按所选风格或模板设置。previewImage.dataUrl 只接受已在本地取得的 PNG/JPEG/WebP/GIF base64 Data URL，不传远程链接或文件路径；Image 仍单独保存真实 Roblox 资源 ID。制作 VM 本身不能读取文件或下载资源。
+平铺图片使用 ImageLabel 的 ScaleType=Enum.ScaleType.Tile，TileSize 按所选风格或模板设置。节点不支持 previewImage 或 setPreviewImage；使用 ui.assets.apply 绑定图片库，或设置 Image 资源 ID。本地预览从图片库查找，图片数据不嵌入节点。制作 VM 本身不能读取文件或下载资源。
 
 `find` 与 MCP 查询共同采用名称 exact/contains、className、parentId、recursive、offset、limit。默认递归，默认 50 条，最多 200 条。过滤条件取交集。parentId 指定时不包含父节点自身；recursive=false 只查直属子节点。
 
@@ -52,8 +52,8 @@ library 支持 project（默认）、templates、permanent。永久UI全局读�
 library 也可明确选择 permanent；导入只读取 PNG/JPEG/WebP/GIF 普通文件，单张不超过 8 MiB，
 不接受远程链接，不上传 Roblox，robloxId 初始为空。成功立即保存资产库，返回资产摘要
 （含 id，不含 previewImage）和新会话；导入不进入文档撤销历史，也不修改节点。
-重读状态后在 `code.execute` 中调用 `ui.assets.apply(nodeId,assetId)`，节点引用和预览快照
-一起进入文档历史。运行时禁止导入。仅设置 `previewImage` 不会在底部图片库登记素材。
+重读状态后在 `code.execute` 中调用 `ui.assets.apply(nodeId,assetId)`，节点引用和 Image
+一起进入文档历史。运行时禁止导入。节点不接受 `previewImage`，不提供旧字段升级。
 
 ## 历史、文件与运行边界
 

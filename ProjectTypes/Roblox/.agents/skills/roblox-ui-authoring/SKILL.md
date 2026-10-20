@@ -39,7 +39,7 @@ View 使用本文件 TranslationTexts 和 Text.Tr 定义模板及参数；静态
    保留稳定节点 ID 和任务外内容。布局单位明确为 Scale/Offset。
    本地图片先用 uie.assets.search 查询复用；缺少时通过 uie.assets.import 将绝对路径文件导入
    项目图片库（library="project"，不上传，Roblox ID 保持空白），再重读会话并在 code.execute
-   中用 ui.assets.apply(nodeId,assetId) 绑定。只写 previewImage 不会登记到底部图片库。
+   中用 ui.assets.apply(nodeId,assetId) 绑定。节点不支持 previewImage 或 setPreviewImage，本地预览从图片库查找，图片数据不嵌入 UI。
    同一素材复用同一资产 ID；应用已有节点时保留位置、尺寸、层级及原有样式。
    游戏数据决定的动态图可先使用占位图；静态图缺少资源时也使用占位图（如重生图标）。
    保留可替换的图片节点，具体遵循业务接入参考的贴图与占位图约定。

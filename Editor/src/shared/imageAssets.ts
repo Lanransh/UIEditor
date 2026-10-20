@@ -1,10 +1,11 @@
 import type { Result } from './project';
 import type { UIDocument, UINode } from './uiDocument';
+import builtins from '../assets/images/builtins.json';
 
 export type ImageLibrary = 'permanent' | 'project';
 export interface ImageAsset {
   id: string; platform: 'roblox'; library: ImageLibrary;
-  name: string; tags: string; previewImage: NonNullable<UINode['previewImage']>;
+  name: string; tags: string; previewImage: { name: string; dataUrl: string };
   robloxId: string;
   usage: 'image' | 'tile' | 'placeholder';
   folder?: string;
@@ -36,7 +37,7 @@ export function normalizeRobloxId(value: unknown): string {
 }
 export function applyImageAsset(node: UINode, asset: ImageAsset, defaults = true): UINode {
   if (!['ImageLabel', 'ImageButton'].includes(node.className)) throw new Error('图片资产只能应用到 ImageLabel 或 ImageButton。');
-  return { ...node, imageAssetId: asset.id, previewImage: { ...asset.previewImage }, properties: {
+  return { ...node, imageAssetId: asset.id, properties: {
     ...node.properties, Image: asset.robloxId,
     ...(defaults ? { BackgroundTransparency: 1, ScaleType: asset.usage === 'tile' ? 'Tile' : 'Fit',
       ...(asset.usage === 'tile' ? { TileSize: { x: { scale: 0, offset: 27 }, y: { scale: 0, offset: 27 } } } : {}) } : {}),
@@ -47,10 +48,20 @@ export function resolveImageAssets(document: UIDocument, assets: ImageAsset[]): 
   const visit = (node: UINode): UINode => {
     const asset = node.imageAssetId ? index.get(node.imageAssetId) : undefined;
     const children = node.children.map(visit);
-    const imageChanged = asset && (node.properties.Image !== asset.robloxId || node.previewImage?.name !== asset.previewImage.name || node.previewImage?.dataUrl !== asset.previewImage.dataUrl);
+    const imageChanged = asset && node.properties.Image !== asset.robloxId;
     if (!imageChanged && children.every((child, index) => child === node.children[index])) return node;
     return { ...(imageChanged ? applyImageAsset(node, asset, false) : node), children };
   };
   const root = visit(document.root);
   return root === document.root ? document : { ...document, root };
+}
+
+// Preview data belongs to the image library, never to the document or runtime nodes.
+export function imagePreviewResolver(assets: ImageAsset[] = builtins as ImageAsset[]) {
+  const byId = new Map(assets.map(asset => [asset.id, asset]));
+  const byRobloxId = new Map(assets.filter(asset => asset.robloxId).map(asset => [asset.robloxId, asset]));
+  return (node: UINode) => {
+    const asset = node.imageAssetId ? byId.get(node.imageAssetId) : undefined;
+    return (asset && asset.robloxId === node.properties.Image ? asset : byRobloxId.get(String(node.properties.Image)))?.previewImage;
+  };
 }

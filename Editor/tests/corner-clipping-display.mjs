@@ -26,13 +26,15 @@ try {
       const corner = strategy.createNode('UICorner'); corner.properties.CornerRadius = dim(0, 20);
       const edge = strategy.createNode('Frame');
       Object.assign(edge.properties, { Position: dim2(0, 50), Size: dim2(110, 10), BackgroundColor3: '#ff0000', ZIndex: 2 });
+      const imageAssets = [];
       if (className === 'ImageButton') {
-        parent.previewImage = { name: 'blue.svg', dataUrl: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="60"><rect width="100" height="60" fill="blue"/></svg>') };
+        imageAssets.push({ id: 'blue', library: 'project', platform: 'roblox', name: 'Blue', tags: '', usage: 'image', robloxId: 'rbxassetid://123', previewImage: { name: 'blue.svg', dataUrl: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="60"><rect width="100" height="60" fill="blue"/></svg>') } });
+        parent.properties.Image = 'rbxassetid://123';
         parent.properties.ScaleType = 'Stretch';
       }
       parent.children.push(corner, edge); document.root.children.push(parent);
       const index = window.displayQA.cases.length;
-      window.displayQA.cases.push({ document }); window.displayQA.show(index);
+      window.displayQA.cases.push({ document, imageAssets }); window.displayQA.show(index);
       return parent.id;
     }, { className, clips });
     const node = page.locator(`[data-node-id="${id}"]`);

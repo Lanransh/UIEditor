@@ -46,9 +46,9 @@ PNG 按同级 `GameKitWorkspace/setting.json` 的所有者及当前原图 SHA-25
 
 同一主进程内，所有资产存储实例按规范化清单目录共享串行队列，迁移、导入和修改在队列内重新读取并写入，异常也释放队列；不能让并发 MCP 读取触发的旧迁移快照覆盖刚保存的资源 ID。此队列不协调外部 Git 操作或其他进程。
 
-图片节点可附加 `imageAssetId`，仍保存已解析 Image 和嵌入 previewImage 快照，保持单独保存界面的可移植性。编辑器、保存、运行及 MCP 均取图片自身的 robloxId；永久图片的 ID 在项目间共享，项目图片只属于自己的工程。当前库没有该资产时保留文档快照，节点属性明确提示缺失，不删除预览。库存在但未配置 ID 时 Image 为空，只能本地预览。
+图片节点仅保存可选 `imageAssetId` 与已解析的 Roblox `Image`，不支持节点 `previewImage`，加载与制作边界拒绝该旧字段，不提供存档升级。图片数据只属于图片库。编辑器、保存、运行及 MCP 均取图片自身的 robloxId；永久图片的 ID 在项目间共享，项目图片只属于自己的工程。画布优先使用与当前 Image 一致的资产引用，否则按 Image 资源 ID 查找本地图片；运行脚本切换 Image 时随之切换预览。缺失资产时保留已保存 Image，找不到本地图片则显示缺图提示，不影响有效资源 ID 的导出。库存在但未配置 ID 时只能本地预览，导出需先配置 ID。
 
-引用节点的 Image 属性只读，应选中图片资产修改资源 ID，或先解除引用再手动设置。平铺、颜色、透明度和尺寸由节点维护，配置 ID 不重置这些属性。图片引用仍使用文档 version=3 的可选节点字段；旧无引用节点继续支持原有预览图片入口。
+引用节点的 Image 属性只读，应选中图片资产修改资源 ID，或先解除引用再手动设置。平铺、颜色、透明度和尺寸由节点维护，配置 ID 不重置这些属性。图片引用仍使用文档 version=3 的可选节点字段；无引用节点可手动设置 Image；预览按资源 ID 从图片库查找，不提供节点本地预览图片入口。
 
 ## 内置资源
 
@@ -59,7 +59,7 @@ PNG 按同级 `GameKitWorkspace/setting.json` 的所有者及当前原图 SHA-25
 
 ## AI 与验证边界
 
-`uie.assets.search` 查询名称、标签、库并分页，返回 robloxId；`uie.assets.get` 返回详情与图片预览；`uie.assets.configure` 保存名称、标签和唯一 robloxId，省略字段保留原值，不支持 projectRobloxId 参数。`uie.assets.import` 接收当前 sessionId/revision、library（project/permanent）和本地图片绝对路径 filePath，由主进程读取并校验 PNG/JPEG/WebP/GIF、单张 8 MiB 上限及普通文件类型；不接受跨工程写入、远程链接或嵌入数据，不上传。无需打开界面即可导入，运行时禁止；成功立即保存资产库并返回无图片数据的资产摘要和新会话，不进入文档历史。先查询并复用已有资产，缺少时导入，再重读状态，通过 `ui.assets.apply(nodeId, assetId)` 应用到节点，随 code.execute 整笔支持撤销、dry-run 与失败回滚。仅设置 previewImage 不会登记到图片资产库。制作 VM 不开放文件与网络。资产导入和属性变化使旧 MCP 编辑会话失效，需重新读取状态。
+`uie.assets.search` 查询名称、标签、库并分页，返回 robloxId；`uie.assets.get` 返回详情与图片预览；`uie.assets.configure` 保存名称、标签和唯一 robloxId，省略字段保留原值，不支持 projectRobloxId 参数。`uie.assets.import` 接收当前 sessionId/revision、library（project/permanent）和本地图片绝对路径 filePath，由主进程读取并校验 PNG/JPEG/WebP/GIF、单张 8 MiB 上限及普通文件类型；不接受跨工程写入、远程链接或嵌入数据，不上传。无需打开界面即可导入，运行时禁止；成功立即保存资产库并返回无图片数据的资产摘要和新会话，不进入文档历史。先查询并复用已有资产，缺少时导入，再重读状态，通过 `ui.assets.apply(nodeId, assetId)` 应用到节点，随 code.execute 整笔支持撤销、dry-run 与失败回滚。不再提供 previewImage 创建选项或 setPreviewImage API。制作 VM 不开放文件与网络。资产导入和属性变化使旧 MCP 编辑会话失效，需重新读取状态。
 
 图片属性提供「上传到 Roblox」；已有 ID 时按钮明确标注「替换 ID」，未保存配置须先保存。点击后由主进程读取资产内容，使用 Toolkit 已配置的资源所有者与 API Key 上传，不在 UIEditor 管理云端凭据。导入 Roblox 前也会列出未配置 ID 的图片，支持单张或逐张批量上传，详见 [Roblox 一次性导入](roblox-import.md)。通过 `/discover.uiEditorImageUpload === 1` 检查能力，旧版提示更新并重启，不影响原有 UI 导入。
 

@@ -6,7 +6,7 @@ import { mkdir, stat } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { createProject, describeError, openProject, RecentProjects } from './projects';
 import type { Project, Result, RecentProjectView } from '../src/shared/project';
-import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset, moveDocumentAsset, listTemplateFolders, templateFolderPath, documentAssetDirectory, documentBundlePath, saveDocumentBundle } from './documents';
+import { readDocument, writeDocument, safeFileName, listDocumentAssets, openDocumentAsset, moveDocumentAsset, listTemplateFolders, templateFolderPath, documentAssetDirectory, documentBundlePath, saveDocumentBundle } from './documents';
 import { robloxStrategy } from '../src/editor/roblox';
 import { LuauSession, RuntimeError } from './runtime';
 import { ToolkitClient } from './toolkit';
@@ -25,7 +25,7 @@ import { watchAssetDirectory } from './asset-watcher';
 import { syncAgentWorkspace } from './agent-workspace';
 import { ensureWorkspaceLauncher } from './workspace-launcher';
 import { listTemplateStyles, previewTemplateStyle, styleDirectory, templateStylesDirectory } from './template-styles';
-import { resolveImageAssets, type BakePreviewConfig, type ImageAssetUpdate, type ImageLibrary } from '../src/shared/imageAssets';
+import { resolveImageAssets, type ImageAsset, type BakePreviewConfig, type ImageAssetUpdate, type ImageLibrary } from '../src/shared/imageAssets';
 
 const runtime = process.env.UI_EDITOR_USER_DATA
   ? process.env.UI_EDITOR_USER_DATA
@@ -85,8 +85,8 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     function stopAssetWatchers() { assetWatchers.forEach(stop => stop()); assetWatchers = []; }
     window.on('closed', stopAssetWatchers);
     const reader = new AutomationReader(runtime, recent, () => automationReady ? activeProject : null, permanentImages);
-    const previews = new Map<Electron.WebContents, { document: UIDocument; bake?: BakePreviewConfig; ready(): void; fail?(error: Error): void }>();
-    async function savedScreenshot(document: UIDocument, target: object) {
+    const previews = new Map<Electron.WebContents, { document: UIDocument; assets: ImageAsset[]; bake?: BakePreviewConfig; ready(): void; fail?(error: Error): void }>();
+    async function savedScreenshot(document: UIDocument, target: object, assets: ImageAsset[]) {
       const preview = new BrowserWindow({ width: 1280, height: 720, useContentSize: true, show: false, skipTaskbar: true, focusable: false,
         webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false } });
       preview.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -96,7 +96,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       try {
         const ready = new Promise<void>((resolve, reject) => {
           timer = setTimeout(() => reject(new Error('模板截图渲染超时。')), 10000);
-          previews.set(preview.webContents, { document, ready: resolve });
+          previews.set(preview.webContents, { document, assets, ready: resolve });
         });
         // Attach the readiness wait before navigation so a load failure cannot leave a rejected promise unhandled.
         await Promise.all([preview.loadURL(url.href), ready]);
@@ -106,6 +106,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       } finally { if (timer) clearTimeout(timer); previews.delete(preview.webContents); preview.destroy(); }
     }
     async function bakeScreenshot(document: UIDocument, bake: BakePreviewConfig): Promise<Buffer> {
+      const assets = await imageStore().list();
       const preview = new BrowserWindow({ width: bake.width, height: bake.height, useContentSize: true, transparent: true, backgroundColor: '#00000000', show: false, skipTaskbar: true, focusable: false,
         webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false } });
       preview.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -115,7 +116,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       try {
         const ready = new Promise<void>((resolve, reject) => {
           timer = setTimeout(() => reject(new Error('图片烘焙渲染超时。')), 15000);
-          previews.set(preview.webContents, { document, bake, ready: resolve, fail: reject });
+          previews.set(preview.webContents, { document, assets, bake, ready: resolve, fail: reject });
         });
         await Promise.all([preview.loadURL(url.href), ready]);
         const captured = await preview.webContents.capturePage({ x: 0, y: 0, width: bake.width, height: bake.height });
@@ -171,7 +172,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
           case 'uie.nodes.get': return { target: saved.target, ...(a.format === 'tree' ? nodeTree(saved.document, a) : { node: getNode(saved.document, a) }) };
           case 'uie.nodes.find': return { target: saved.target, ...findNodes(saved.document, a) };
           case 'uie.scripts.get': return { target: saved.target, scripts: a.kind === undefined ? saved.document.scripts : { [String(a.kind)]: saved.document.scripts[a.kind as 'source' | 'integration'] } };
-          case 'uie.debug.screenshot': return savedScreenshot(saved.document, saved.target);
+          case 'uie.debug.screenshot': return savedScreenshot(saved.document, saved.target, saved.assets);
         }
       }
       if (['uie.assets.search', 'uie.assets.get'].includes(request.name) && (a.projectId !== undefined || a.library === 'permanent')) {
@@ -223,6 +224,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       const preview = previews.get(event.sender);
       if (preview && event.senderFrame === event.sender.mainFrame && new URL(event.senderFrame.url).searchParams.get('uiePreview') === '1') {
         if (input?.operation === 'preview:document') return preview.document;
+        if (input?.operation === 'preview:assets') return preview.assets;
         if (input?.operation === 'preview:config') return preview.bake ?? null;
         if (input?.operation === 'preview:ready') { preview.ready(); return null; }
         if (input?.operation === 'preview:error') { preview.fail?.(new Error(String(input.argument))); return null; }
@@ -619,11 +621,6 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
         document = { ...document, id: randomUUID() };
       }
       return saveBoundFile(path, document);
-    });
-    handle('document:image', async () => {
-      requireProject();
-      const result = await dialog.showOpenDialog(window, { title: '选择本地预览图片（不会上传）', properties: ['openFile'], filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }] });
-      return result.canceled || !result.filePaths[0] ? null : readPreviewImage(result.filePaths[0]);
     });
     handle('document:confirm', async () => {
       const result = await dialog.showMessageBox(window, { type: 'question', title: '界面尚未保存', message: '是否保存当前界面的修改？', buttons: ['保存', '不保存', '取消'], defaultId: 0, cancelId: 2 });

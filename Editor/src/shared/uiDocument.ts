@@ -8,7 +8,6 @@ export interface UINode {
   name: string;
   properties: Record<string, PropertyValue>;
   children: UINode[];
-  previewImage?: { name: string; dataUrl: string };
   imageAssetId?: string;
 }
 export interface UIDocument {

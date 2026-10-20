@@ -25,7 +25,7 @@ export function createBatchExportSnapshot(document: UIDocument, assets: ImageAss
   const snapshot = structuredClone(resolveImageAssets(document, assets));
   // Freeze resolved image IDs so retrying an uncertain submission sends the same package.
   function freezeImages(node: UIDocument['root']) {
-    delete node.imageAssetId;
+    if (node.properties.Image) delete node.imageAssetId;
     node.children.forEach(freezeImages);
   }
   freezeImages(snapshot.root);

@@ -37,7 +37,6 @@ const documents: DocumentAPI = {
   createTemplateFolder: name => ipcRenderer.invoke('document:create-template-folder', name),
   saveTemplate: (document, folder) => ipcRenderer.invoke('document:save-template', { document, folder }),
   save: (document, saveAs = false, projectUI = false) => ipcRenderer.invoke('document:save', { document, saveAs, projectUI }),
-  pickImage: () => ipcRenderer.invoke('document:image'),
   confirmChanges: () => ipcRenderer.invoke('document:confirm'),
   setDirty: dirty => ipcRenderer.send('document:dirty', dirty),
   onCloseRequest: callback => { const listener = () => callback(); ipcRenderer.on('document:close-request', listener); return () => ipcRenderer.removeListener('document:close-request', listener); },

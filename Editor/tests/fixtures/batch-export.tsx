@@ -15,7 +15,6 @@ const imageAsset: ImageAsset = { id: 'icon', platform: 'roblox', library: 'proje
   previewImage: { name: 'Icon', dataUrl: 'data:image/png;base64,AAAA' }, robloxId: 'rbxassetid://123', usage: 'image' };
 const icon = strategy.createNode('ImageLabel');
 icon.imageAssetId = imageAsset.id;
-icon.previewImage = imageAsset.previewImage;
 first.root.children.push(icon);
 const second = strategy.createDocument('SecondUI');
 second.root.name = 'SecondUI';

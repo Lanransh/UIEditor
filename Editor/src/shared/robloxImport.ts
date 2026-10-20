@@ -12,20 +12,20 @@ export interface RobloxModel {
   attributes: Record<string, JSONValue>; children: RobloxModel[];
 }
 export interface UnconfiguredRobloxImage {
-  key: string; name: string; dataUrl: string; assetId?: string; nodeIds: string[]; nodePaths: string[];
+  key: string; name: string; dataUrl: string; assetId: string; nodeIds: string[]; nodePaths: string[];
 }
 export function findUnconfiguredRobloxImages(document: UIDocument, assets: ImageAsset[]): UnconfiguredRobloxImage[] {
   const assetIndex = new Map(assets.map(asset => [asset.id, asset]));
   const images = new Map<string, UnconfiguredRobloxImage>();
   function visit(node: UINode, path: string) {
-    if (node.className.startsWith('Image') && node.previewImage && !node.properties.Image) {
-      const asset = node.imageAssetId ? assetIndex.get(node.imageAssetId) : undefined;
-      const groupKey = node.imageAssetId ? `asset:${node.imageAssetId}` : `preview:${node.previewImage.dataUrl}`;
+    const asset = node.imageAssetId ? assetIndex.get(node.imageAssetId) : undefined;
+    if (node.className.startsWith('Image') && asset && !node.properties.Image) {
+      const groupKey = `asset:${asset.id}`;
       let image = images.get(groupKey);
       if (!image) {
-        const preview = asset?.previewImage ?? node.previewImage;
-        image = { key: node.imageAssetId ? `asset:${node.imageAssetId}` : `preview:${node.id}`, name: asset?.name ?? preview.name, dataUrl: preview.dataUrl,
-          ...(asset ? { assetId: asset.id } : {}), nodeIds: [], nodePaths: [] };
+        const preview = asset.previewImage;
+        image = { key: groupKey, name: asset.name, dataUrl: preview.dataUrl,
+          assetId: asset.id, nodeIds: [], nodePaths: [] };
         images.set(groupKey, image);
       }
       image.nodeIds.push(node.id); image.nodePaths.push(path);
@@ -52,7 +52,7 @@ export function createRobloxImportPackage(source: unknown): RobloxImportPackage 
   function build(node: UINode, path: string): RobloxModel {
     if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(node.name)) throw new Error(`${path}：导入节点名只支持英文、数字和下划线，且须以字母开头。`);
     if (new Set(node.children.map(child => child.name)).size !== node.children.length) throw new Error(`${path} 存在同名子节点，脚本路径有歧义。`);
-    if (node.className.startsWith('Image') && node.previewImage && !node.properties.Image) throw new Error(`${path} 只有本地预览图，请先配置 Roblox 资源 ID。`);
+    if (node.className.startsWith('Image') && node.imageAssetId && !node.properties.Image) throw new Error(`${path} 图片资产尚未配置 Roblox 资源 ID。`);
     if (node.className.startsWith('Image') && node.properties.Image && !/^rbxassetid:\/\/[1-9][0-9]*$/.test(String(node.properties.Image))) throw new Error(`${path} 的图片必须使用 rbxassetid:// 资源 ID。`);
     const properties: Record<string, JSONValue> = {};
     for (const [key, value] of Object.entries(node.properties)) {

@@ -10,8 +10,8 @@ import '../../src/styles.css';
 const ui = robloxStrategy.createDocument('Rewards'); ui.root.name = 'RewardsUI';
 const trainingPreview = { name: 'TrainingIcon', dataUrl: 'data:image/png;base64,AAAA' };
 const trainingAsset: ImageAsset = { id: 'training', platform: 'roblox', library: 'project', name: 'TrainingIcon', tags: '', previewImage: trainingPreview, robloxId: '', usage: 'image' };
-const training = robloxStrategy.createNode('ImageLabel'); training.name = 'TrainingIcon'; training.imageAssetId = trainingAsset.id; training.previewImage = trainingPreview; ui.root.children.push(training);
-const money = robloxStrategy.createNode('ImageLabel'); money.name = 'MoneyIcon'; money.previewImage = { name: 'MoneyIcon', dataUrl: 'data:image/png;base64,BBBB' }; ui.root.children.push(money);
+const training = robloxStrategy.createNode('ImageLabel'); training.name = 'TrainingIcon'; training.imageAssetId = trainingAsset.id; ui.root.children.push(training);
+const money = robloxStrategy.createNode('ImageLabel'); money.name = 'MoneyIcon'; money.imageAssetId = 'money'; ui.root.children.push(money);
 let current: RobloxImportTask = { id: 'a'.repeat(32), deliveryId: 'delivery', name: 'RewardsUI', status: 'awaiting_studio', message: '等待 Studio 回执', scriptPath: 'Client/UI/Generated/RewardsUI', sourceClass: 'CRewardsUIBaseCompClass' };
 const state = { submitted: 0, uploaded: [] as string[], received: null as UIDocument | null, failDiscovery: false, failTask: false, multipleTargets: false, submitError: '', targetAvailable: true, failReceipt: () => { current = { ...current, status: 'failed', message: 'Studio 导入失败' }; }, succeed: () => { current = { ...current, status: 'succeeded', message: 'UI 已导入 Studio' }; } };
 (window as unknown as { importQA: typeof state }).importQA = state;
@@ -39,17 +39,10 @@ window.toolkit = {
 };
 function Fixture() {
   const [open, setOpen] = useState(true);
-  const [document, setDocument] = useState(ui);
-  const [assets, setAssets] = useState([trainingAsset]);
+  const document = ui;
+  const [assets, setAssets] = useState([trainingAsset, { ...trainingAsset, id: 'money', name: 'MoneyIcon', previewImage: {name:'MoneyIcon',dataUrl:'data:image/png;base64,BBBB'} }]);
   return open ? <RobloxImportDialog document={resolveImageAssets(document, assets)} imageAssets={assets} saveAssetId={async (id, robloxId) => {
     setAssets(current => current.map(asset => asset.id === id ? { ...asset, robloxId } : asset));
-  }} assignNodeIds={(ids, robloxId) => {
-    setDocument(currentDocument => {
-      const next = structuredClone(currentDocument);
-      for (const node of next.root.children) if (ids.includes(node.id)) node.properties.Image = robloxId;
-      state.received = next;
-      return next;
-    });
   }} onClose={() => setOpen(false)} /> : <p>已关闭</p>;
 }
 createRoot(document.getElementById('root')!).render(<Fixture />);

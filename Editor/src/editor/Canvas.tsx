@@ -9,7 +9,7 @@ import { channels, gradientStyle, imageGradient, rgba, scrollGeometry } from './
 import scrollTop from '../assets/roblox-scrollbars/scroll-top.png';
 import scrollMiddle from '../assets/roblox-scrollbars/scroll-middle.png';
 import scrollBottom from '../assets/roblox-scrollbars/scroll-bottom.png';
-import { applyImageAsset } from '../shared/imageAssets';
+import { applyImageAsset, imagePreviewResolver, type ImageAsset } from '../shared/imageAssets';
 import { insertNode } from './commands';
 
 interface Gesture {
@@ -210,7 +210,7 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
       setPan({ x: x - (x - pan.x) * zoomLevel / next, y: y - (y - pan.y) * zoomLevel / next }); setZoomLevel(next);
     }}>
       <div className="ui-artboard" data-testid="ui-artboard" style={{ width: 1280, height: 720, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
-        <DocumentPreview document={shown} strategy={editor.strategy} selected={!capturing && !editor.runtime.active ? editor.selected : undefined} runtime={editor.runtime}
+        <DocumentPreview document={shown} strategy={editor.strategy} imageAssets={editor.imageAssets} selected={!capturing && !editor.runtime.active ? editor.selected : undefined} runtime={editor.runtime}
           onNodePointerDown={(event, node) => { if (editor.runtime.active) return; start(event, space || event.button === 1 ? 'pan' : 'move', space || event.button === 1 ? undefined : node); }}
           onResize={(event, node) => start(event, space || event.button === 1 ? 'pan' : 'resize', space || event.button === 1 ? undefined : node)} />
       </div>
@@ -219,18 +219,21 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
   </section>;
 }
 
-export function DocumentPreview({ document: shown, strategy, selected: selection, runtime, onNodePointerDown, onResize }: {
+export function DocumentPreview({ document: shown, strategy, imageAssets, selected: selection, runtime, onNodePointerDown, onResize }: {
   document: UIDocument;
   strategy: ProjectStrategy;
+  imageAssets?: ImageAsset[];
   selected?: UINode;
   runtime?: Pick<DocumentEditor['runtime'], 'active' | 'frame' | 'activate'>;
   onNodePointerDown?: (event: PointerEvent, node: UINode) => void;
   onResize?: (event: PointerEvent, node: UINode) => void;
 }) {
   const filterPrefix = useId();
+  const previewFor = imagePreviewResolver(imageAssets);
   function renderNode(node: UINode, rect: PreviewRect) {
     if (!node.properties.Visible) return null;
     const p = node.properties;
+    const previewImage = previewFor(node);
     const corner = auxiliary(node, 'UICorner')?.properties.CornerRadius as UDim | undefined;
     const stroke = auxiliary(node, 'UIStroke')?.properties;
     const gradient = auxiliary(node, 'UIGradient')?.properties;
@@ -272,12 +275,12 @@ export function DocumentPreview({ document: shown, strategy, selected: selection
         {gradient?.Enabled && <div className="preview-background" style={{ position: 'absolute', inset: 0, borderRadius: radius, pointerEvents: 'none', ...gradientStyle(gradient, p.BackgroundColor3 as string, p.BackgroundTransparency as number, rect.width, rect.height) }} />}
         {textNode && stroke?.Enabled && <div className="preview-text preview-text-stroke" style={{ ...textStyle, color: 'transparent', WebkitTextStroke: `${2 * (stroke.Thickness as number)}px ${rgba(stroke.Color as string, stroke.Transparency as number)}` }}>{text}</div>}
         {textNode && <div className="preview-text preview-text-fill" style={{ ...textStyle, color: rgba(p.TextColor3 as string, p.TextTransparency as number), ...(gradient?.Enabled ? { ...gradientStyle(gradient, p.TextColor3 as string, p.TextTransparency as number, rect.width, rect.height), backgroundClip: 'text', color: 'transparent' } : {}) }}>{text}</div>}
-        {node.className.startsWith('Image') && (node.previewImage ? <>
+        {node.className.startsWith('Image') && (previewImage ? <>
           <svg width="0" height="0" aria-hidden="true" style={{ position: 'absolute' }}><defs><filter id={imageFilterId} colorInterpolationFilters="sRGB" x="0" y="0" width="100%" height="100%">
             <feColorMatrix type="matrix" values={`${tint[0]} 0 0 0 0 0 ${tint[1]} 0 0 0 0 0 ${tint[2]} 0 0 0 0 0 1 0`} result="tinted" />
             {gradient?.Enabled && <><feImage href={imageGradient(gradient, rect.width, rect.height)} result="gradient" preserveAspectRatio="none" /><feComposite in="tinted" in2="gradient" operator="arithmetic" k1="1" k2="0" k3="0" k4="0" /></>}
           </filter></defs></svg>
-          <div className="preview-image" style={{ borderRadius: radius, opacity: 1 - (p.ImageTransparency as number), filter: `url("#${imageFilterId}")`, backgroundImage: `url("${node.previewImage.dataUrl}")`, backgroundSize: p.ScaleType === 'Tile' ? `${Math.max(.01, pixels(tileSize!.x, rect.width))}px ${Math.max(.01, pixels(tileSize!.y, rect.height))}px` : p.ScaleType === 'Stretch' ? '100% 100%' : p.ScaleType === 'Crop' ? 'cover' : 'contain', backgroundPosition: p.ScaleType === 'Tile' ? 'left top' : undefined, backgroundRepeat: p.ScaleType === 'Tile' ? 'repeat' : 'no-repeat' }} />
+          <div className="preview-image" style={{ borderRadius: radius, opacity: 1 - (p.ImageTransparency as number), filter: `url("#${imageFilterId}")`, backgroundImage: `url("${previewImage.dataUrl}")`, backgroundSize: p.ScaleType === 'Tile' ? `${Math.max(.01, pixels(tileSize!.x, rect.width))}px ${Math.max(.01, pixels(tileSize!.y, rect.height))}px` : p.ScaleType === 'Stretch' ? '100% 100%' : p.ScaleType === 'Crop' ? 'cover' : 'contain', backgroundPosition: p.ScaleType === 'Tile' ? 'left top' : undefined, backgroundRepeat: p.ScaleType === 'Tile' ? 'repeat' : 'no-repeat' }} />
         </> : <div className="preview-image-missing" style={{ borderRadius: radius }}>▧<small>缺少预览图片</small></div>)}
         {scroll && scrollbar.vertical && <div data-scroll-axis="y" data-position={scrollbar.y} data-max={scrollbar.maxY} data-travel={scrollbar.windowHeight-scrollbar.thumbHeight} className="preview-scrollbar vertical" style={{ pointerEvents: runtime?.active ? 'auto' : undefined, zIndex: 10000, width: thickness, height: scrollbar.thumbHeight, top: scrollbar.top }}>{scrollTexture(scrollbar.thumbHeight)}</div>}
         {scroll && scrollbar.horizontal && <div data-scroll-axis="x" data-position={scrollbar.x} data-max={scrollbar.maxX} data-travel={scrollbar.windowWidth-scrollbar.thumbWidth} className="preview-scrollbar horizontal" style={{ pointerEvents: runtime?.active ? 'auto' : undefined, zIndex: 10000, height: thickness, width: scrollbar.thumbWidth, left: scrollbar.left }}>{scrollTexture(scrollbar.thumbWidth, true)}</div>}

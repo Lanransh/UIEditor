@@ -3,7 +3,6 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import builtins from '../src/assets/images/builtins.json';
 import { normalizeRobloxId, type ImageAsset, type ImageAssetUpdate, type ImageLibrary } from '../src/shared/imageAssets';
-import type { UINode } from '../src/shared/uiDocument';
 import { readPreviewImage } from './documents';
 import { RobloxImageAssetStore } from './roblox-image-assets';
 
@@ -135,7 +134,7 @@ export class ImageAssetStore {
     await withCatalog(this.directory('project'), () => this.projectStore().remove(id));
     return this.list();
   }
-  async import(library: ImageLibrary, previewImage: NonNullable<UINode['previewImage']>): Promise<ImageAsset> {
+  async import(library: ImageLibrary, previewImage: ImageAsset['previewImage']): Promise<ImageAsset> {
     if (!['permanent', 'project'].includes(library)) throw new Error('图片资产库无效。');
     let asset = validateAsset({ id: library === 'project' ? randomUUID().replaceAll('-', '') : randomUUID(), platform: 'roblox', library, name: previewImage.name.replace(/\.[^.]+$/, ''), tags: '', previewImage, robloxId: '', usage: 'image' });
     await withCatalog(this.directory(library), async () => {

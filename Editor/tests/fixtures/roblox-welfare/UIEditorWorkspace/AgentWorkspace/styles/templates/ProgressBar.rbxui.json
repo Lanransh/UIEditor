@@ -53,10 +53,6 @@
                 "className": "ImageLabel",
                 "id": "fe55fa51-dfa7-439f-ab17-7eed315fba39",
                 "name": "StudTileImg",
-                "previewImage": {
-                  "dataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAAACXBIWXMAACE4AAAhOAFFljFgAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAAAgdJREFUeAHt3M1KAlEUwPFjn7TpA6woq0WLFkLv5ELwxXyOniFoIZkaWpGbwijCSpvObUaI0Ijo3nOV/w8OTbNR599c29wRAQAAAAAAAAAAAAAAADBrchJIkiTutZZ1jnQOdRYkLgOdK52zXC73KoEECaAXf05/rEp68Q8kbpc6TZ0HDZGIZ3MSxmr2WjsSv31J3+tadtd65X0Z0A+xJOmScyDxLTs/cRHcktkXj0LcAccS55o/ye2X40XxLMRF2ZPp8KZzLel3wMhMBJj0IU4kMpVKZaterxfdcaFQuK9Wq13xbJrWZK9KpdJOq9XKj37vdDqbGuRdD+/Fo1D/BUWv3W5vfD+nd0NePCNAZjgczv/m3H8jgDECGCOAMQIYI4AxAhgjgDECGCOAMQIYI4AxAhgjgDECGCOAMQIYI4AxAhgjgDECGCOAMQIYI4AxAhgjgDECGCOAMQIYI4AxAhgjgDECGAuxRcltfvu+T8ztSh/tycqH2AgRqxB3wOWYc7duT1atVtuO+eInSfIknoUIUNfpSHonuHFBLsbtyYpNt9vtiWchlqAXnXOdhkyRwWDw1mg0rsQz73dA9sCLR53h1/PFYvFOIuUuvt6hp3ro/akpwR5X42TPjVjR+Vz3y+XybrPZXI/le6Df7z/re7zr9Xo3+tf/IgAAAAAAAAAAAAAAAADwBx/xiIkJsM5B3AAAAABJRU5ErkJggg==",
-                  "name": "StudTile.png"
-                },
                 "properties": {
                   "AnchorPoint": {
                     "x": 0,
@@ -187,10 +183,6 @@
             "className": "ImageLabel",
             "id": "704808d1-4fe8-4ea3-9df0-56e2c676ab7c",
             "name": "StudTileImg",
-            "previewImage": {
-              "dataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAAACXBIWXMAACE4AAAhOAFFljFgAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAAAgdJREFUeAHt3M1KAlEUwPFjn7TpA6woq0WLFkLv5ELwxXyOniFoIZkaWpGbwijCSpvObUaI0Ijo3nOV/w8OTbNR599c29wRAQAAAAAAAAAAAAAAADBrchJIkiTutZZ1jnQOdRYkLgOdK52zXC73KoEECaAXf05/rEp68Q8kbpc6TZ0HDZGIZ3MSxmr2WjsSv31J3+tadtd65X0Z0A+xJOmScyDxLTs/cRHcktkXj0LcAccS55o/ye2X40XxLMRF2ZPp8KZzLel3wMhMBJj0IU4kMpVKZaterxfdcaFQuK9Wq13xbJrWZK9KpdJOq9XKj37vdDqbGuRdD+/Fo1D/BUWv3W5vfD+nd0NePCNAZjgczv/m3H8jgDECGCOAMQIYI4AxAhgjgDECGCOAMQIYI4AxAhgjgDECGCOAMQIYI4AxAhgjgDECGCOAMQIYI4AxAhgjgDECGCOAMQIYI4AxAhgjgDECGAuxRcltfvu+T8ztSh/tycqH2AgRqxB3wOWYc7duT1atVtuO+eInSfIknoUIUNfpSHonuHFBLsbtyYpNt9vtiWchlqAXnXOdhkyRwWDw1mg0rsQz73dA9sCLR53h1/PFYvFOIuUuvt6hp3ro/akpwR5X42TPjVjR+Vz3y+XybrPZXI/le6Df7z/re7zr9Xo3+tf/IgAAAAAAAAAAAAAAAADwBx/xiIkJsM5B3AAAAABJRU5ErkJggg==",
-              "name": "StudTile.png"
-            },
             "properties": {
               "AnchorPoint": {
                 "x": 0,

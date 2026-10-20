@@ -8,10 +8,9 @@ import { ImageUploadDialog } from './ImageUploadDialog';
 declare global { interface Window { toolkit: ToolkitAPI } }
 interface UploadSession { mode: 'single' | 'all'; images: UnconfiguredRobloxImage[]; index: number }
 
-export function RobloxImportDialog({ document, imageAssets, saveAssetId, assignNodeIds, onClose }: {
+export function RobloxImportDialog({ document, imageAssets, saveAssetId, onClose }: {
   document: UIDocument; imageAssets: ImageAsset[];
   saveAssetId(id: string, robloxId: string): Promise<void>;
-  assignNodeIds(nodeIds: string[], robloxId: string): void;
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -69,8 +68,7 @@ export function RobloxImportDialog({ document, imageAssets, saveAssetId, assignN
   function startSingle(image: UnconfiguredRobloxImage) { setUploadSession({ mode: 'single', images: [image], index: 0 }); }
   function startAll() { setUploadSession({ mode: 'all', images: missingImages, index: 0 }); }
   async function uploadSaved(image: UnconfiguredRobloxImage, robloxId: string) {
-    if (image.assetId) await saveAssetId(image.assetId, robloxId);
-    else assignNodeIds(image.nodeIds, robloxId);
+    await saveAssetId(image.assetId, robloxId);
   }
   function advanceBatch() {
     setUploadSession(current => current?.mode === 'all' && current.index + 1 < current.images.length
@@ -119,7 +117,7 @@ export function RobloxImportDialog({ document, imageAssets, saveAssetId, assignN
       </div>
     </>}
     {currentUpload && <ImageUploadDialog key={currentUpload.key} image={{
-      ...(currentUpload.assetId ? { assetId: currentUpload.assetId, name: currentUpload.name } : { name: currentUpload.name, dataUrl: currentUpload.dataUrl }),
+      assetId: currentUpload.assetId, name: currentUpload.name,
     }} initialTargetId={uploadTargetId} onTargetSelected={setUploadTargetId} saveId={id => uploadSaved(currentUpload, id)}
       onUploaded={uploadSession?.mode === 'all' ? advanceBatch : undefined}
       batchProgress={uploadSession?.mode === 'all' ? { current: uploadSession.index + 1, total: uploadSession.images.length } : undefined}

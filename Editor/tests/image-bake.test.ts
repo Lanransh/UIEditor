@@ -33,7 +33,7 @@ test('conversion flattens visuals, retains identity and layout, and restores the
   let state = history.execute(documentCommand('烘焙为图片', value => convertToBakedImage(value, button.id, 'ImageButton', asset, strategy), strategy), document);
   const baked = findNode(state.root, button.id)!;
   assert.equal(baked.name, 'Claim'); assert.equal(baked.className, 'ImageButton');
-  assert.equal(baked.imageAssetId, asset.id); assert.equal(baked.previewImage?.dataUrl, asset.previewImage.dataUrl);
+  assert.equal(baked.imageAssetId, asset.id); assert.equal('previewImage' in baked, false);
   assert.equal(baked.properties.BackgroundTransparency, 1); assert.equal(baked.properties.ScaleType, 'Stretch');
   assert.equal(baked.properties.ImageColor3, '#ffffff'); assert.equal(baked.properties.ImageTransparency, 0);
   assert.deepEqual(baked.properties.Position, button.properties.Position); assert.equal(baked.properties.Rotation, 20);

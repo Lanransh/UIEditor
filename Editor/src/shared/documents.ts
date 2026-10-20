@@ -1,5 +1,5 @@
 import type { Result } from './project';
-import type { UIDocument, UINode } from './uiDocument';
+import type { UIDocument } from './uiDocument';
 
 export interface DocumentFile { document: UIDocument; path: string }
 export interface DocumentAsset { name: string; path: string }
@@ -25,7 +25,6 @@ export interface DocumentAPI {
   createTemplateFolder(name: string): Promise<Result<null>>;
   saveTemplate(document: UIDocument, folder?: string): Promise<Result<DocumentFile | null>>;
   save(document: UIDocument, saveAs?: boolean, projectUI?: boolean): Promise<Result<DocumentFile | null>>;
-  pickImage(): Promise<Result<UINode['previewImage'] | null>>;
   confirmChanges(): Promise<Result<'save' | 'discard' | 'cancel'>>;
   setDirty(dirty: boolean): void;
   onCloseRequest(callback: () => void): () => void;

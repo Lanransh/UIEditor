@@ -4,7 +4,7 @@ import { cp, mkdtemp, mkdir, readFile, writeFile, rename, stat } from 'node:fs/p
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { ImageAssetStore, permanentImageRoot } from '../electron/image-assets';
-import { normalizeRobloxId, applyImageAsset, resolveImageAssets } from '../src/shared/imageAssets';
+import { normalizeRobloxId, applyImageAsset, resolveImageAssets, imagePreviewResolver } from '../src/shared/imageAssets';
 import { robloxStrategy } from '../src/editor/roblox';
 import { executeCode, robloxCodeAdapter } from '../electron/code-executor';
 import { writeDocument, readDocument } from '../electron/documents';
@@ -267,7 +267,7 @@ test('uploaded ID updates retain current metadata across store instances and rel
   assert.equal((await store.list()).find(asset => asset.id === saved.id)!.robloxId, 'rbxassetid://888');
   await assert.rejects(store.updateRobloxId(saved.id, ''), /无效/);
 });
-test('asset references resolve the single Roblox ID while standalone documents retain snapshots; authoring remains undoable', async () => {
+test('asset references resolve the single Roblox ID without embedding preview data; authoring remains undoable', async () => {
   const { store, root } = await fixture();
   const assets = await store.list(), stud = assets.find(a => a.usage === 'tile')!;
   const document = robloxStrategy.createDocument('AssetTest');
@@ -282,7 +282,9 @@ test('asset references resolve the single Roblox ID while standalone documents r
   const resolved = resolveImageAssets(loaded, [overridden]);
   assert.equal(resolved.root.children[0].properties.Image, 'rbxassetid://1234');
   assert.equal(loaded.root.children[0].properties.Image, stud.robloxId);
-  assert.deepEqual(resolved.root.children[0].previewImage, stud.previewImage);
+  assert.equal('previewImage' in resolved.root.children[0], false);
+  assert.deepEqual(imagePreviewResolver([overridden])(resolved.root.children[0]), stud.previewImage);
+  assert.equal((await readFile(file, 'utf8')).includes('data:image'), false);
   const result = await executeCode(robloxCodeAdapter, resolve('native-bin'), robloxStrategy.createDocument('McpAsset'), 'luau', `local n=ui.nodes.create("ImageLabel"); ui.assets.apply(n.id,"${stud.id}")`, [overridden]);
   assert.equal(result.document.root.children[0].properties.Image, 'rbxassetid://1234');
   assert.equal(result.document.root.children[0].imageAssetId, stud.id);
@@ -291,4 +293,22 @@ test('asset references resolve the single Roblox ID while standalone documents r
   const after = history.execute(documentCommand('应用图片资产', () => result.document, robloxStrategy), before);
   assert.deepEqual(history.undo(after), before); assert.deepEqual(history.redo(before), after);
   await assert.rejects(executeCode(robloxCodeAdapter, resolve('native-bin'), document, 'luau', 'ui.assets.apply(ui.root.id,"missing")', assets));
+});
+
+
+test('previews follow library references and runtime image changes without mutating documents', () => {
+  const node = robloxStrategy.createNode('ImageLabel');
+  const make = (id: string, robloxId: string) => ({ id, platform: 'roblox' as const, library: 'project' as const,
+    name: id, tags: '', usage: 'image' as const, robloxId, previewImage: { name: id, dataUrl: `data:image/png;base64,${id}` } });
+  const first = make('first', 'rbxassetid://123'), second = make('second', 'rbxassetid://456'), pending = make('pending', '');
+  const preview = imagePreviewResolver([first, second, pending]);
+  const linked = applyImageAsset(node, first);
+  assert.equal(preview(linked), first.previewImage);
+  assert.equal(preview({ ...linked, properties: { ...linked.properties, Image: second.robloxId } }), second.previewImage);
+  assert.equal(preview({ ...linked, properties: { ...linked.properties, Image: 'rbxassetid://999' } }), undefined);
+  assert.equal(preview({ ...linked, imageAssetId: 'missing' }), first.previewImage);
+  assert.equal(preview(applyImageAsset(node, pending)), pending.previewImage);
+  assert.equal(preview(node), undefined);
+  assert.equal('previewImage' in linked, false);
+  assert.equal(linked.properties.Image, first.robloxId);
 });

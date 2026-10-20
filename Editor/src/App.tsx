@@ -250,7 +250,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
     {savingTemplate && <SaveDocumentDialog editor={editor} onClose={() => setSavingTemplate(false)} />}
     {importing && !editor.runtime.active && project.manifest.mode === 'roblox' && <RobloxImportDialog document={editor.document} imageAssets={editor.imageAssets}
       saveAssetId={async (id, robloxId) => { await editor.configureImageRobloxId(id, robloxId); }}
-      assignNodeIds={editor.assignRobloxImageId} onClose={() => setImporting(false)} />}
+      onClose={() => setImporting(false)} />}
     {editor.error && <div className="editor-error" role="alert">{editor.error}</div>}
     <div className="workspace-content" ref={content}>
     <div className="workspace-body">

@@ -2,7 +2,7 @@
 
 ## 使用流程
 
-在 StudioGameToolkit 打开目标游戏的 GameKitWorkspace 工程，在项目设置填写 PlaceId；Studio 打开同一地图，使用更新后的 Toolkit 插件。UIEditor 运行控制栏最右侧的「导出」按当前工程类型进入对应流程，目前支持 Roblox；运行期间隐藏此入口，文件菜单不再提供导入。先检查当前界面图片。若有仅本地预览、缺少 Roblox ID 的图片，导入暂停并显示图片清单，列出图片名称与节点路径；可单张上传，也可全部按顺序上传。上传成功后，图片资产的 ID 保存到资产库，内联预览图的 ID 保存到对应节点并进入文档历史。失败、审核未完成或 ID 未保存的图片继续阻止导入。所有图片就绪后使用 Toolkit 唯一可用的工程连接，不在编辑器选择目标游戏；没有连接或存在多个连接时明确报错，用户在 Toolkit 处理后刷新连接。用户点击“导出 UI 和脚本”后提交当前编辑快照，不要求先保存。导入操作本身不写入文档历史，也不使用运行副本。
+在 StudioGameToolkit 打开目标游戏的 GameKitWorkspace 工程，在项目设置填写 PlaceId；Studio 打开同一地图，使用更新后的 Toolkit 插件。UIEditor 运行控制栏最右侧的「导出」按当前工程类型进入对应流程，目前支持 Roblox；运行期间隐藏此入口，文件菜单不再提供导入。先检查当前界面图片。若有仅本地预览、缺少 Roblox ID 的图片，导入暂停并显示图片清单，列出图片名称与节点路径；可单张上传，也可全部按顺序上传。上传成功后，图片资产的 ID 保存到资产库，再解析到引用节点；不支持内联节点预览图。失败、审核未完成或 ID 未保存的图片继续阻止导入。所有图片就绪后使用 Toolkit 唯一可用的工程连接，不在编辑器选择目标游戏；没有连接或存在多个连接时明确报错，用户在 Toolkit 处理后刷新连接。用户点击“导出 UI 和脚本”后提交当前编辑快照，不要求先保存。导入操作本身不写入文档历史，也不使用运行副本。
 
 “导出到 Roblox”弹窗仅显示当前界面名、操作状态与必要按钮，不展示类继承说明和生成脚本路径。提交错误、连接错误与失败回执统一显示醒目的红色错误区域；发生错误时显示刷新连接，成功后提示在 Studio 保存场景。
 
@@ -89,7 +89,7 @@ return Business
 
 ## 校验与重复更新
 
-导入拒绝同级重名、非法节点名、非整数 Offset、只有本地预览的图片和无效资源引用。UIEditor 导入对话框在提交前处理缺少 Roblox ID 的预览图；图片上传仍需用户显式发起，批量上传逐张等待成功并保存 ID。Scale/Offset 保留，颜色/向量转换为带类型的节点属性；渐变转换为 ColorSequence/NumberSequence；静态模型补齐 BorderSizePixel=0、IgnoreGuiInset=true、ResetOnSpawn=false。预览 Data URL 不导入 Roblox 包。
+导入拒绝同级重名、非法节点名、非整数 Offset、未配置资源 ID 的图片资产和无效资源引用。UIEditor 导入对话框在提交前处理缺少 Roblox ID 的预览图；图片上传仍需用户显式发起，批量上传逐张等待成功并保存 ID。Scale/Offset 保留，颜色/向量转换为带类型的节点属性；渐变转换为 ColorSequence/NumberSequence；静态模型补齐 BorderSizePixel=0、IgnoreGuiInset=true、ResetOnSpawn=false。预览 Data URL 不导入 Roblox 包。
 
 Toolkit 校验包结构、节点数量、深度和类继承关系；原生节点只投递到 StarterGui，脚本不嵌入节点包。生成类平铺在 Generated 下，此目录专用于生成脚本，按实际类名直接覆盖同名交互类和公共基类，不检查旧文件生成标记、文档归属或目录外的同名类。Toolkit 不再读取或写入 `.uie-owners.json`；已有清单不参与导入。类改名后旧文件保留，目录外脚本不修改。
 

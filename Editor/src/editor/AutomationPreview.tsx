@@ -3,20 +3,22 @@ import type { UIDocument, UINode } from '../shared/uiDocument';
 import { findNode } from '../shared/uiDocument';
 import { DocumentPreview } from './Canvas';
 import { robloxStrategy } from './roblox';
-import type { BakePreviewConfig } from '../shared/imageAssets';
+import { imagePreviewResolver, type ImageAsset, type BakePreviewConfig } from '../shared/imageAssets';
 
 // Static saved-design rendering only: no editor, runtime or interaction scripts.
 export function AutomationPreview() {
   const [document, setDocument] = useState<UIDocument | null>(null);
+  const [assets, setAssets] = useState<ImageAsset[]>([]);
   const [bake, setBake] = useState<BakePreviewConfig | null>(null);
-  useEffect(() => { void Promise.all([window.automation.invoke('preview:document'), window.automation.invoke('preview:config')]).then(([document, config]) => { setBake(config); setDocument(document); }); }, []);
+  useEffect(() => { void Promise.all([window.automation.invoke('preview:document'), window.automation.invoke('preview:config'), window.automation.invoke('preview:assets')]).then(([document, config, assets]) => { setAssets(assets); setBake(config); setDocument(document); }); }, []);
   useEffect(() => {
     if (!document) return;
     let alive = true;
     const images = new Set<string>();
-    function collect(node: UINode) { if (node.previewImage) images.add(node.previewImage.dataUrl); node.children.forEach(collect); }
-    collect((bake && findNode(document.root, bake.nodeId)) || document.root);
+    const previewFor = imagePreviewResolver(assets);
+    function collect(node: UINode) { const preview = previewFor(node); if (preview) images.add(preview.dataUrl); else if (bake && node.className.startsWith('Image') && (node.properties.Image || node.imageAssetId)) throw new Error(`图片 ${node.name} 在图片库中缺少本地图片，无法烘焙。`); node.children.forEach(collect); }
     void (async () => {
+      collect((bake && findNode(document.root, bake.nodeId)) || document.root);
       await Promise.all([...images].map(source => new Promise<void>((resolve, reject) => { const image = new Image(); image.onload = () => resolve(); image.onerror = () => bake ? reject(new Error('预览图片无法加载，无法烘焙。')) : resolve(); image.src = source; })));
       await window.document.fonts.ready;
       await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
@@ -46,8 +48,8 @@ export function AutomationPreview() {
       if (alive) await window.automation.invoke('preview:ready');
     })().catch(error => { if (alive) void window.automation.invoke('preview:error', error instanceof Error ? error.message : String(error)); });
     return () => { alive = false; };
-  }, [document, bake]);
+  }, [document, bake, assets]);
   return <div style={{ position: 'fixed', inset: 0, width: 1280, height: 720, overflow: 'hidden', background: '#fff' }}>
-    {document && <DocumentPreview document={document} strategy={robloxStrategy} />}
+    {document && <DocumentPreview document={document} imageAssets={assets} strategy={robloxStrategy} />}
   </div>;
 }

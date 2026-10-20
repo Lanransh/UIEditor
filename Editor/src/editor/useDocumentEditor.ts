@@ -10,7 +10,7 @@ import { useRuntime } from './useRuntime';
 import { mergeSavedDocument } from './reloadDocument';
 import { useAutomation } from './useAutomation';
 import { convertToBakedImage, type BakedNodeClass } from './imageBake';
-import { applyImageAsset, normalizeRobloxId, resolveImageAssets, type ImageAsset, type ImageAssetUpdate, type ImageLibrary } from '../shared/imageAssets';
+import { applyImageAsset, resolveImageAssets, type ImageAsset, type ImageAssetUpdate, type ImageLibrary } from '../shared/imageAssets';
 
 declare global { interface Window { documents: DocumentAPI } }
 
@@ -83,22 +83,6 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
         void runtime.setProperty(id, property, value);
       } catch (cause) { setError(cause instanceof Error ? cause.message : '编辑失败'); }
     } else editNode(id, node => property === 'Name' ? { ...node, name: value as string } : { ...node, properties: { ...node.properties, [property]: value } }, property === 'Name' ? '节点改名' : '修改属性');
-  }
-  function assignRobloxImageId(nodeIds: string[], robloxId: string) {
-    if (!hasDocument || operating.current || runtime.active) throw new Error('当前不能更新图片节点。');
-    const imageId = normalizeRobloxId(robloxId);
-    if (!imageId) throw new Error('上传资源 ID 无效。');
-    try {
-      history.execute(documentCommand('保存 Roblox 图片 ID', value => {
-        let root = value.root;
-        for (const id of nodeIds) root = updateNode(root, id, node => ({ ...node, properties: { ...node.properties, Image: imageId } }));
-        return { ...value, root };
-      }, strategy));
-      setError('');
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '图片 ID 保存失败');
-      throw cause;
-    }
   }
   async function save(saveAs = false, projectUI = false): Promise<boolean> {
     if (!hasDocument) return false;
@@ -239,14 +223,6 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
   function remove() { execute('删除节点', value => deleteNode(value, selected.id)); }
   function duplicate() { execute('复制节点', value => duplicateNode(value, selected.id, strategy)); }
   function reparent(parentId: string) { execute('调整父节点', value => reparentNode(value, selected.id, parentId, strategy)); }
-  const pickImage = () => run(async () => {
-    const result = await window.documents.pickImage();
-    if (!result.ok) { setError(result.error); return; }
-    if (result.value) {
-      const image = result.value;
-      history.execute(documentCommand('设置预览图片', value => ({ ...value, root: updateNode(value.root, selected.id, node => { const { imageAssetId: _, ...rest } = node; return { ...rest, previewImage: image }; }) }), strategy));
-    }
-  });
   async function refreshImages() {
     const result = await window.imageAssets.list();
     if (!result.ok) throw new Error(result.error);
@@ -306,9 +282,9 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
       return result.value !== null;
     } finally { operating.current = false; setBusy(false); }
   }
-  const editor = { projectId: project.manifest.id, projectName: project.name, projectPath: project.path, strategy, document, inspectionDocument, inspectionBusy: busy || assetsLoading || (runtime.active && !runtime.ready), hasDocument, history, selected, select, editNode, editProperty, execute, add, reparent, pickImage,
+  const editor = { projectId: project.manifest.id, projectName: project.name, projectPath: project.path, strategy, document, inspectionDocument, inspectionBusy: busy || assetsLoading || (runtime.active && !runtime.ready), hasDocument, history, selected, select, editNode, editProperty, execute, add, reparent,
     inspectedAssetId, inspectAsset, clearAssetInspection, setAssetConfigurationDirty,
-    imageAssetRevision, documentAssetRevision, imageAssets, inspectImages: () => liveImageAssets.current, assetsLoading, refreshImages, configureImage, configureImageRobloxId, assignRobloxImageId, importImage, useImage, bakeImage,
+    imageAssetRevision, documentAssetRevision, imageAssets, inspectImages: () => liveImageAssets.current, assetsLoading, refreshImages, configureImage, configureImageRobloxId, importImage, useImage, bakeImage,
     moveImage: (id: string, folder: string) => changeProjectImages(() => window.imageAssets.move(id, folder)),
     removeImage: (id: string) => changeProjectImages(() => window.imageAssets.remove(id)),
     location: documentLocation(project.path, path), newDocument, openDocument, openTemplate, saveTemplate, moveAsset, save: (saveAs = false) => run(async () => { await save(saveAs); }),

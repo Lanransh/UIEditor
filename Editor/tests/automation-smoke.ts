@@ -188,7 +188,7 @@ print("Created reward UI")`;
     assert.deepEqual(await state('full'), created);
   }
   await app.evaluate(() => Object.assign((globalThis as any).exportQA, { targets: [{ id: 'export-target', name: 'Test game', placeId: '123' }], discoverError: '' }));
-  await mutate('uie.code.execute', { language: 'luau', source: 'ui.nodes.create("ImageLabel", {name="MissingImage", previewImage={name="missing.png",dataUrl="data:image/png;base64,YQ=="}})' });
+  await mutate('uie.code.execute', { language: 'luau', source: 'local n=ui.nodes.create("ImageLabel", {name="MissingImage"});ui.assets.apply(n.id,"builtin:roblox:placeholder")' });
   const missingExport = await raw('uie.document.export');
   assert.equal(missingExport.isError, true); assert.match(missingExport.content[0].text, /MissingImage/);
   assert.equal(await app.evaluate(() => (globalThis as any).exportQA.submissions.length), 0);

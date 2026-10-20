@@ -85,26 +85,24 @@ test('import rejects ambiguous paths, local-only pictures and fractional offsets
   first.name = 'Panel'; first.properties.Position = { x: { scale: 0, offset: .5 }, y: { scale: 0, offset: 0 } };
   assert.throws(() => createRobloxImportPackage(document), /Offset/);
   document.root.children = [strategy.createNode('ImageLabel')];
-  document.root.children[0].previewImage = { name: 'tile.png', dataUrl: 'data:image/png;base64,AAAA' };
-  assert.throws(() => createRobloxImportPackage(document), /本地预览/);
+  document.root.children[0].imageAssetId = 'tile';
+  assert.throws(() => createRobloxImportPackage(document), /Roblox 资源 ID/);
   document.root.children[0].properties.Image = 'rbxassetid://123';
   assert.equal(JSON.stringify(createRobloxImportPackage(document)).includes('data:image'), false);
 });
 
-test('image preflight groups repeated asset and inline previews and reports node paths', () => {
+test('image preflight groups repeated library references and reports node paths', () => {
   const document = strategy.createDocument('Rewards'); document.root.name = 'RewardsUI';
   const previewImage = { name: 'training.png', dataUrl: 'data:image/png;base64,AAAA' };
-  const first = strategy.createNode('ImageLabel'); first.name = 'TrainingIcon'; first.imageAssetId = 'training'; first.previewImage = previewImage;
-  const repeated = strategy.createNode('ImageButton'); repeated.name = 'TrainingButton'; repeated.imageAssetId = 'training'; repeated.previewImage = previewImage;
-  const inline = strategy.createNode('ImageLabel'); inline.name = 'InlineIcon'; inline.previewImage = previewImage;
+  const first = strategy.createNode('ImageLabel'); first.name = 'TrainingIcon'; first.imageAssetId = 'training';
+  const repeated = strategy.createNode('ImageButton'); repeated.name = 'TrainingButton'; repeated.imageAssetId = 'training';
+  const inline = strategy.createNode('ImageLabel'); inline.name = 'InlineIcon'; inline.properties.Image = 'rbxassetid://456';
   document.root.children.push(first, repeated, inline);
   const assets = [{ id: 'training', platform: 'roblox' as const, library: 'project' as const, name: 'TrainingIcon', tags: '', previewImage, robloxId: '', usage: 'image' as const }];
   const missing = findUnconfiguredRobloxImages(document, assets);
-  assert.equal(missing.length, 2);
+  assert.equal(missing.length, 1);
   assert.deepEqual(missing[0].nodePaths, ['RewardsUI.TrainingIcon', 'RewardsUI.TrainingButton']);
   assert.equal(missing[0].assetId, 'training');
-  assert.deepEqual(missing[1].nodePaths, ['RewardsUI.InlineIcon']);
-  assert.equal(missing[1].assetId, undefined);
   first.properties.Image = 'rbxassetid://123';
   assert.equal(findUnconfiguredRobloxImages(document, assets)[0].nodePaths.length, 1);
 });

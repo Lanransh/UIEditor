@@ -25,7 +25,7 @@ function DocumentThumbnail({ asset, editor, library }: { asset: { name: string; 
   }, [asset, current, library]);
   const document = useMemo(() => current ? editor.document : saved ? resolveImageAssets(saved, editor.imageAssets) : null, [current, editor.document, saved, editor.imageAssets]);
   return <span className="ui-asset-preview ui-document-thumbnail" role="img" aria-label={`${asset.name} 缩略图`} title={error || undefined}>
-    {document ? <span className="ui-thumbnail-artboard" aria-hidden="true"><DocumentPreview document={document} strategy={editor.strategy} /></span>
+    {document ? <span className="ui-thumbnail-artboard" aria-hidden="true"><DocumentPreview document={document} imageAssets={editor.imageAssets} strategy={editor.strategy} /></span>
       : <span className="ui-thumbnail-message">{error ? '预览不可用' : '加载中…'}</span>}
   </span>;
 }

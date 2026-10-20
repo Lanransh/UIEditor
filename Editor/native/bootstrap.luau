@@ -195,7 +195,7 @@ local function cloneNode(id)
     local copied = {
         name = source.name, className = source.className, properties = clone(source.properties),
         definitions = source.definitions, children = {},
-        previewImage = clone(source.previewImage), imageAssetId = source.imageAssetId,
+        imageAssetId = source.imageAssetId,
     }
     nodes[copiedId] = copied
     nodeCount += 1
@@ -591,7 +591,7 @@ function host.output()
         return {
             id = id, name = node.name, className = node.className,
             properties = node.properties, children = children,
-            previewImage = node.previewImage, imageAssetId = node.imageAssetId,
+            imageAssetId = node.imageAssetId,
         }
     end
     local tree = snapshot(root)
