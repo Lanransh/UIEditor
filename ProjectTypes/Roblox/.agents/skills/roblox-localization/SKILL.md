@@ -29,10 +29,13 @@ description: 编写或审查 UIEditor 的 UI 文本时使用，区分静态节�
    shortdatetime / shortdate / translate`，具体格式和预览边界见接口文档。
    数字说明符传有限 number，日期传 Unix 秒，`:translate` 传 string；同条文案不混用
    字符串类与数字类说明符。App 的英文 UTC 预览不代替 Roblox 玩家语言验证。
-5. 纯数值、图标与代码已翻译的具体文本节点，优先在设计节点及原型上保存
+5. 纯数值、图标字符与代码已翻译的具体文本节点，优先在设计节点及原型上保存
    `AutoLocalize=false`；克隆继承，无需 View 重复管理。仅代码直接新建或无法修改原模板时，
    在创建后、写入文字前补设。静态文案和依赖自动翻译的动态英文保持开启，不关闭父容器
-   或整页；代码文案定义仍保留。保存重开、导出与克隆检查开关，细节见文本接口。
+   或整页；代码文案定义仍保留。图标字符仅指文本节点中的字符，图片节点保持开启。
+   只关闭目标文本节点，先检查其后代；若有依赖自动翻译的子文本，保持父文本节点开启
+   并反馈层级冲突。祖先关闭会阻断后代，子节点 true 不能恢复，不递归批量关闭。
+   保存重开、导出与克隆检查开关，细节见文本接口。
    语言刷新由游戏已有机制驱动，连接随组件清理。
 6. 移动文件或重命名类不改已有 Key。发现冲突先说明来源及迁移影响，不擅自改已有
    Key；只有用户授权后迁移，并交付旧 Key → 新 Key 映射。修改 Source 保持 Key，
@@ -44,7 +47,7 @@ description: 编写或审查 UIEditor 的 UI 文本时使用，区分静态节�
 全部文本节点（含隐藏原型），按稳定节点 ID 编写 `local expectations = { ... }`：
 每项用 `dynamic` 声明是否由脚本填充 Text，用 `autoLocalize` 声明是否依赖节点自动翻译。
 例如 `["实际节点ID"] = {dynamic=true, autoLocalize=false}`。按真实职责填写，不照抄当前属性，
-不按节点名猜测；静态文案通常为 false/true，脚本翻译或纯数据为 true/false，图标为 false/false。
+不按节点名猜测；静态文案通常为 false/true，脚本翻译或纯数据为 true/false；图标字符仅在没有依赖自动翻译的后代时为 false/false。
 依赖自动翻译的动态英文为 true/true；TextBox 的 PlaceholderText 另行核对有效用途。
 
 将清单声明与脚本原文拼接，通过 `uie.code.execute` 携带最新 sessionId/revision 执行；
