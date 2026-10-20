@@ -24,6 +24,8 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 
 创建或打开工程会生成工作区 `Run.bat`，双击可直接打开该工程；移动工程或更换编辑器位置后，重新打开工程以更新启动路径。工作区 `.gitignore` 仅追加 `/Run.bat`，工程 `project.json`、UI 文件和项目图片资产均可提交。已有忽略规则保留，用户自建 Run.bat 不会被覆盖。
 
+工作台顶部“批量导出”支持多选项目UI并依次导出到 Toolkit 当前唯一连接的工程，每项等待 Studio 回执后继续，显示逐项状态和总进度。支持停止队列、继续查询和取消当前任务；提交结果未知时暂停整轮，重试当前快照后再继续。离开工作台会停止后续提交，已发出的操作仍可能完成。批量导出使用已保存的界面与脚本，当前修改请先保存；缺少图片 Roblox ID 时先通过单界面导出处理。
+
 ### 模板风格与项目 AI
 
 工程公共入口和技能维护于 `ProjectTypes/Roblox/`；视觉风格维护于
@@ -76,6 +78,7 @@ npm run dev
 | 命令 | 用途 |
 | --- | --- |
 | `npm run typecheck` | TypeScript 静态检查 |
+| `npm run test:batch-export` | 构建并验证多选队列、串行回执、失败继续及连接拦截 |
 | `npm run build:runtime` | 使用固定版本官方 Luau 源码构建独立宿主，输出到 native-bin |
 | `npm test` | 存储、布局、撤销重做及真实 Luau 运行测试；先构建运行宿主 |
 | `npm run build` | 检查并生成界面和 Electron 代码 |

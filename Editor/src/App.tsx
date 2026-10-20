@@ -13,6 +13,7 @@ import { NewProjectDialog } from './editor/NewProjectDialog';
 import { RobloxImportDialog } from './editor/RobloxImportDialog';
 import { McpSettings } from './editor/McpSettings';
 import { StyleLibraryDialog } from './editor/StyleLibraryDialog';
+import { BatchExportMenu } from './editor/BatchExportMenu';
 
 declare global { interface Window { projects: ProjectAPI } }
 
@@ -243,6 +244,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
           <button disabled={editor.busy || !history.canRedo} title={history.redoLabel ?? undefined} onClick={history.redo}>重做 <span>Ctrl+Y / Ctrl+Shift+Z</span></button>
         </div>
       </details>
+      <BatchExportMenu editor={editor} />
     </header>
     {creatingInterface && <NewInterfaceDialog onCancel={() => setCreatingInterface(false)} onCreate={name => { setCreatingInterface(false); void editor.newDocument(name); }} />}
     {savingTemplate && <SaveDocumentDialog editor={editor} onClose={() => setSavingTemplate(false)} />}
