@@ -14,12 +14,13 @@ test('Text module formats source parameters in View and Preview without translat
   document.root.children.push(strategy.createNode('TextLabel'));
   document.scripts.source = `local FX = _G.FX
 local Text = FX.Loader:RequireShared("Scripts/Game/Shared/Text")
-local TranslationTexts = {
-    Reward = { Key = "TextPreview.Reward", Source = "{player} received {count:int} {item}: {value}" },
-}
+local TranslationTexts = Text.Define("TextPreview", {
+    Reward = "{player} received {count:int} {item}: {value}",
+    Item = "Coins",
+})
 local UI = FX.Class("CTextPreviewView", "CUIView")
 function UI:Render(state)
-    local arguments = {player = "Player%1", count = 99.8, itemDefinition = {Key = "TextPreview.Item", Source = "Coins"}, value = "1.2K"}
+    local arguments = {player = "Player%1", count = 99.8, itemDefinition = TranslationTexts.Item, value = "1.2K"}
     self:GetRootNode():GetChildren()[1].Text = Text.Tr(TranslationTexts.Reward, arguments)
     assert(arguments.item == nil)
     assert(TranslationTexts.Reward.Source == "{player} received {count:int} {item}: {value}")
@@ -53,8 +54,59 @@ return Preview`;
     const exported = createRobloxImportPackage(document);
     assert.ok(JSON.stringify(exported).includes('Scripts/Game/Shared/Text'));
     assert.ok(JSON.stringify(exported).includes('TranslationTexts'));
+    assert.ok(JSON.stringify(exported).includes('Text.Define'));
     assert.ok(!JSON.stringify(exported).includes('TextPreview.Format'));
   } finally { await session.stop(); }
+});
+
+test('Text.Define expands stable keys, freezes results and validates names and sources without a global registry', async () => {
+  const document = strategy.createDocument('TextDefinitions');
+  document.scripts.source = `local FX = _G.FX
+local Text = FX.Loader:RequireShared("Scripts.Game.Shared.Text")
+local TranslationTexts = Text.Define("OnlineReward", {
+    Progress = "{current:int} / {required:int} minutes",
+    Claimable = "Ready!",
+})
+local UI = FX.Class("CTextDefinitionsView", "CUIView")
+function UI:OnReady()
+    assert(Text == FX.Loader:RequireShared("Scripts/Game/Shared/Text"))
+    assert(not pcall(function() FX.Loader:RequireShared("Scripts.Game.Shared.Other") end))
+    assert(TranslationTexts.Progress.Key == "OnlineReward.Progress")
+    assert(TranslationTexts.Progress.Source == "{current:int} / {required:int} minutes")
+    assert(TranslationTexts.Claimable.Key == "OnlineReward.Claimable")
+    assert(Text.Tr(TranslationTexts.Progress, {current = 5, required = 10}) == "5 / 10 minutes")
+    assert(table.isfrozen(TranslationTexts))
+    assert(table.isfrozen(TranslationTexts.Progress))
+    assert(not pcall(function() TranslationTexts.New = {} end))
+    assert(not pcall(function() TranslationTexts.Progress = {} end))
+    assert(not pcall(function() TranslationTexts.Progress.Key = "Other.Key" end))
+    assert(not pcall(function() TranslationTexts.Progress.Source = "Changed" end))
+    assert(next(Text.Define("Empty", {})) == nil)
+    assert(Text.Define("OnlineReward", {Claimable = "Ready!"}).Claimable.Key == TranslationTexts.Claimable.Key)
+    assert(Text.Define("OtherReward", {Claimable = "Ready!"}).Claimable.Key == "OtherReward.Claimable")
+    local sources = {Message = "Original"}
+    local definitions = Text.Define("Copy", sources)
+    sources.Message = "Changed"
+    assert(definitions.Message.Source == "Original")
+    assert(not table.isfrozen(sources))
+    for _, prefix in ipairs({"", " ", "reward", "Reward.View", "Reward_View", "1Reward"}) do
+        assert(not pcall(Text.Define, prefix, {Message = "Text"}))
+    end
+    assert(not pcall(Text.Define, 1, {}))
+    assert(not pcall(Text.Define, "Reward", nil))
+    assert(not pcall(Text.Define, "Reward", "text"))
+    for _, name in ipairs({"", " ", "message", "Reward.Message", "Reward_Message", "1Message"}) do
+        assert(not pcall(Text.Define, "Reward", {[name] = "Text"}))
+    end
+    assert(not pcall(Text.Define, "Reward", {[1] = "Text"}))
+    for _, source in ipairs({"", " ", 1, false, {}}) do
+        assert(not pcall(Text.Define, "Reward", {Message = source}))
+    end
+end
+return UI`;
+  document.scripts.integration = 'return _G.FX.Class("CTextDefinitionsPreview", "CTextDefinitionsView")';
+  const { session } = await LuauSession.start(resolve('native-bin'), document);
+  await session.stop();
 });
 
 test('runtime OnReady can disable localization on the root and visual descendants', async () => {

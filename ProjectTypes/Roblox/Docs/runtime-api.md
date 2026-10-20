@@ -6,8 +6,9 @@
 
 接入类 Ctor 先调用 Super.Ctor，在自身 Config/State 定义模拟数据；OnUIAction 修改状态并 RefreshUI。App 支持有限 FX.Class，不包含完整游戏框架。停止统一清理连接。
 
-`FX.Loader:RequireShared("Scripts/Game/Shared/Text")` 提供项目 Text 接口：
-`Text.Tr(definition, arguments?)` 用 Source 展开参数，`Text.TrSource(source)` 返回原文。
+`FX.Loader:RequireShared("Scripts.Game.Shared.Text")` 提供项目 Text 接口（兼容旧斜杠路径）：
+`Text.Define(prefix, sources)` 展开只读定义，`Text.Tr(definition, arguments?)` 用 Source 展开参数，
+`Text.TrSource(source)` 返回原文。
 不加载真实译文，不支持任意模块加载；定义、格式和制作规则见 [UI 文本与翻译接口](text-localization.md)。
 
 窗口统一通过 `Show()` / `Hide()` 显隐。`CUIView.OpenAnimation` 默认 true，

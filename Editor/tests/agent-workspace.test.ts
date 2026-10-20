@@ -27,6 +27,10 @@ test('打开更新公共提示词，保留 styles/LOCAL，重复同步不改写�
   await cp(resolve('../ProjectTypes/Roblox'), type, { recursive: true });
   const project = (await createProject(root, undefined, resolve('../TemplateStyles/Roblox/多彩棋格风格'), type)).project;
   const agent = project.path;
+  const localizationSkill = join('.agents', 'skills', 'roblox-localization', 'SKILL.md');
+  assert.match(await readFile(join(agent, localizationSkill), 'utf8'), /Text\.Define/);
+  assert.match(await readFile(join(agent, 'AGENTS.md'), 'utf8'), /roblox-localization\/SKILL\.md/);
+  await writeFile(join(agent, localizationSkill), '# 旧版规范');
   const local = join(agent, 'AGENTS.LOCAL.md');
   await writeFile(local, '# 项目要求');
   await writeFile(join(agent, 'styles', 'Game-DESIGN.md'), '# 自定义风格');
@@ -35,6 +39,7 @@ test('打开更新公共提示词，保留 styles/LOCAL，重复同步不改写�
   await writeFile(join(agent, 'Docs', 'obsolete.md'), 'old');
   await writeFile(join(type, 'Docs', 'runtime-api.md'), '# 新版接口');
   await syncAgentWorkspace(project.path, type);
+  assert.equal(await readFile(join(agent, localizationSkill), 'utf8'), await readFile(join(type, localizationSkill), 'utf8'));
   assert.equal(await readFile(join(agent, 'Docs', 'runtime-api.md'), 'utf8'), '# 新版接口');
   await assert.rejects(readFile(join(agent, 'Docs', 'obsolete.md')), /ENOENT/);
   assert.equal(await readFile(local, 'utf8'), '# 项目要求');

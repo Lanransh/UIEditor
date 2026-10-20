@@ -271,6 +271,25 @@ function Text.ValidateDefinition(definition)
         "Text: definition.Source must be a non-empty string")
     return definition
 end
+-- 将业务前缀和原文表展开为只读定义，不翻译或登记全局 Key。
+-- @param prefix string 稳定的 PascalCase 业务前缀
+-- @param sources table PascalCase 条目名到英文原文或参数模板的映射
+-- @return table 按原条目名索引的只读 Key/Source 定义表
+function Text.Define(prefix, sources)
+    assert(type(prefix) == "string" and string.match(prefix, "^[A-Z][A-Za-z0-9]*$"),
+        "Text: prefix must be a PascalCase business name")
+    assert(type(sources) == "table", "Text: sources must be a table")
+    local definitions = {}
+    for name, source in pairs(sources) do
+        assert(type(name) == "string" and string.match(name, "^[A-Z][A-Za-z0-9]*$"),
+            "Text: entry name must be a PascalCase identifier")
+        definitions[name] = table.freeze(Text.ValidateDefinition({
+            Key = prefix .. "." .. name,
+            Source = source,
+        }))
+    end
+    return table.freeze(definitions)
+end
 function Text.FromConfig(source)
     return Text.ValidateDefinition({ Key = source, Source = source })
 end
@@ -315,7 +334,8 @@ end
 table.freeze(Text)
 -- 白名单入口，不能借此加载任意游戏模块。
 function Loader:RequireShared(path)
-    assert(path == "Scripts/Game/Shared/Text", "Unsupported shared module: " .. tostring(path))
+    assert(path == "Scripts.Game.Shared.Text" or path == "Scripts/Game/Shared/Text",
+        "Unsupported shared module: " .. tostring(path))
     return Text
 end
 -- 校验固定路径，避免空段或斜杠被静默解析为其他节点。

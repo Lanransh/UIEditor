@@ -18,15 +18,18 @@
 
 ### 项目文本接口模拟
 
-App 运行时通过 `FX.Loader:RequireShared("Scripts/Game/Shared/Text")` 提供冻结的 Text
-兼容模块，仅允许这一模块路径。`Text.Tr(definition, arguments?)` 校验非空 Key/Source，
+App 运行时通过 `FX.Loader:RequireShared("Scripts.Game.Shared.Text")` 提供冻结的 Text
+兼容模块，仅允许这一模块（兼容旧斜杠路径）。`Text.Define(prefix, sources)` 将业务前缀与
+PascalCase 条目名展开为只读 Key/Source 定义，校验名称和非空原文，不翻译或全局登记。
+`Text.Tr(definition, arguments?)` 校验非空 Key/Source，
 按 Source 展开参数；支持普通和数字索引占位符、int、fixed、num 及 string/translate
 原值替换，itemDefinition 按原文求值得到 item。无参数时返回 Source，不改变定义与参数。
 `Text.TrSource(source)` 返回原文，不展开参数。ValidateDefinition/FromConfig 保持项目定义合同。
 不加载真实译文，不模拟日期格式或语言切换，非法定义、缺失参数及未支持格式明确报错。
 保存和导出保留源码，由游戏真实 Text 接口处理翻译；不将模拟实现导出到游戏。
 
-公共制作提示词要求各 Luau 顶层独立定义 TranslationTexts，Key 在收集范围唯一；
+公共本地化 skill 要求新增动态原文在各 Luau 顶层独立用 Text.Define 声明 TranslationTexts，
+Key 在收集范围唯一且不随文件或类名变化；App 不实现静态收集器或全项目 Key 校验。
 静态节点与配置引用不补表，View 已处理的动态文案不在模拟或游戏接入中重复翻译。
 详细作者合同见 [UI 文本与翻译接口](../../ProjectTypes/Roblox/Docs/text-localization.md)。
 
