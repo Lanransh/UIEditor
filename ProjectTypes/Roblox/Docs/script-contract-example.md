@@ -14,33 +14,104 @@ TitleTxt（TextLabel）、StatusTxt（TextLabel）、ClaimBtn（TextButton）。
 --[[
 单条奖励接入契约
 
+职责边界：
+  展示类：绑定节点和领取事件，更新标题、状态文字及按钮可点击性。
+  游戏接入：提供真实配置与状态，处理请求、资格校验和权威结果。
+  游戏接入不重绑领取事件，不覆写 Render 或再次设置上述节点属性。
+  展示缺陷或契约不能满足需求时反馈 UIEditor，不在项目中补丁绕过。
+
 Config（RewardConfig）：
   entryId: string，必填，稳定的奖励条目业务 ID，无默认值；不是物品 ID。
   title: string，必填，标题，无默认值。
+
 State（RewardState，Render 的完整输入，不是增量）：
   status: string，必填，无默认值；只允许 Locked / Claimable / Claimed，
           分别表示未满足条件 / 可领取 / 已领取，由接入层提供。
   pending: boolean，可选，省略按 false 处理；请求期间禁用领取。
   error: string，可选，省略为 nil；失败提示原文，非 pending 时优先显示。
 
-最小完整数据示例（在接入 Ctor 调用父构造之后准备）：
-  self.Config = { entryId = "online_5", title = "在线 5 分钟奖励" }
-  self.State = { status = "Claimable", pending = false }
-
-数据来源与刷新：
+初始化与刷新：
   GetUIConfig() 默认读取 self.Config；GetUIState() 默认读取 self.State。
   RefreshUI() 调用 Render(GetUIState())，不合并补丁、不填充业务字段。
   接入 OnReady 先调用父 OnReady 绑定节点，再 BindUIData()、Show()。
   后续更新 self.State 后调用 self:RefreshUI()；Render 只读数据、更新显示。
   本例没有列表或加载态；首次刷新前须备齐数据，异步未就绪时不调用 Show。
 
-动作与覆写：
-  必需实现 OnUIAction(action, payload)，无返回值。
-  action = "Claim"；payload = { entryId: string }，与 Config.entryId 相同。
+展示与交互规则：
+  状态文字优先级：pending > error > status。
+  pending：显示“领取中”。
+  error：显示失败提示；不自动改变领取资格。
+  Locked：显示“尚未满足条件”，不允许点击，也不发送解释原因的动作。
+  Claimable：显示“可领取”，仅非 pending 时允许点击并发送 Claim。
+  Claimed：显示“已领取”，不允许点击。
+  本例不动态改按钮颜色，也无其他输入事件。
+
+动作：
+  action = "Claim"。
+  payload.entryId: string，必填，与 Config.entryId 相同的稳定奖励条目业务 ID。
   真实接入负责资格校验和请求：请求前 pending=true、error=nil 并刷新；
   成功后 pending=false、status="Claimed"；失败后 pending=false、error=提示，
   并按业务结果保留或更新 status。每次状态更新后刷新。
-  无其他必需或可选的页面专用覆写。模拟接入只修改模拟状态，不实际发奖。
+  模拟接入只修改模拟状态，不实际发奖。
+
+接口实现清单：
+  必须实现的页面接口：
+    OnUIAction(action: string, payload: table) -> 无返回值。
+    由继承的 EmitUIAction 在点击时调用；仅支持上述 Claim 与 entryId。
+    负责请求与结果处理，不调用父 OnUIAction（父实现会报未接入错误）。
+  项目生命周期与数据接入：
+    Ctor(owner: table) -> 无返回值。
+    组件创建时调用；若在此准备依赖和数据，必须先调用父 Ctor(self, owner)。
+    OnReady() -> 无返回值。
+    本例接入类必须实现；宿主初始化时调用，先父 OnReady，再 BindUIData、Show。
+    BindUIData() -> 无返回值。
+    本例需要跟随真实奖励数据变化时覆写；由上述接入 OnReady 调用一次。
+    覆写后负责读取首次状态、刷新和订阅；无需再调只刷新一次的父实现。
+    Dtor() -> 无返回值。
+    仅有未托管的订阅或请求等资源时覆写；组件销毁时先释放自身资源，再调父 Dtor。
+    已由 TrackConnection/TrackCleanup 托管的资源交父类清理，不重复释放。
+  可选页面专用覆写：无。
+  继承无需重写：
+    GetUIConfig() -> RewardConfig，供展示层读取 self.Config。
+    GetUIState() -> RewardState，供 RefreshUI 读取 self.State。
+    OnShow() -> 无返回值，本页面已在显示时刷新，项目不重复实现。
+  项目仅调用，不重写：
+    RefreshUI() -> 无返回值；项目更新完整状态后调用。
+    Show() / Hide() -> 无返回值；由项目业务入口决定何时打开或关闭。
+    TrackConnection(connection: RBXScriptConnection) -> RBXScriptConnection。
+    项目建立订阅后调用以托管连接；返回传入的同一连接。
+  展示层内部，不得覆盖：
+    Render、EmitUIAction、SetButtonEnabled 及已有节点/事件绑定逻辑。
+
+项目接入步骤：
+  1. 在 Generated 外创建继承 CRewardView 的游戏类，初始化完成后加载，
+     在客户端玩家对象创建前 require，并只挂载游戏子类，不挂载模拟类。
+  2. 准备真实奖励数据与请求依赖；先父构造，再提供完整 Config 和首次 State。
+     status 来自权威奖励数据；尚未就绪不 Show，不用模拟 Claimable 充当真实资格。
+  3. OnReady 先让父类绑定节点，再调用项目 BindUIData，最后 Show。
+     BindUIData 读取最新完整状态并刷新，只建立一次数据订阅并托管连接；
+     Show 触发已继承的 OnShow 刷新，不需要项目再写 OnShow。
+  4. 数据订阅收到更新后转换并写入完整 State，再 RefreshUI；
+     请求进行中保留本次 pending，不因覆盖业务快照丢失防重状态。
+  5. 收到 Claim 时核对 entryId，拦截重复请求，设置 pending=true、清 error 并刷新，
+     再向项目真实服务端发送稳定奖励 ID；服务端校验资格并发奖。
+     成功时采用权威结果更新 status；失败时按权威结果保留或更新 status，并设置 error。
+     两条路径均清 pending 并刷新，不在客户端直接认定发奖成功。
+  6. 业务入口调用 Hide 关闭；本例隐藏后保留订阅，再次 Show 由父行为显示最新状态。
+     关闭不等于销毁，不在重开时重复订阅或绑定按钮。
+  7. 销毁时释放未托管资源，取消请求或阻止已过期回调更新本实例；
+     父 Dtor 清理已托管连接和展示资源。项目不删除继承层拥有的节点。
+  本例未指定真实服务或协议名，需按项目现有接口接入，不存在内置奖励服务 API。
+
+最小完整数据示例（在接入 Ctor 调用父构造之后准备）：
+  self.Config = {
+      entryId = "online_5",
+      title = "在线 5 分钟奖励",
+  }
+  self.State = {
+      status = "Claimable",
+      pending = false,
+  }
 ]]
 local FX = _G.FX
 local FXLoader = FX.Loader
@@ -162,6 +233,10 @@ Claimable、Claimed、pending=true、error="领取失败，请重试"，再刷�
 
 ## AI 交付前核对
 
+- 契约分节、空行、字段换行和嵌套缩进清晰，最小样例不是压缩的一行 table。
+- 项目与展示层职责、状态优先级、点击许可及允许的覆写入口均明确，不依赖项目二次覆盖。
+- 接口清单明确必需、条件覆写、继承、仅调用及禁止覆盖的分类，参数、返回值、时机和 Super 顺序齐全。
+- 项目步骤逐项对应实际数据、动作、请求及清理，不把模拟实现当作真实业务接入。
 - 接入者只读 source，就能写出完整 Config/State、知道何时刷新及如何处理动作。
 - Render 和它调用的方法读取的所有业务字段均有说明；可选字段的实际行为符合注释。
 - 示例 ID、字典键、动作参数相互对应；模拟类遵循同一契约。

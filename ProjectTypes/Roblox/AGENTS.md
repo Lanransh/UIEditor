@@ -9,6 +9,9 @@ AGENTS.LOCAL.md 和 styles/ 由项目维护并提交；不修改编辑器维护�
 本工作区就是 UIEditorWorkspace，交付物是工程中可继续编辑、保存和重开的 Roblox UI。
 制作或修改 UI 时使用 [Roblox UI 制作技能](.agents/skills/roblox-ui-authoring/SKILL.md)；
 编写 Luau 时同时读取 [编码规范](.agents/skills/roblox-luau-standards/SKILL.md)。
+编写或修改界面交互脚本前，必须读取本工作区的
+[脚本数据契约示例](Docs/script-contract-example.md)，按示例的分节、换行和缩进组织契约，
+明确展示层与项目接入职责；参考结构而非照搬奖励业务字段。
 涉及 UI 文本时同时使用 [本地化规范](.agents/skills/roblox-localization/SKILL.md)，
 按其中规则声明文案、保存动态节点属性，并执行覆盖隐藏原型的文本属性验收及运行态检查。
 未执行或未通过须明确报告，不能仅凭截图宣称通过。
