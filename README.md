@@ -46,7 +46,7 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 复制失败清理本次创建内容，目标已有文件不会被覆盖。
 
 在 Codex 中以项目 `UIEditorWorkspace/` 为 AI 工作目录，
-启用 `ui-editor` MCP 并在 App 中打开该项目，只需描述界面需求。
+启用 `ui-editor` MCP 后，可由 AI 调用 `uie.project.open` 打开该项目，无需人工先启动工作区。
 项目入口要求 AI 先读规范及实际模板结构，按用途自动选择窗口和组件，
 沿用本风格的字体、字号、加粗、语义色与纹理，通过 MCP 制作、测试、
 截图、保存和重开。不能用模拟领取/购买状态代替真实资格校验、支付或发奖。
@@ -63,7 +63,7 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 
 ## 开发与验证
 
-Hub 右上角“设置”提供 Codex MCP 配置以启用 `ui-editor`。AI 在当前打开的工程内通过节点查询和代码事务制作界面，可用文件工具直接修改同名 `.view.luau` 交互代码与 `.example.luau` 模拟接入代码，再运行、模拟点击、读取日志和截图。执行结果可在 App 内撤销重做，MCP 不提供 undo/redo。所有新工程从项目 `UIEditorWorkspace` 根目录开始；工程类型提供平台技能，风格提供视觉规范和专项技能。运行、保存或重开界面时重新读取磁盘；同一文件两侧修改冲突时提示处理。工作区启动不迁移旧结构。接口与边界见 [MCP 自动化](Docs/design/mcp-automation.md)。
+Hub 右上角“设置”提供 Codex MCP 配置以启用 `ui-editor`。 新版 App 运行一次后，AI 可通过 `uie.project.open({path:"工作区绝对路径",minimized:true})` 自主启动并打开已有 UIEditorWorkspace；默认最小化，传 false 正常显示。重复打开同工程复用会话；无法安全切换时明确要求人工保存并关闭，不自动丢弃修改。`uie.editor.get_state` 返回当前 workspacePath，Hub 时为 null。AI 在当前打开的工程内通过节点查询和代码事务制作界面，可用文件工具直接修改同名 `.view.luau` 交互代码与 `.example.luau` 模拟接入代码，再运行、模拟点击、读取日志和截图。执行结果可在 App 内撤销重做，MCP 不提供 undo/redo。所有新工程从项目 `UIEditorWorkspace` 根目录开始；工程类型提供平台技能，风格提供视觉规范和专项技能。运行、保存或重开界面时重新读取磁盘；同一文件两侧修改冲突时提示处理。工作区启动不迁移旧结构。接口与边界见 [MCP 自动化](Docs/design/mcp-automation.md)。
 
 ```powershell
 cd Editor
@@ -92,6 +92,7 @@ npm run dev
 | `npm run test:runtime` | 构建并验证脚本、按钮动作、数据刷新、重置及错误恢复 |
 | `npm run build:mcp` | 构建独立 stdio MCP 服务，普通 build 已包含 |
 | `npm run test:mcp` | 构建并通过真实 stdio MCP 验证制作、查询、历史、运行与保存 |
+| `npm run test:project-opening` | 构建并验证 MCP 工作区冷启动、重复打开、安全切换与最小化 |
 | `npm run test:mcp:packaged` | 验证已打包程序的 MCP 完整链路，需先 package |
 | `npm run test:asset-refresh` | 构建并验证外部 UI、模板、图片与目录变化后的自动刷新及监听清理 |
 | `npm run test:assets` | 构建并验证图片库、共用属性面板、单一 Roblox ID、保存重开及资产 MCP |

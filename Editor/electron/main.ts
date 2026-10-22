@@ -1,8 +1,9 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
-import { join, dirname, basename, relative } from 'node:path';
+import { join, dirname, basename, relative, isAbsolute } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
-import { mkdir, stat } from 'node:fs/promises';
+import { mkdir, stat, writeFile, rename } from 'node:fs/promises';
+import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { createProject, describeError, openProject, RecentProjects } from './projects';
 import type { Project, Result, RecentProjectView } from '../src/shared/project';
@@ -39,8 +40,12 @@ for (const name of ['userData', 'sessionData', 'logs', 'crashDumps'] as const) {
 
 const startupWorkspace = process.env.UI_EDITOR_OPEN_WORKSPACE;
 const background = process.env.UI_EDITOR_BACKGROUND === '1';
+const mcpLaunch = process.env.UI_EDITOR_MCP_LAUNCH === '1';
+const startMinimized = process.env.UI_EDITOR_MINIMIZED === '1';
 delete process.env.UI_EDITOR_OPEN_WORKSPACE;
-if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null })) {
+delete process.env.UI_EDITOR_MCP_LAUNCH;
+delete process.env.UI_EDITOR_MINIMIZED;
+if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null, mcpLaunch })) {
   app.quit();
 } else {
   void app.whenReady().then(async () => {
@@ -53,9 +58,10 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       title: 'UI 编辑器', backgroundColor: '#f7f8fa', show: false,
       skipTaskbar: background, focusable: !background,
       icon: join(__dirname, '../dist/app-icon.png'),
-      webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: !background },
+      webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: !background && !startMinimized },
     });
     app.on('second-instance', (_event, _argv, _cwd, data) => {
+      if ((data as { mcpLaunch?: boolean } | null)?.mcpLaunch) return;
       if (!background) {
         if (window.isMinimized()) window.restore();
         window.show();
@@ -70,7 +76,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
         finally { busy = false; }
       })().catch(error => dialog.showMessageBox(window, { type: 'error', title: '无法打开工作区', message: describeError(error) }));
     });
-    if (!background) window.once('ready-to-show', () => window.show());
+    if (!background) window.once('ready-to-show', () => { if (startMinimized) window.minimize(); else window.show(); });
     const source = !app.isPackaged && process.env.UI_EDITOR_DEV_URL
       ? process.env.UI_EDITOR_DEV_URL : pathToFileURL(join(__dirname, '../dist/index.html')).href;
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -81,6 +87,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       return listTemplateStyles(stylesRoot);
     }
     let activeProject: Project | null = null;
+    let hubReady = false;
     let assetWatchers: (() => void)[] = [];
     function stopAssetWatchers() { assetWatchers.forEach(stop => stop()); assetWatchers = []; }
     window.on('closed', stopAssetWatchers);
@@ -144,6 +151,13 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     const trusted = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === source;
     const nativeDirectory = join(__dirname, app.isPackaged ? '../../native-bin' : '../native-bin');
     const discoveryPath = join(runtime, 'ui-editor-automation.json');
+    const launchPath = `${discoveryPath}.launch.json`, launchTemporary = `${launchPath}.${randomUUID()}.tmp`;
+    await writeFile(launchTemporary, JSON.stringify({
+      version: 1, executablePath: process.execPath,
+      ...(app.isPackaged ? {} : { applicationPath: app.getAppPath() }),
+      ...(process.env.UI_EDITOR_USER_DATA ? { userDataPath: process.env.UI_EDITOR_USER_DATA } : {}),
+    }), { flag: 'wx' });
+    await rename(launchTemporary, launchPath);
     const mcpSettings = createCodexMcpSettingsStore({ serverPath: app.isPackaged ? join(process.resourcesPath, 'mcp-dist/server.mjs') : join(__dirname, '../mcp-dist/server.mjs'), discoveryPath });
     const cursorMcpSettings = createCursorMcpSettingsStore({ serverPath: app.isPackaged ? join(process.resourcesPath, 'mcp-dist/server.mjs') : join(__dirname, '../mcp-dist/server.mjs'), discoveryPath });
     let automationReady = false;
@@ -162,8 +176,49 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       clearTimeout(item.timer); pending.delete(reply.requestId);
       if (reply.ok) item.resolve(reply.value); else item.reject(new Error(reply.error));
     });
+    function sendAutomation(request: { name: string; arguments: Record<string, unknown> }): Promise<unknown> {
+      const requestId = randomUUID();
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => { pending.delete(requestId); reject(request.name === 'uie.project.open' ? intervention('工程切换超时') : new Error('编辑器操作超时。')); }, request.name === 'uie.document.export' ? 140000 : 12000);
+        pending.set(requestId, { resolve, reject, timer }); window.webContents.send('automation:request', { ...request, requestId });
+      });
+    }
+    const intervention = (reason = '当前有未保存修改、运行会话或未完成操作') => new Error(`当前工作区：${activeProject?.path ?? 'Hub'}。${reason}，无法安全关闭当前工程会话，需要人工介入：请保存并关闭当前 UI 编辑器后重试。`);
+    async function waitForEditor(ready: () => boolean) {
+      const deadline = Date.now() + 10000;
+      while (!ready()) {
+        if (window.isDestroyed() || Date.now() >= deadline) throw intervention('等待编辑器就绪超时或窗口已关闭');
+        await delay(50);
+      }
+    }
     const bridge = await startBridge(discoveryPath, async request => {
       const a = request.arguments;
+      if (request.name === 'uie.project.open') {
+        if (typeof a.path !== 'string' || !isAbsolute(a.path)) throw new Error('path 必须是 UIEditorWorkspace 的绝对路径。');
+        const project = await openProject(a.path);
+        await waitForEditor(() => hubReady && (automationReady || !busy));
+        const same = automationReady && activeProject?.path.toLowerCase() === project.path.toLowerCase();
+        if (!same) {
+          if (busy || dirty || runtimeSession || (activeProject && !automationReady && window.webContents.isCrashed())) throw intervention();
+          let opened: Project;
+          if (automationReady) opened = await sendAutomation({ name: 'uie.project.open', arguments: { path: project.path } }) as Project;
+          else {
+            busy = true;
+            try { opened = await remember(project, false); }
+            finally { busy = false; }
+          }
+          cancelAutomation();
+          window.webContents.send('project:activated', opened);
+          await waitForEditor(() => automationReady && activeProject?.path === project.path);
+        }
+        const state = await sendAutomation({ name: 'uie.editor.get_state', arguments: {} });
+        if (!background) {
+          window.webContents.setBackgroundThrottling(false);
+          if (a.minimized !== false) window.minimize();
+          else { if (window.isMinimized()) window.restore(); window.show(); window.focus(); }
+        }
+        return { ...(state as object), workspacePath: project.path, agentWorkspacePath: project.path, reused: same, minimized: window.isMinimized() };
+      }
       if (request.name === 'uie.project.list') return reader.listProjects();
       if (request.name === 'uie.document.list' && (a.projectId !== undefined || a.library === 'permanent' || !automationReady)) return reader.listDocuments(a);
       if (a.target !== undefined && request.name !== 'uie.document.open') {
@@ -188,20 +243,17 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
         return { projectId, assets: matches.slice(offset, offset + limit).map(({ previewImage: _, ...asset }) => asset), total: matches.length, nextOffset: offset + limit < matches.length ? offset + limit : null };
       }
       if (!automationReady || window.isDestroyed()) {
+        if (request.name === 'uie.editor.get_state') return { connected: true, state: 'hub', projectId: null, projectName: null, documentId: null, workspacePath: null, agentWorkspacePath: null, nodeCount: 0, ...(a.detail === 'full' ? { document: null } : {}) };
         if (request.name === 'uie.debug.get_diagnostics') return { connected: true, state: 'hub', console: consoleLogs, consoleCursor };
         throw new Error('请先打开工程，当前没有编辑会话。');
       }
-      const requestId = randomUUID();
       const screenshot = request.name === 'uie.debug.screenshot';
       const throttling = window.webContents.getBackgroundThrottling();
       let value: unknown;
       try {
         // Resume animation frames before the renderer waits for screenshot preparation.
         if (screenshot) window.webContents.setBackgroundThrottling(false);
-        value = await new Promise<unknown>((resolve, reject) => {
-          const timer = setTimeout(() => { pending.delete(requestId); reject(new Error('编辑器操作超时。')); }, request.name === 'uie.document.export' ? 140000 : 12000);
-          pending.set(requestId, { resolve, reject, timer }); window.webContents.send('automation:request', { ...request, requestId });
-        });
+        value = await sendAutomation(request);
       } finally {
         if (screenshot && !window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.setBackgroundThrottling(throttling);
       }
@@ -233,6 +285,12 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
       if (!trusted(event)) throw new Error('无效来源。');
       const argument = input?.argument;
       switch (input?.operation) {
+        case 'project:open': {
+          if (!automationReady || busy || dirty || runtimeSession || typeof argument?.requestId !== 'string' || !pending.has(argument.requestId)) throw intervention();
+          busy = true;
+          try { return await remember(await openProject(argument.path), false, argument.requestId); }
+          finally { busy = false; }
+        }
         case 'settings:get': return mcpSettings.getStatus();
         case 'settings:set': return mcpSettings.setEnabled(argument);
         case 'settings:cursor:get': return cursorMcpSettings.getStatus();
@@ -349,9 +407,11 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
         finally { if (!assetRead) busy = false; }
       });
     }
-    async function remember(project: Project): Promise<Project> {
+    async function remember(project: Project, interactive = true, requestId?: string): Promise<Project> {
       await syncAgentWorkspace(project.path, join(app.isPackaged ? process.resourcesPath : dirname(app.getAppPath()), 'ProjectTypes', 'Roblox'));
       await ensureWorkspaceLauncher(project.path, process.execPath, app.isPackaged ? undefined : app.getAppPath());
+      if (!interactive) await recent.record(project.path);
+      if (requestId && !pending.has(requestId)) throw intervention('工程切换请求已超时或失效');
       stopRuntime();
       stopAssetWatchers();
       activeProject = project; documentPath = null; dirty = false;
@@ -365,7 +425,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
         };
         assetWatchers.push(watchAssetDirectory(directory, () => notify(), error => notify(`资产目录监听失败：${error.message}`)));
       }
-      try { await recent.record(project.path); }
+      try { if (interactive) await recent.record(project.path); }
       catch (error) {
         await dialog.showMessageBox(window, { type: 'warning', title: '无法保存最近记录', message: '工程已打开，但无法更新最近工程列表。', detail: describeError(error) });
       }
@@ -406,6 +466,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null }))
     handle('project:open-recent', async path => remember(await openProject(await recent.resolveRecent(path))));
     let startupConsumed = false;
     handle('project:open-startup', async () => {
+      hubReady = true;
       if (startupConsumed) return null;
       startupConsumed = true;
       return startupWorkspace ? remember(await openProject(startupWorkspace)) : null;

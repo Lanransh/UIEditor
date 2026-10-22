@@ -1,16 +1,12 @@
-import { readFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 import { definitions, validateTool } from '../src/shared/automation-tools';
+import { openEditor, requestEditor } from './editor-launch';
 
 export { definitions } from '../src/shared/automation-tools';
 export async function callTool(name: string, args: Record<string, unknown>, discoveryPath: string) {
   validateTool(name, args);
-  const discovery = JSON.parse(await readFile(discoveryPath, 'utf8').catch(() => { throw new Error('UIEditor 未运行。'); }));
-  if (!Number.isInteger(discovery.port) || discovery.port < 1 || discovery.port > 65535 || typeof discovery.token !== 'string') throw new Error('无效的桥接发现文件。');
-  const response = await fetch(`http://127.0.0.1:${discovery.port}/call`, { method: 'POST', headers: { authorization: `Bearer ${discovery.token}`, 'content-type': 'application/json' }, body: JSON.stringify({ name, arguments: args }), signal: AbortSignal.timeout(name === 'uie.document.export' ? 145000 : 15000) });
-  const result = await response.json() as { ok: boolean; value?: any; error?: string };
-  if (!result.ok) throw new Error(result.error);
+  const result = { value: name === 'uie.project.open' ? await openEditor(args, discoveryPath) : await requestEditor(name, args, discoveryPath) };
   if (result.value?.png) return { content: [{ type: 'image', mimeType: 'image/png', data: result.value.png }, { type: 'text', text: JSON.stringify(result.value.metadata) }] };
   if (name === 'uie.assets.get' && result.value?.asset?.previewImage) {
     const { previewImage, ...asset } = result.value.asset;

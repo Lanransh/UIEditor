@@ -283,7 +283,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
     } finally { operating.current = false; setBusy(false); }
   }
   const editor = { projectId: project.manifest.id, projectName: project.name, projectPath: project.path, strategy, document, inspectionDocument, inspectionBusy: busy || assetsLoading || (runtime.active && !runtime.ready), hasDocument, history, selected, select, editNode, editProperty, execute, add, reparent,
-    inspectedAssetId, inspectAsset, clearAssetInspection, setAssetConfigurationDirty,
+    inspectedAssetId, inspectAsset, clearAssetInspection, setAssetConfigurationDirty, assetConfigurationDirty,
     imageAssetRevision, documentAssetRevision, imageAssets, inspectImages: () => liveImageAssets.current, assetsLoading, refreshImages, configureImage, configureImageRobloxId, importImage, useImage, bakeImage,
     moveImage: (id: string, folder: string) => changeProjectImages(() => window.imageAssets.move(id, folder)),
     removeImage: (id: string) => changeProjectImages(() => window.imageAssets.remove(id)),

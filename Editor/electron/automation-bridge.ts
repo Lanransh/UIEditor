@@ -24,7 +24,7 @@ export async function startBridge(discoveryPath: string, dispatch: (request: Aut
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('桥接启动失败。');
   await mkdir(dirname(discoveryPath), { recursive: true });
   const temporary = `${discoveryPath}.${token}.tmp`;
-  try { await writeFile(temporary, JSON.stringify({ port: address.port, token }), { flag: 'wx' }); await rename(temporary, discoveryPath); }
+  try { await writeFile(temporary, JSON.stringify({ port: address.port, token, pid: process.pid }), { flag: 'wx' }); await rename(temporary, discoveryPath); }
   catch (error) { server.close(); await unlink(temporary).catch(() => {}); throw error; }
   return { close: () => { server.close(); void unlink(discoveryPath).catch(() => {}); } };
 }

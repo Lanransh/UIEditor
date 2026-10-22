@@ -16,7 +16,10 @@ description: UIEditor 文案翻译接入：Text.Define 声明、文件内去重�
 
 - 先读现有 View 和声明。每文件最多一个顶层 `local TranslationTexts = Text.Define(...)`，
   没有新增文案不建空表。先加载 Text，只用字面量，前缀和条目用 PascalCase。
-- 同文件 Key、Source 都不能重复，相同文案复用；跨文件允许重复，不建共享文案表。
+- 同文件 Key、Source 都不能重复，相同文案复用；跨文件允许重复，不建全局或集中共享文案表。
+- View 定义 TranslationTexts 后，将原表挂到类的 `BaseViewTranslationTexts` 字段供项目派生类复用，
+  例如 `CWeaponShopView.BaseViewTranslationTexts = TranslationTexts`。派生类优先引用基类已有定义，
+  不复制声明、不修改基类表；只有新增文案才在派生类文件中定义自己的 TranslationTexts。
 - Source 用完整英文，动态值通过参数传入，不拼接、不拆句翻译，不手写 Key/Source 表。
 - 在 Render 等实际展示位置调用 `Text.Tr(TranslationTexts.Message, arguments)`，
   不在模块顶层缓存译文。整数数量用 `{count:int}`，字符串或已格式化值用 `{value}`；
@@ -34,21 +37,30 @@ description: UIEditor 文案翻译接入：Text.Define 声明、文件内去重�
 - 只关闭目标文本节点，不关闭图片、父容器或整页。先检查后代；若会阻断子文本自动翻译，
   先报告层级冲突，调整后再关闭，不能靠子节点 true 覆盖。修改模板原件仍须用户授权。
 
-示例：进度节点 ProgressTxt 在编辑器中保存 `Text=""`、`AutoLocalize=false`，
+示例：持有数量节点 OwnedTxt 在编辑器中保存 `Text=""`、`AutoLocalize=false`，
 View 的声明与 Render 片段如下（节点已由现有 View 获取）：
 
 ```lua
 local FX = _G.FX
 local Text = FX.Loader:RequireShared("Scripts.Game.Shared.Text")
+local CWeaponShopView = FX.Class("CWeaponShopView", "CUIView")
 
-local TranslationTexts = Text.Define("OnlineReward", {
-    Progress = "{current:int} / {required:int} minutes",
+local TranslationTexts = Text.Define("WeaponShop", {
+    Owned = "Owned: {count:int}",
 })
+CWeaponShopView.BaseViewTranslationTexts = TranslationTexts
 
 -- 放在现有 Render 中；不重复设置节点的 AutoLocalize
-self.ProgressTxt.Text = Text.Tr(TranslationTexts.Progress, {
-    current = state.Minutes,
-    required = config.RequiredMinutes,
+self.OwnedTxt.Text = Text.Tr(TranslationTexts.Owned, {
+    count = state.OwnedCount,
+})
+```
+
+项目派生类取得基类 CWeaponShopView 后，直接复用定义，无需再次 Text.Define：
+
+```lua
+local ownedText = Text.Tr(CWeaponShopView.BaseViewTranslationTexts.Owned, {
+    count = state.OwnedCount,
 })
 ```
 

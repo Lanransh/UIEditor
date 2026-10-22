@@ -4,6 +4,7 @@ import { runtimeBatchStepsSchema, validateRuntimeBatchSteps } from './runtime-ba
 const uuid = { type: 'string', pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$' };
 const target = { type: 'object', properties: { projectId: uuid, library: { enum: ['project', 'templates', 'permanent'] }, documentId: uuid }, required: ['documentId'], additionalProperties: false };
 const properties = {
+  path: { type: 'string' }, minimized: { type: 'boolean', default: true },
   to: pointSchema, from: pointSchema, delta: pointSchema,
   steps: runtimeBatchStepsSchema,
   projectId: uuid, target, mode: { enum: ['edit', 'copy'] }, format: { enum: ['json', 'tree'] }, maxNodes: { type: 'integer', minimum: 1, maximum: 2000 },
@@ -18,6 +19,7 @@ const properties = {
   tags: { type: 'string' }, robloxId: { type: 'string' }, filePath: { type: 'string' },
 };
 const fields: Record<string, string[]> = {
+  'uie.project.open': ['path', 'minimized'],
   'uie.runtime.hover': ['sessionId', 'revision', 'id'],
   'uie.runtime.scroll': ['sessionId', 'revision', 'id', 'to', 'delta'],
   'uie.runtime.drag': ['sessionId', 'revision', 'id', 'from', 'to', 'steps'],
@@ -36,7 +38,7 @@ const fields: Record<string, string[]> = {
   'uie.document.export': [],
 };
 const descriptions = [
-  'Read active project/session, revision, current file library/path/mode, absolute workspacePath/agentWorkspacePath/gameDesignPath and gameDesignExists, and optionally full design document. Read/edit Game-DESIGN.md using filesystem tools.',
+  'Read active project/session, revision, current file library/path/mode, absolute workspacePath/agentWorkspacePath/gameDesignPath and gameDesignExists, and optionally full design document. Hub returns state=hub and workspacePath=null. Does not launch the App. Read/edit Game-DESIGN.md using filesystem tools.',
   'Discover project APIs before executing code. Prefer detail=summary, then className for needed node properties/parenting. Omitted filters return full capabilities.',
   'Read current or saved UI nodes. target selects document UUID and library; omitted projectId means current project. Omit id for root. format=tree returns compact text; depth/maxNodes bound output. compact=true omits JSON paths/parent IDs.',
   'Find nodes in current UI or saved target by name, class and parent scope; paginated tree order. compact=true returns id/name/className. Omitted target uses current canvas.',
@@ -59,8 +61,9 @@ const descriptions = [
   'Drag a runtime node using normalized local from/to points (0–1), with 1–32 moves (default 8). Sends mouse begin/change/end without activating a button.',
   'Import a local PNG/JPEG/WebP/GIF (up to 8 MiB) by absolute filePath into the current project or permanent image library. Saves immediately, without uploading or assigning a Roblox ID; not a document undo operation. Read fresh state after importing, then use ui.assets.apply(nodeId,assetId) in code.execute.',
   'Export the current design snapshot and interaction script to Roblox through the existing Toolkit flow. Takes no arguments and exports the latest current design, including unsaved changes. Requires edit mode, configured Roblox image IDs and exactly one connected target. Does not save, upload images or change history. Returns target and task receipt; awaiting_studio is not success and Studio must still save the scene.',
+  'Launch UIEditor if needed and open an existing UIEditorWorkspace by absolute path. minimized defaults to true; false shows the window normally. Reuses the same workspace without reloading. Unsafe switches require human intervention to save and close the existing editor. Never discards changes or force-kills. Returns ready state including workspacePath.',
 ];
-export const definitions = toolNames.map((name, index) => ({ name, description: descriptions[index], inputSchema: { type: 'object', properties: Object.fromEntries(fields[name].map(key => [key, name === 'uie.runtime.hover' && key === 'id' ? { type: ['string', 'null'] } : name === 'uie.runtime.drag' && key === 'steps' ? { type: 'integer', minimum: 1, maximum: 32 } : name === 'uie.document.list' && key === 'library' ? { enum: ['project', 'templates', 'permanent'] } : properties[key as keyof typeof properties]])), additionalProperties: false, required: fields[name].filter(key => ['sessionId', 'revision'].includes(key) || (name === 'uie.assets.import' && ['library', 'filePath'].includes(key)) || (name === 'uie.runtime.batch' && key === 'steps') || (name === 'uie.runtime.drag' && ['from', 'to'].includes(key)) || (name === 'uie.code.execute' && ['language', 'source'].includes(key)) || (['uie.runtime.click', 'uie.runtime.hover', 'uie.runtime.scroll', 'uie.runtime.drag', 'uie.assets.get', 'uie.assets.configure'].includes(name) && key === 'id') || (name === 'uie.runtime.control' && key === 'action') || (name === 'uie.document.new' && key === 'name')) } }));
+export const definitions = toolNames.map((name, index) => ({ name, description: descriptions[index], inputSchema: { type: 'object', properties: Object.fromEntries(fields[name].map(key => [key, name === 'uie.runtime.hover' && key === 'id' ? { type: ['string', 'null'] } : name === 'uie.runtime.drag' && key === 'steps' ? { type: 'integer', minimum: 1, maximum: 32 } : name === 'uie.document.list' && key === 'library' ? { enum: ['project', 'templates', 'permanent'] } : properties[key as keyof typeof properties]])), additionalProperties: false, required: fields[name].filter(key => ['sessionId', 'revision'].includes(key) || (name === 'uie.assets.import' && ['library', 'filePath'].includes(key)) || (name === 'uie.runtime.batch' && key === 'steps') || (name === 'uie.runtime.drag' && ['from', 'to'].includes(key)) || (name === 'uie.code.execute' && ['language', 'source'].includes(key)) || (['uie.runtime.click', 'uie.runtime.hover', 'uie.runtime.scroll', 'uie.runtime.drag', 'uie.assets.get', 'uie.assets.configure'].includes(name) && key === 'id') || (name === 'uie.runtime.control' && key === 'action') || (name === 'uie.document.new' && key === 'name') || (name === 'uie.project.open' && key === 'path')) } }));
 
 export function validateTool(name: string, args: unknown) {
   const tool = definitions.find(tool => tool.name === name);

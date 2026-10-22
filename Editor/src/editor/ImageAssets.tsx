@@ -175,7 +175,7 @@ export function ImageAssetProperties({ editor, asset }: { editor: DocumentEditor
   let effective = '', invalid = '';
   try { effective = normalizeRobloxId(robloxId); } catch (cause) { invalid = String(cause); }
   const changed = name !== asset.name || tags !== asset.tags || robloxId !== asset.robloxId;
-  useEffect(() => { editor.setAssetConfigurationDirty(changed); return () => editor.setAssetConfigurationDirty(false); }, [changed, editor.setAssetConfigurationDirty]);
+  useLayoutEffect(() => { editor.setAssetConfigurationDirty(changed); return () => editor.setAssetConfigurationDirty(false); }, [changed, editor.setAssetConfigurationDirty]);
   async function save() {
     setPending(true); setMessage('');
     try {

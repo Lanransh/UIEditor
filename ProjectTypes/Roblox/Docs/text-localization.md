@@ -9,8 +9,12 @@ UIEditor 编写的 View 会作为 Generated 展示类导入游戏，动态文本
   不在 Render 中重复覆盖静态文字。
 - 动态完整句子、状态文案及脚本创建节点的固定文字在所属 Luau 顶层用 `Text.Define` 声明一个
   `local TranslationTexts`，使用完整英文原文或参数模板。返回表及每项定义只读。
-- 每个文件只定义自己需要的动态文案，不创建全局或集中共享表，不跨文件导出文案表。
+- 每个文件只定义自己新增的动态文案，不创建全局或集中共享表。
   同文件 Key、Source 均不重复，相同文案复用已有表项；跨文件允许重复。
+- View 将本文件的原始定义表保存到类字段 `BaseViewTranslationTexts`，例如
+  `CWeaponShopView.BaseViewTranslationTexts = TranslationTexts`，供项目派生类复用。
+  派生类优先引用基类已有定义，不重复 Text.Define，不修改基类表；新增文案才在本文件独立声明。
+  该字段保存定义而非译文字符串，仍在实际展示位置调用 Text.Tr。
 - 配置引用由工具处理，不复制配置原文到 TranslationTexts。
   纯数字、业务 ID、节点路径和玩家输入不翻译；模拟接入不重复声明 View 已有文案。
 - 游戏端不直接修改 Generated。业务接入先检查生成类，只为它尚未正确处理的动态文本
@@ -76,7 +80,8 @@ self.ProgressTxt.Text = Text.Tr(TranslationTexts.Progress, {
   App 当前不实现该收集器；需由已适配 Text.Define 的外部工具验证。
 
 新增前先检查当前文件的 `Text.Define`、条目及 Source，相同文案复用已有项。
-跨文件 Key、Source 均可重复，不为去重改已有 Key；不导入、导出文案表，接收完整定义不复制声明。
+跨文件 Key、Source 均可重复，不为去重改已有 Key；通过基类 BaseViewTranslationTexts
+复用已有定义，不复制声明或另建共享模块。挂载类字段不改变顶层 Text.Define 的静态收集形式。
 
 文件移动、类名或 UI 改名默认保持已有 Key，不批量迁移历史文案。只有用户明确授权才改 Key，
 逐项保持 Source、参数名、类型和必要标签，并交付旧 Key → 新 Key 映射供工具显式迁移；

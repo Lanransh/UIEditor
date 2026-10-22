@@ -20,7 +20,7 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
   useEffect(() => {
     if (!window.automation) return;
     let alive = true;
-    const handle = async (request: AutomationRequest): Promise<any> => {
+    const handle = async (request: AutomationRequest & { requestId?: string }): Promise<any> => {
       const { editor: e, files: f } = current.current;
       const a = request.arguments, h = e.history.inspect();
       const signature = JSON.stringify(e.inspectImages());
@@ -41,6 +41,12 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
         return { document: resolved() };
       };
       try {
+        if (request.name === 'uie.project.open') {
+          if (e.busy || dirty() || e.assetConfigurationDirty || e.runtime.active) throw new Error(`当前工作区：${e.projectPath}。无法安全关闭当前工程会话，需要人工介入：请保存并关闭当前 UI 编辑器后重试。`);
+          f.busy(true);
+          try { return await window.automation.invoke('project:open', { path: a.path, requestId: request.requestId }); }
+          finally { f.busy(false); }
+        }
         if (!e.hasDocument && !['uie.editor.get_state', 'uie.editor.get_capabilities', 'uie.document.list', 'uie.document.new', 'uie.document.open', 'uie.assets.search', 'uie.assets.get', 'uie.assets.configure', 'uie.assets.import', 'uie.debug.get_diagnostics'].includes(request.name)) throw new Error('请先新建或打开界面。');
         switch (request.name) {
           case 'uie.runtime.batch': return { ...await executeRuntimeBatch(a, handle, () => current.current.editor.runtime.inspect().frame, verify, () => current.current.editor.runtime.inspect().interaction), ...state() };

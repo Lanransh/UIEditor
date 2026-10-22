@@ -36,7 +36,7 @@ let app: Awaited<ReturnType<typeof electron.launch>> | undefined;
 try {
   assert.equal((await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'test', version: '1' } })).serverInfo.name, 'ui-editor');
   const listed = (await rpc('tools/list')).tools;
-  assert.equal(listed.length, 25); assert.ok(listed.some((tool: any) => tool.name === 'uie.document.export')); assert.ok(listed.some((tool: any) => tool.name === 'uie.assets.import')); assert.ok(listed.some((tool: any) => tool.name === 'uie.runtime.batch')); assert.ok(listed.some((tool: any) => tool.name === 'uie.scripts.set')); assert.ok(!listed.some((tool: any) => tool.name.startsWith('uie.history.')));
+  assert.equal(listed.length, 26); assert.ok(listed.some((tool: any) => tool.name === 'uie.document.export')); assert.ok(listed.some((tool: any) => tool.name === 'uie.assets.import')); assert.ok(listed.some((tool: any) => tool.name === 'uie.runtime.batch')); assert.ok(listed.some((tool: any) => tool.name === 'uie.scripts.set')); assert.ok(!listed.some((tool: any) => tool.name.startsWith('uie.history.')));
   assert.equal((await raw('uie.history.undo')).isError, true);
   assert.equal((await raw('uie.editor.get_state')).isError, true);
   const parent = join(root, 'project'); await mkdir(parent);
@@ -60,7 +60,7 @@ try {
   if (packaged) await page.context().setOffline(true);
   const pageErrors: string[] = []; page.on('pageerror', error => pageErrors.push(error.message));
   await page.getByRole('heading', { name: '选择工程', exact: true }).waitFor();
-  assert.equal((await raw('uie.editor.get_state')).isError, true);
+  assert.equal((await state()).workspacePath, null);
   assert.equal(await page.getByRole('button', { name: '打开 AI 工作区', exact: true }).count(), 0);
   assert.equal(await page.getByRole('button', { name: '配置 Codex MCP', exact: true }).count(), 0);
   const settings = page.getByRole('button', { name: '设置', exact: true });
