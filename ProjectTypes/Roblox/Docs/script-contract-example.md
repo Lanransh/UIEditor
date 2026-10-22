@@ -3,6 +3,8 @@
 编写或修改交互脚本时，按此例的组织方式交付 source 与 integration。字段由实际页面决定，
 不要把 RewardState 或福利字段当成所有界面的公共结构。先确定页面所需数据，再写契约、
 Render 和模拟数据；三者必须一致。注释中的类型名用于阅读，不代表自动类型或运行时校验。
+source 契约只描述游戏项目能取得的导出内容及接入责任，不出现 Preview/example、
+模拟类或模拟专用字段。下文 integration 是编辑器内部制作示例，不属于导出的接入契约。
 
 ## source：契约必须在交互脚本里
 
@@ -52,7 +54,6 @@ State（RewardState，Render 的完整输入，不是增量）：
   真实接入负责资格校验和请求：请求前 pending=true、error=nil 并刷新；
   成功后 pending=false、status="Claimed"；失败后 pending=false、error=提示，
   并按业务结果保留或更新 status。每次状态更新后刷新。
-  模拟接入只修改模拟状态，不实际发奖。
 
 接口实现清单：
   必须实现的页面接口：
@@ -85,9 +86,9 @@ State（RewardState，Render 的完整输入，不是增量）：
 
 项目接入步骤：
   1. 在 Generated 外创建继承 CRewardView 的游戏类，初始化完成后加载，
-     在客户端玩家对象创建前 require，并只挂载游戏子类，不挂载模拟类。
+     在客户端玩家对象创建前 require，并只挂载游戏子类。
   2. 准备真实奖励数据与请求依赖；先父构造，再提供完整 Config 和首次 State。
-     status 来自权威奖励数据；尚未就绪不 Show，不用模拟 Claimable 充当真实资格。
+     status 来自权威奖励数据；尚未就绪不 Show，不伪造 Claimable 充当真实资格。
   3. OnReady 先让父类绑定节点，再调用项目 BindUIData，最后 Show。
      BindUIData 读取最新完整状态并刷新，只建立一次数据订阅并托管连接；
      Show 触发已继承的 OnShow 刷新，不需要项目再写 OnShow。
@@ -156,7 +157,7 @@ function CRewardView:Render(state)
     self:SetButtonEnabled(self.ClaimBtn, state.status == "Claimable" and not state.pending)
 end
 
--- 由模拟或游戏接入覆写，不在展示层执行业务。
+-- 由游戏接入覆写，不在展示层执行业务。
 -- @param action string 本页面仅发送 Claim
 -- @param payload table { entryId: string }，稳定条目 ID
 function CRewardView:OnUIAction(action, payload)
@@ -234,6 +235,7 @@ Claimable、Claimed、pending=true、error="领取失败，请重试"，再刷�
 ## AI 交付前核对
 
 - 契约分节、空行、字段换行和嵌套缩进清晰，最小样例不是压缩的一行 table。
+- source 契约和接口注释不包含未导出的脚本、类名、模拟流程或模拟专用字段。
 - 项目与展示层职责、状态优先级、点击许可及允许的覆写入口均明确，不依赖项目二次覆盖。
 - 接口清单明确必需、条件覆写、继承、仅调用及禁止覆盖的分类，参数、返回值、时机和 Super 顺序齐全。
 - 项目步骤逐项对应实际数据、动作、请求及清理，不把模拟实现当作真实业务接入。
