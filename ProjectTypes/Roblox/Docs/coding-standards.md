@@ -9,7 +9,7 @@
 - 方法用 PascalCase，局部变量用清楚的 lowerCamelCase，私有成员用 `_` 前缀。不用 `_` 命名未使用参数/循环变量；可用有语义的 index、owner，并在需要时说明来源。
 - 声明 `local FX = _G.FX`、`local FXLoader = FX.Loader`。先核对节点树中的真实 ScreenGui 名称，再用 `local root = FXLoader:PlayerGui("ExampleUI")` 获取界面；不要以 `self:GetRootNode()` 作为生成代码的节点获取入口。子节点用 `FXLoader:Here(root, "Panel.HintTxt")`，也可直接用 `FXLoader:PlayerGui("ExampleUI.Panel.HintTxt")`。Here 路径不包含根名，PlayerGui 路径包含根名。只支持 `.`，`/`、空路径和空段明确报错；节点名不含分隔符。
 - 不假设完整游戏 FXLoader API：当前只使用 runtime-api 中公开的接口。事件用 TrackConnection；动作只发必要业务标识，Render 只更新展示，模拟接入只更新模拟状态。
-- 动态文案遵循 [本地化规范](../.agents/skills/roblox-localization/SKILL.md) 和 [UI 文本与翻译接口](text-localization.md)：各 Luau 顶层通过 Text.Define 独立声明 TranslationTexts，Key 唯一且稳定，不新增手写 Key/Source 表；Text.Tr 接收定义和参数，Text.TrSource 仅按原文查询。静态节点和配置引用不补文案表。
+- 动态文案遵循 [本地化规范](../.agents/skills/roblox-localization/SKILL.md) 和 [UI 文本与翻译接口](text-localization.md)：各 Luau 顶层通过 Text.Define 独立声明 TranslationTexts，文件内 Key、Source 不重复且 Key 稳定，跨文件允许重复，不新增手写 Key/Source 表；Text.Tr 接收定义和参数，Text.TrSource 仅按原文查询。静态节点和配置引用不补文案表。
 - 所有效果保存为设计节点和属性，不在运行脚本创建效果。不要把可读性改动变成业务或视觉改动。
 - 窗口使用 CUIView 通用动画与 Show/Hide，不重复生成动画代码；常驻 HUD 设置 OpenAnimation = false 并注释原因。ScreenAdaptation 独立控制屏幕适配，关闭时说明由界面自行管理布局。两个类开关均在实例创建前设置；Render 不提前隐藏整窗，完整合同见 [展示与业务接入](presentation-contract.md#通用打开与关闭动画)。
 

@@ -14,14 +14,9 @@ description: 在 UIEditor 的 Roblox 工程中制作、修改和验证可编辑 
 [运行接口](../../../Docs/runtime-api.md)、[展示与业务接入](../../../Docs/presentation-contract.md)
 [脚本数据契约示例](../../../Docs/script-contract-example.md) 和
 [Luau 编码规范](../roblox-luau-standards/SKILL.md)。接口以当前 MCP 返回的能力为准。
-编写动态文字时同时读取 [UI 文本与翻译接口](../../../Docs/text-localization.md)：
-View 使用本文件 TranslationTexts 和 Text.Tr 定义模板及参数；静态节点与配置引用不补表，
-模拟接入不重复翻译。App 只模拟英文格式化，真实翻译由游戏 Text 接口负责。
-由脚本填充的文本节点（含隐藏原型）显式保存 `Text=""`，不写入默认文字或假名称、数值样例；
-固定文案保留，样例数据放 example，由 View 在运行时写入。细节见文本接口的「动态节点不保存占位文本」。
-纯数值、图标字符及代码已翻译的文本在具体设计文本节点和原型上保存 `AutoLocalize=false`，克隆继承，
-代码不重复设置；依赖自动翻译的文案保持开启，不关闭整页。新建节点等例外见文本接口「节点与验证」。
-只关闭目标文本节点，图片父节点和容器保持开启；先检查后代，若关闭会阻断子文本自动翻译，保持开启并反馈层级冲突，不递归关闭或靠子节点 true 覆盖。
+涉及 UI 文本时同时使用 [本地化规范](../roblox-localization/SKILL.md)，
+按其中规则处理文案归属、动态节点属性及交付验收；参数格式与预览边界见
+[UI 文本与翻译接口](../../../Docs/text-localization.md)。
 
 ## 制作流程
 
