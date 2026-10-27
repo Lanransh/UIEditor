@@ -36,6 +36,12 @@ try {
     assert.equal(await dialog.getByRole('button', { name: '运行', exact: true }).count(), 0);
   }
   await templates.getByRole('button', { name: /CloseButton/ }).click();
+  const closeId = source.templates.find(template => template.document.name === 'CloseButton').document.root.children[0].id;
+  const closeImage = dialog.locator(`[data-node-id="${closeId}"] > .preview-image`);
+  await closeImage.waitFor();
+  assert.match(await closeImage.evaluate(element => element.style.backgroundImage), /data:image\/png;base64,/);
+  assert.equal(await closeImage.evaluate(element => element.style.backgroundSize), 'contain');
+  assert.equal(await dialog.locator('.preview-image-missing').count(), 0);
   const zoom = dialog.getByLabel('画风预览缩放');
   await page.waitForFunction(() => Number(document.querySelector('[aria-label="画风预览缩放"]')?.value) > 1);
   const focused = await dialog.locator('.style-preview-frame').boundingBox();

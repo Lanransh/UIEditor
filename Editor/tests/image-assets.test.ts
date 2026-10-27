@@ -96,7 +96,7 @@ test('local file import persists previews without a Roblox ID and rejects invali
 test('each image has one Roblox ID; permanent IDs are shared and project imports move with project', async () => {
   const { store, root, runtime, project } = await fixture();
   const initial = await store.list();
-  assert.equal(initial.length, 2);
+  assert.equal(initial.length, 3);
   const stud = initial.find(a => a.usage === 'tile')!, placeholder = initial.find(a => a.usage === 'placeholder')!;
   assert.equal(placeholder.robloxId, '');
   await store.update({ ...stud, robloxId: '12345' });

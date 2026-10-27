@@ -7,6 +7,7 @@ import { createProject, describeError, openProject } from '../electron/projects'
 import { listTemplateStyles, previewTemplateStyle, projectStylePath, relocateStyleFile, readTemplateStyle, styleDirectory, templateStylesDirectory } from '../electron/template-styles';
 import { robloxStrategy } from '../src/editor/roblox';
 import { writeDocument, readDocument, documentFiles } from '../electron/documents';
+import { imagePreviewResolver } from '../src/shared/imageAssets';
 
 async function assertInstalledFile(workspace: string, style: string, file: { path: string; content: Buffer }) {
   if (file.path.startsWith(`template-references${sep}`) && file.path.endsWith('.json')) {
@@ -291,7 +292,7 @@ test('随应用提供的 多彩棋格风格：7 个鲜明配色模板和完整�
   assert.deepEqual((await readdir(join(project.path, 'styles', 'templates'))).sort(), ['CloseButton', 'LargeWindow', 'MediumWindow', 'OperationButtonExamples', 'ProgressBar', 'SmallWindow', 'Title']);
   for (const file of files) await assertInstalledFile(project.path, style, file);
   const colors: Record<string, string> = {
-    TitleImg: '#df1a23', CloseSurfaceImg: '#55ce35',
+    TitleImg: '#df1a23',
     ConfirmBtn: '#67ed14', CancelBtn: '#638079', BuyBtn: '#67ed14',
     PaidPurchaseBtn: '#ffd633', EquipBtn: '#67ed14', UnequipBtn: '#f2654d',
     ProgressBarImg: '#571018', ProgressFillImg: '#ff2b35',
@@ -308,12 +309,25 @@ test('随应用提供的 多彩棋格风格：7 个鲜明配色模板和完整�
         assert.equal(node.children.find(child => child.name === 'BottomEdgeImg')?.properties.BackgroundColor3, '#e58a25');
         assert.ok(!node.children.some(child => child.className === 'UIGradient'), '付费按钮使用纯色，不添加渐变');
       }
-      if (['TitleTxt', 'CloseBtn', 'ButtonTxt', 'ProgressTxt'].includes(node.name)) {
+      if (['TitleTxt', 'ButtonTxt', 'ProgressTxt'].includes(node.name)) {
         assert.equal(node.properties.TextColor3, '#ffffff', `${file.path} ${node.name} 使用白字描边`);
         assert.equal(node.children.find(child => child.name === 'TextStroke')?.properties.Enabled, true);
       }
-      if (node.name === 'CloseBtn') {
-        assert.deepEqual(node.properties.Position, { x: { scale: 0, offset: 0 }, y: { scale: 0, offset: -8 } }, `${file.path} 关闭字符补偿字形偏移`);
+      assert.notEqual(node.name, 'CloseBtn', `${file.path} 不保留旧文字关闭按钮`);
+      if (node.name === 'CloseSurfaceImg') {
+        assert.equal(node.className, 'ImageButton');
+        assert.equal(node.properties.Image, 'rbxassetid://98802390031827');
+        assert.equal(node.properties.ScaleType, 'Fit');
+        assert.equal(node.properties.BackgroundTransparency, 1);
+        assert.deepEqual(node.children, []);
+        assert.equal(node.imageAssetId, undefined);
+        const preview = imagePreviewResolver()(node)!;
+        assert.ok(preview, '关闭图片在无来源工程图片库时仍可预览');
+        const png = Buffer.from(preview.dataUrl.split(',')[1], 'base64');
+        assert.equal(png.readUInt32BE(16), 52);
+        assert.equal(png.readUInt32BE(20), 52);
+        assert.doesNotMatch(document.scripts.source, /CloseSurfaceImg\.CloseBtn/);
+        assert.ok(document.scripts.source.includes(`\"${document.name === 'CloseButton' ? '' : 'TitleBox.'}CloseSurfaceImg\"`));
       }
       node.children.forEach(checkStyle);
     };

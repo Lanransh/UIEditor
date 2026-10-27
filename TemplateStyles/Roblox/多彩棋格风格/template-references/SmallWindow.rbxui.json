@@ -370,94 +370,8 @@
             }
           },
           {
-            "children": [
-              {
-                "children": [],
-                "className": "UICorner",
-                "id": "8bb2f760-38e1-497f-b52a-b9cc091fd227",
-                "name": "UICorner",
-                "properties": {
-                  "CornerRadius": {
-                    "offset": 6,
-                    "scale": 0
-                  }
-                }
-              },
-              {
-                "children": [],
-                "className": "UIStroke",
-                "id": "f2f465cf-19a7-4f20-af50-dbb24894cd22",
-                "name": "UIStroke",
-                "properties": {
-                  "Color": "#000000",
-                  "Enabled": true,
-                  "Thickness": 3,
-                  "Transparency": 0
-                }
-              },
-              {
-                "children": [
-                  {
-                    "children": [],
-                    "className": "UIStroke",
-                    "id": "a95d6727-776f-4d38-9022-9fe86438fad6",
-                    "name": "TextStroke",
-                    "properties": {
-                      "Color": "#000000",
-                      "Enabled": true,
-                      "Thickness": 2,
-                      "Transparency": 0
-                    }
-                  }
-                ],
-                "className": "TextButton",
-                "id": "ca7a7b6b-4a84-4279-9b1b-9ca664183f30",
-                "name": "CloseBtn",
-                "properties": {
-                  "AnchorPoint": {
-                    "x": 0,
-                    "y": 0
-                  },
-                  "BackgroundColor3": "#ffffff",
-                  "BackgroundTransparency": 1,
-                  "ClipsDescendants": false,
-                  "Font": "GothamBold",
-                  "LayoutOrder": 0,
-                  "Position": {
-                    "x": {
-                      "offset": 0,
-                      "scale": 0
-                    },
-                    "y": {
-                      "offset": -8,
-                      "scale": 0
-                    }
-                  },
-                  "Rotation": 0,
-                  "Size": {
-                    "x": {
-                      "offset": 52,
-                      "scale": 0
-                    },
-                    "y": {
-                      "offset": 52,
-                      "scale": 0
-                    }
-                  },
-                  "Text": "×",
-                  "TextColor3": "#ffffff",
-                  "TextScaled": false,
-                  "TextSize": 52,
-                  "TextTransparency": 0,
-                  "TextWrapped": false,
-                  "TextXAlignment": "Center",
-                  "TextYAlignment": "Center",
-                  "Visible": true,
-                  "ZIndex": 7
-                }
-              }
-            ],
-            "className": "Frame",
+            "children": [],
+            "className": "ImageButton",
             "id": "ce4d0cbe-6db0-45bf-9b6b-c5065c8b8127",
             "name": "CloseSurfaceImg",
             "properties": {
@@ -465,9 +379,13 @@
                 "x": 0,
                 "y": 0
               },
-              "BackgroundColor3": "#55ce35",
-              "BackgroundTransparency": 0,
+              "AutoLocalize": true,
+              "BackgroundColor3": "#ffffff",
+              "BackgroundTransparency": 1,
               "ClipsDescendants": false,
+              "Image": "rbxassetid://98802390031827",
+              "ImageColor3": "#ffffff",
+              "ImageTransparency": 0,
               "LayoutOrder": 0,
               "Position": {
                 "x": {
@@ -480,6 +398,7 @@
                 }
               },
               "Rotation": 0,
+              "ScaleType": "Fit",
               "Size": {
                 "x": {
                   "offset": 52,
@@ -488,6 +407,16 @@
                 "y": {
                   "offset": 52,
                   "scale": 0
+                }
+              },
+              "TileSize": {
+                "x": {
+                  "offset": 0,
+                  "scale": 1
+                },
+                "y": {
+                  "offset": 0,
+                  "scale": 1
                 }
               },
               "Visible": true,
@@ -543,7 +472,7 @@
   },
   "scripts": {
     "integration": "local FX = _G.FX\nlocal CWindowUIPreviewCompClass = FX.Class(\"CWindowUIPreviewCompClass\", \"CWindowUIBaseCompClass\")\n\n-- 模板无业务接入，动作仅输出模拟记录。\n-- @param action string 操作名\n-- @param payload table 动作参数\nfunction CWindowUIPreviewCompClass:OnUIAction(action, payload)\n    print(\"Template preview: \" .. action)\nend\n\nreturn CWindowUIPreviewCompClass",
-    "source": "local FX = _G.FX\nlocal FXLoader = FX.Loader\nlocal CWindowUIBaseCompClass = FX.Class(\"CWindowUIBaseCompClass\", \"FCUICompClass\")\n\n-- 关闭只影响当前模拟窗口，停止或重置恢复设计态。\nfunction CWindowUIBaseCompClass:OnReady()\n    local root = FXLoader:PlayerGui(\"SmallWindowUI\")\n    local titleBox = FXLoader:Here(root, \"TitleBox\")\n    local panel = FXLoader:Here(root, \"PopupPanelImg\")\n    local close = FXLoader:Here(root, \"TitleBox.CloseSurfaceImg.CloseBtn\")\n    self:TrackConnection(close.Activated:Connect(function()\n        titleBox.Visible = false\n        panel.Visible = false\n        self:EmitUIAction(\"Close\", {})\n    end))\nend\n\nreturn CWindowUIBaseCompClass"
+    "source": "local FX = _G.FX\nlocal FXLoader = FX.Loader\nlocal CWindowUIBaseCompClass = FX.Class(\"CWindowUIBaseCompClass\", \"FCUICompClass\")\n\n-- 关闭只影响当前模拟窗口，停止或重置恢复设计态。\nfunction CWindowUIBaseCompClass:OnReady()\n    local root = FXLoader:PlayerGui(\"SmallWindowUI\")\n    local titleBox = FXLoader:Here(root, \"TitleBox\")\n    local panel = FXLoader:Here(root, \"PopupPanelImg\")\n    local close = FXLoader:Here(root, \"TitleBox.CloseSurfaceImg\")\n    self:TrackConnection(close.Activated:Connect(function()\n        titleBox.Visible = false\n        panel.Visible = false\n        self:EmitUIAction(\"Close\", {})\n    end))\nend\n\nreturn CWindowUIBaseCompClass"
   },
   "version": 3
 }

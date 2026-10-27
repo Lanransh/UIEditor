@@ -35,6 +35,11 @@ TemplatePage 展示页；没有修改来源工程原件。
 金黄色 `#FFD633` 与橙色底部压边 `#E58A25`，普通主动作保持亮绿，
 标题、按钮和进度使用白字描边；黑色窗口底板与 Stud 平铺纹理保留，
 “棋格”不表示改用棋盘格贴图。模板不包含全画布展示背景。
+关闭组件采用与参考工程实际界面一致的单个 `CloseSurfaceImg` 图片按钮，
+使用 `rbxassetid://98802390031827`，背景透明、`ScaleType=Fit`，保留 52×52
+尺寸与原位置。关闭预览随 App 内置为 `builtin:roblox:close`，独立关闭模板
+及三个窗口按 Roblox ID 查找预览，不保留来源 `imageAssetId`；脚本直接连接
+该按钮的 `Activated`，不再使用 `CloseBtn` 子节点。
 配色与节点结构以实际模板及制作规范为依据。
 用户提供截图时默认只参考布局，不沿用原语言或配色；显示文案转为英文，
 颜色遵循项目规范，只有用户明确要求参考配色时才参考截图颜色。
@@ -73,9 +78,9 @@ UIEditorWorkspace/
 安装时分别映射到 styles/templates/、styles/Game-DESIGN.md、styles/skills/；
 Markdown 相对链接随路径调整，模板转换为三文件格式，二进制资源保持原字节。项目模板读写统一使用 styles/templates/。
 
-图片预览保存在模板 JSON 中，Roblox ID 独立保存；不允许通过 imageAssetId
-关联来源工程或全局图片目录，以免后续被来源图片变化覆盖。
-需要从项目图片库制作模板时，保存为含 previewImage 与 Image 的独立快照。
+图片预览来自图片库，模板 JSON 只保存 Roblox `Image` 资源 ID；不允许通过
+`imageAssetId` 关联来源工程或全局图片目录，以免后续被来源图片变化覆盖。
+随应用分发的模板图片应提供内置预览，按 Roblox ID 查找，不把 `previewImage` 写入节点。
 模板保留界面与源码内容，资源按字节复制，提示词仅调整相对链接，不重写元数据、类名或设计属性。
 源码类的适配由项目 AI 制作新界面时处理，不修改模板原件。
 

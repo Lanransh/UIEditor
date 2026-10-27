@@ -23,7 +23,7 @@
   不沿用截图配色；只有用户明确要求参考配色时才参考其颜色，
   否则使用本规范的主题色与按钮语义色。“照着截图做”不视为指定参考配色。
 - 使用实际支持的 Roblox 节点类型；文字使用 `TextLabel`，操作按钮使用
-  `ImageButton`，关闭点击节点使用 `TextButton`。
+  `ImageButton`，关闭组件使用图片按钮 `CloseSurfaceImg`。
 - 透明结构容器使用 `Box` 后缀，可见表面使用 `Img` 后缀，按钮使用 `Btn`，
   文字使用 `Txt`；同父节点名称唯一，使用 PascalCase。
 - 厚度通过模板内可编辑的高光与压边色带表现，不额外添加外阴影、发光或模糊。
@@ -43,7 +43,7 @@
 | 确认、短说明、少量内容 | [SmallWindow](../template-references/SmallWindow.rbxui.json) | SmallWindow / SmallWindowUI | PopupPanelImg、TitleBox 完整子树 |
 | 设置、常规功能、双区内容 | [MediumWindow](../template-references/MediumWindow.rbxui.json) | SmallWindow / MediumWindowUI | PopupPanelImg、TitleBox 完整子树 |
 | 列表、详情、多区域内容 | [LargeWindow](../template-references/LargeWindow.rbxui.json) | SmallWindow / LargeWindowUI | PopupPanelImg、TitleBox 完整子树 |
-| 独立关闭操作 | [CloseButton](../template-references/CloseButton.rbxui.json) | CloseButton / CloseButtonUI | CloseSurfaceImg，实际点击节点 CloseBtn |
+| 独立关闭操作 | [CloseButton](../template-references/CloseButton.rbxui.json) | CloseButton / CloseButtonUI | CloseSurfaceImg 图片按钮（自身接收点击） |
 | 独立标题、无标题窗口 | [Title](../template-references/Title.rbxui.json) | Title / TitleUI | TitleImg 完整子树 |
 | 确认、取消、购买、装备 | [OperationButtonExamples](../template-references/OperationButtonExamples.rbxui.json) | OperationButtonExamples / OperationButtonExamplesUI | ContentImg 下对应的 *Btn 完整子树 |
 | 进度、经验、能量、加载 | [ProgressBar](../template-references/ProgressBar.rbxui.json) | ProgressBar / ProgressBarUI | ProgressBarImg 完整子树 |
@@ -184,30 +184,25 @@
 
 ## 六、关闭按钮
 
-关闭组件必须同时复用可见底板 `CloseSurfaceImg` 与真实点击节点 `CloseBtn`。
+关闭组件复用单个 `CloseSurfaceImg` 图片按钮，外观与点击由同一节点承载。
 
 `参考值`：
 
-- 底板尺寸：`52×52`。
-- 填充：绿色 `#55CE35`，背景透明度 `0`。
-- 圆角：`6px`。
-- 描边：`#000000`，粗细 `3px`，透明度 `0`。
+- 节点类型：`ImageButton`，尺寸 `52×52`。
+- `Image`：`rbxassetid://98802390031827`，绿底、白叉、黑边已包含在图片中。
+- `ScaleType=Fit`，`ImageColor3=#FFFFFF`，`ImageTransparency=0`。
+- `BackgroundTransparency=1`；不额外添加底色、圆角、描边或文字叉号。
 - 窗口内位置：`TitleBox` 右侧，`y=9`，右边距 `10px`。
-
-内部资源参考：
-
-- `UICorner` / `UIStroke`：底板圆角与描边。
-- `CloseBtn`：透明背景的 `TextButton`，尺寸 `52×52`，相对位置 `(0,-8)`，
-  补偿 App 预览替代字体的字形下偏，使白叉在底板内视觉居中；Studio 显示仍需单独验收。
-- 关闭字符：`×`，`GothamBold`，字号 `52px`，颜色 `#FFFFFF`，居中。
-- `CloseBtn/TextStroke`：`#000000`，粗细 `2px`，透明度 `0`，`Enabled=true`。
+- 预览图随 App 内置，图片库稳定 ID 为 `builtin:roblox:close`。模板只保存
+  `Image`，不保存来源图片库的 `imageAssetId`，按 Roblox ID 查找内置预览。
 
 规则：
 
-- 保持绿底、白叉、黑边，不改成圆形或纯文字“关闭”。
-- 不只复制 `×` 文字，不另造与底板错位的点击区域。
-- 装饰不遮挡文字、不成为新的点击入口；动作连接实际 `CloseBtn`，
-  测试其 `Activated`。
+- 完整复制 `CloseSurfaceImg`，保持原图比例，不改成圆形或纯文字“关闭”。
+- 不再创建 `CloseBtn` 子节点，不用文字 `×` 重绘，也不应用内容图标问号占位图。
+- 动作直接连接 `CloseSurfaceImg.Activated`；不要使用旧路径
+  `CloseSurfaceImg.CloseBtn`。独立按钮继续发送 `Close`，窗口按钮关闭本窗口。
+- 本地预览可用不代表 Roblox 资源权限已验证；Studio 与设备显示单独验收。
 
 ## 七、操作按钮规范
 
@@ -309,7 +304,6 @@
 | TitleTxt | GothamBold / 是 | 30px | #FFFFFF | Center / Center | #000000、2px |
 | ButtonTxt | GothamBold / 是 | 24px | #FFFFFF | Center / Center | #20231C、2px |
 | ProgressTxt | GothamBold / 是 | 22px | #FFFFFF | Center / Center | #000000、2px |
-| CloseBtn × | GothamBold / 是 | 52px | #FFFFFF | Center / Center | #000000、2px |
 
 以上文字描边均开启，透明度为 `0`。
 
@@ -357,7 +351,7 @@
 - 问号占位图当前没有内置 Roblox ID，不编造 ID，不自动上传；
   Studio 使用前需单独配置资源。预览不依赖本机路径。
 - 问号占位规则只针对内容图标，不替换模板的 Stud 平铺纹理、
-  底板、高光压边或关闭按钮的 `×`。
+  底板、高光压边或 `CloseSurfaceImg` 专用关闭图片。
 - 不需要为现有图片库纹理额外创建空 `assets` 目录。
 - Roblox 资源权限及设备显示需另行验证，不能因为存在 ID 就宣称可用。
 

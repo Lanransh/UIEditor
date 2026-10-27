@@ -31,6 +31,9 @@ description: 制作或修改多彩棋格风格 UI 时，指导模板复用并检
   橙色压边 `#E58A25`）、取消灰绿、卸载橙红。
   标题、按钮和进度保留白字与文字描边、黑色外轮廓和 Stud 平铺。
   项目实际模板修改后不强套旧参数，明确差异。
+- 关闭：`CloseSurfaceImg` 是 `ImageButton`，使用 `rbxassetid://98802390031827`，
+  背景透明、`ScaleType=Fit`；不叠加文字叉号或旧 `CloseBtn`，动作连接自身 `Activated`。
+  预览使用随 App 内置的 `builtin:roblox:close`，模板不关联来源图片库。
 - 图片：预览从图片库查找，节点不支持 previewImage，Image 是 Roblox ID；不依赖本机路径，
   不遗漏资源，不逐个创建 Stud 凸点，普通文本不转图片。
 - 层级：组件底板/纹理/高光压边/文本依次呈现，文字不被遮挡；
