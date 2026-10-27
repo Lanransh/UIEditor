@@ -11,6 +11,7 @@ import scrollMiddle from '../assets/roblox-scrollbars/scroll-middle.png';
 import scrollBottom from '../assets/roblox-scrollbars/scroll-bottom.png';
 import { applyImageAsset, imagePreviewResolver, type ImageAsset } from '../shared/imageAssets';
 import { insertNode } from './commands';
+import { textFont, textFontSize } from './text';
 
 interface Gesture {
   pointerId: number; x: number; y: number; kind: 'pan' | 'move' | 'resize';
@@ -229,6 +230,12 @@ export function DocumentPreview({ document: shown, strategy, imageAssets, select
   onResize?: (event: PointerEvent, node: UINode) => void;
 }) {
   const filterPrefix = useId();
+  const [, fontsLoaded] = useState(0);
+  useEffect(() => {
+    let active = true;
+    void Promise.all(["400 20px 'Roblox Montserrat'", "700 20px 'Roblox Montserrat'", "400 20px 'Roblox Source Sans Pro'", "400 20px 'Roblox Arimo'", "20px 'Roblox Symbols'"].map(font => window.document.fonts.load(font))).then(() => { if (active) fontsLoaded(value => value + 1); });
+    return () => { active = false; };
+  }, []);
   const previewFor = imagePreviewResolver(imageAssets);
   function renderNode(node: UINode, rect: PreviewRect) {
     if (!node.properties.Visible) return null;
@@ -256,12 +263,11 @@ export function DocumentPreview({ document: shown, strategy, imageAssets, select
     const scrollPosition = scroll ? p.CanvasPosition as Vector2 : { x: 0, y: 0 };
     const scrollbar = scrollGeometry(rect.width, rect.height, contentWidth, contentHeight, scroll ? p.ScrollBarThickness as number : 0, scrollPosition.x, scrollPosition.y, p.ScrollingDirection as string);
     const childRects = strategy.layout(node, contentWidth, contentHeight);
-    const textSize = p.TextScaled ? auxiliary(node, 'UITextSizeConstraint')?.properties : undefined;
-    const fontSize = Math.min(textSize ? textSize.MaxTextSize as number : 100, Math.max(textSize ? textSize.MinTextSize as number : 1, p.TextScaled ? Math.min(rect.height * .7, rect.width / Math.max(1, String(p.Text).length) * 1.5) : p.TextSize as number));
-    const contentStyle: CSSProperties = { position: 'absolute', inset: 0, overflow: scroll || p.ClipsDescendants || node.className === 'CanvasGroup' ? 'hidden' : 'visible' };
-    const textStyle: CSSProperties = { fontSize, fontFamily: `'Roblox Symbols', ${p.Font === 'Arial' ? 'Arial, sans-serif' : String(p.Font).startsWith('Gotham') ? 'Segoe UI, sans-serif' : 'Segoe UI, Microsoft YaHei, sans-serif'}`, fontWeight: p.Font === 'GothamBold' ? 700 : undefined, whiteSpace: p.TextWrapped ? 'pre-wrap' : 'pre', textAlign: String(p.TextXAlignment).toLowerCase() as CSSProperties['textAlign'], justifyContent: p.TextYAlignment === 'Top' ? 'flex-start' : p.TextYAlignment === 'Bottom' ? 'flex-end' : 'center' };
-    const tileSize = p.TileSize as UDim2 | undefined;
     const text = (p.Text as string) || (node.className === 'TextBox' ? p.PlaceholderText as string : '');
+    const fontSize = textNode ? textFontSize(node, text, rect.width, rect.height) : undefined;
+    const contentStyle: CSSProperties = { position: 'absolute', inset: 0, overflow: scroll || p.ClipsDescendants || node.className === 'CanvasGroup' ? 'hidden' : 'visible' };
+    const textStyle: CSSProperties = { ...textFont(p.Font), fontSize, whiteSpace: p.TextWrapped || p.TextScaled ? 'pre-wrap' : 'pre', overflowWrap: 'anywhere', textAlign: String(p.TextXAlignment).toLowerCase() as CSSProperties['textAlign'], justifyContent: p.TextYAlignment === 'Top' ? 'flex-start' : p.TextYAlignment === 'Bottom' ? 'flex-end' : 'center' };
+    const tileSize = p.TileSize as UDim2 | undefined;
     const imageFilterId = `${filterPrefix}-image-${node.id}`;
     const tint = node.className.startsWith('Image') ? channels(p.ImageColor3 as string) : [1, 1, 1];
     const thickness = scroll ? p.ScrollBarThickness as number : 0;

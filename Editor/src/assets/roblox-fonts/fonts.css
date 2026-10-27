@@ -1,0 +1,6 @@
+/* Roblox TextSize is the font's ascent-to-descent height; CSS uses unitsPerEm.
+   Normalize using the original fonts' hhea metrics, without changing TextSize. */
+@font-face { font-family: 'Roblox Montserrat'; src: url('./Montserrat-Regular.ttf') format('truetype'); font-weight: 400; size-adjust: 82.034454%; }
+@font-face { font-family: 'Roblox Montserrat'; src: url('./Montserrat-Bold.ttf') format('truetype'); font-weight: 700; size-adjust: 82.034454%; }
+@font-face { font-family: 'Roblox Source Sans Pro'; src: url('./SourceSansPro-Regular.ttf') format('truetype'); font-weight: 400; size-adjust: 79.554495%; }
+@font-face { font-family: 'Roblox Arimo'; src: url('./Arimo-Regular.ttf') format('truetype'); font-weight: 400; size-adjust: 89.51049%; }

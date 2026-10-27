@@ -142,14 +142,14 @@ Image 保存 Roblox 资源标识；节点可引用图片库，但不保存图片
 本地预览从图片库按资产引用或 Image 资源 ID 查找，缺失时显示占位提示。图片通过图片库导入与应用，不提供节点预览图片入口；格式与限制见 [图片资产](image-assets.md)。
 图片还可从永久与项目库引用，节点附加 imageAssetId 并保留预览和 Image 快照；单一 Roblox ID、属性入口与 MCP 见 [图片资产](image-assets.md)。引用节点的 Image 由资产解析，解除引用后恢复手动编辑。
 
-编辑模式的按钮和输入框只用于选择；运行模式的 TextButton、ImageButton 支持 Activated，输入框仍不提供运行交互。字体使用本机替代字体，TextScaled
-使用静态估算，GroupColor3 使用浏览器混合近似展示。ImageColor3 只乘入实际图片
+编辑模式的按钮和输入框只用于选择；运行模式的 TextButton、ImageButton 支持 Activated，输入框仍不提供运行交互。Font 使用随 App 打包的 Roblox 对应字体；TextSize 按原生行为向下取整，CSS 行高等于字号。TextScaled
+按实际字体和可用宽高测量换行，选择约束范围内可容纳的整数字号，开启时自动换行；TextBox 空文字按实际显示的 PlaceholderText 测量。字体加载后重新测量，编辑、运行及缩略图共用。GroupColor3 使用浏览器混合近似展示。ImageColor3 只乘入实际图片
 像素，保留透明度和 Fit 留白；TileSize 支持 Scale/Offset，默认 1×1 Scale，
 平铺从左上角开始。旧图片节点缺少 TileSize 时加载补入默认值，文件版本保持 3。
 UICorner 只圆角化节点自身的背景、图片与渐变，不按圆角裁剪子节点；
 ClipsDescendants 按矩形边界裁剪子节点。
-GothamBold 在本机以 Segoe UI 粗体替代。UIStroke 在文本节点上描画文字，在其他节点上画外边框。
-Roblox 私用字符 U+E000–U+E003 使用随 App 内嵌的 RobloxEmoji 字体预览；普通文字继续使用替代字体。Text 和 PlaceholderText 属性提供“插入 Robux 图标”，在光标或选区处插入 U+E002，支持撤销重做。图标随字号、颜色、描边与渐变显示，画布、运行预览、资产缩略图共用。JSON 和 Roblox 导入保留原始 Unicode 字符，不转换为图片；运行脚本可用 `utf8.char(0xE002)` 设置。字体来源见 [特殊字符字体](../../Editor/src/assets/roblox-symbols.md)，最终排版仍需在 Roblox 确认。
+Gotham/GothamBold 对应 Montserrat Regular/Bold，SourceSans 对应 Source Sans Pro，Arial 对应 Arimo；来源与许可证见 [预览字体](../../Editor/src/assets/roblox-fonts/README.md)。中文仍使用系统备用字体；浏览器与 Roblox 的字形栅格化、字距取整及换行规则可能有差异，不承诺逐像素一致。UIStroke 在文本节点上描画文字，在其他节点上画外边框。
+Roblox 私用字符 U+E000–U+E003 使用随 App 内嵌的 RobloxEmoji 字体预览。Text 和 PlaceholderText 属性提供“插入 Robux 图标”，在光标或选区处插入 U+E002，支持撤销重做。图标随字号、颜色、描边与渐变显示，画布、运行预览、资产缩略图共用。JSON 和 Roblox 导入保留原始 Unicode 字符，不转换为图片；运行脚本可用 `utf8.char(0xE002)` 设置。字体来源见 [特殊字符字体](../../Editor/src/assets/roblox-symbols.md)，最终排版仍需在 Roblox 确认。
 UIGradient 分别插值颜色和透明度，并与背景、文字或图片的颜色及透明度相乘；
 旋转渐变的中心线控制点落在节点边界上。
 ScrollingFrame 通过 CanvasSize 与 CanvasPosition 展示滚动区域，位置按原生规则

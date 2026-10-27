@@ -132,3 +132,25 @@ node tests/roblox-display-compare.mjs
 
 Studio 已恢复 Edit 模式，`StarterGui.UIEditorDisplayQA` 保留 343 个样例和
 `NodeOverview` 总览，下一次 Play 默认显示总览。工程未另存或发布。
+## 字体修复补充（2026-10-28）
+
+上文早期静态显示报告的“字体替代 / TextScaled 字号估算”限制已部分更新：
+现在使用随 App 打包的 Montserrat、Source Sans Pro、Arimo，按字体 ascent/descent
+归一化 CSS em，TextSize 向下取整，TextScaled 按实际字体、换行及约束测量。
+字体与许可证见 [预览字体](../src/assets/roblox-fonts/README.md)。
+
+通过 Roblox MCP 采集当前游戏 RebirthUI 截图、TextSize、Font、TextBounds 及
+UIScale；确认文字使用 GothamBold、TextScaled=false，响应缩放约 0.898。
+官方 Font 文档确认 Gotham 系列映射 Montserrat。另以原生 TextService 在无
+UIScale 条件下测量 Rebirth、REBIRTH、x5，覆盖 19/20/23/40/100 及四个 Font
+选项。浏览器实际加载字体后，对 10 组文字测量宽度：最大差约 3.1px（40 号
+七字母样本），其余小于 3px，保留字距取整及栅格化差异。
+
+在 Editor 中先构建，再运行 `node tests/text-metrics-smoke.mjs`，检查真实字体
+加载、上述原生尺寸对照、小数字号取整、显式换行、TextScaled 的宽窄字形、
+Min/Max 约束、不缩放时忽略约束和 TextBox 占位符测量。输出位于
+`test-results/text-metrics/metrics.json` 与 `editor.png`。特殊字符的混排、插入与
+撤销重做另由 `npx tsx tests/text-symbols-smoke.ts` 验证。
+
+本次没有修改游戏工程或项目 UI 数据；没有做 TextScaled 的原生换行全组合、
+中文备用字体、多设备或逐像素验收。上文内容保留为早期检查记录。
