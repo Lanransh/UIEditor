@@ -1,8 +1,22 @@
-import { lstat, mkdir, readdir, readFile, writeFile, unlink, rmdir } from 'node:fs/promises';
-import { dirname, join, sep } from 'node:path';
-import { readAgentPackage, validateDocumentLinks, validateSkillNames } from './template-styles';
+import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
-export const AGENT_IGNORE_RULES = ['/Run.bat', '/AGENTS.md', '/Docs/', '/.agents/skills/'];
+export const AGENT_IGNORE_RULES = ['/Run.bat', '/AGENTS.md'];
+export const WORKSPACE_INSTRUCTIONS = `# UIEditor 工作区
+
+<!-- UIEditor managed workspace: MCP 文档读取入口。 -->
+
+本工作区由 UIEditor 管理。开始在这里工作时，先调用 ui-editor MCP 的
+uie.docs.read({file:"AGENTS.md"})，读取通用指南与自动发现的技能摘要，
+再按任务读取相关 skill 和参考；当前上下文已有相同 documentRevision 时可复用。
+已知包内路径直接 uie.docs.read，不知道位置时用 uie.docs.search 定位后按需读取。
+公共说明不再复制到工作区；旧 Docs/ 与 .agents/skills/ 副本不再更新，以 MCP 随包文档为准。
+
+先读取项目补充要求 AGENTS.LOCAL.md（@AGENTS.LOCAL.md）。
+若有 styles/Game-DESIGN.md，读取风格及其链接的专项技能。
+项目要求、风格和授权仍须遵守；文档读取不授予修改或导出权限。
+操作前核对 MCP 当前工程与本工作区一致，不直接修改 UI JSON。
+`;
 export const LOCAL_INSTRUCTIONS = `# 项目补充要求
 
 本文件由项目维护并提交到 Git，编辑器仅在缺失时创建，不覆盖已有内容。
@@ -14,67 +28,25 @@ async function info(path: string) {
   return lstat(path).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
 }
 
-// Inspect before any write, including parent directories, so synchronization never follows junctions.
-async function inspect(path: string): Promise<string[]> {
-  const entry = await info(path);
-  if (!entry) return [];
-  if (entry.isSymbolicLink()) throw new Error(`AI 工作区路径不能是链接：${path}`);
-  if (entry.isFile()) return [path];
-  if (!entry.isDirectory()) throw new Error(`AI 工作区路径类型无效：${path}`);
-  const files: string[] = [];
-  for (const name of await readdir(path)) files.push(...await inspect(join(path, name)));
-  return files;
+async function writeChanged(path: string, content: string) {
+  const existing = await readFile(path, 'utf8').catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+  if (existing !== content) await writeFile(path, content, 'utf8');
 }
 
-async function writeChanged(path: string, content: Buffer | string) {
-  const bytes = Buffer.isBuffer(content) ? content : Buffer.from(content);
-  const existing = await readFile(path).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
-  if (existing?.equals(bytes)) return;
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, bytes);
-}
-
-async function pruneEmpty(path: string) {
-  const entry = await info(path);
-  if (!entry?.isDirectory()) return;
-  for (const name of await readdir(path)) await pruneEmpty(join(path, name));
-  await rmdir(path).catch(error => { if (error.code !== 'ENOTEMPTY' && error.code !== 'ENOENT') throw error; });
-}
-
-/** Called only when activating a project, never when listing recent projects or inspecting clone sources. */
-export async function syncAgentWorkspace(workspace: string, packageRoot: string): Promise<void> {
-  const common = await readAgentPackage(packageRoot, ['AGENTS.md']);
-  validateDocumentLinks(common);
-  validateSkillNames(common);
-  // These are the only editor-owned destinations. Project files can never enter this list.
-  for (const file of common) {
-    if (file.path !== 'AGENTS.md' && !file.path.startsWith(`Docs${sep}`) && !file.path.startsWith(join('.agents', 'skills') + sep)) {
-      throw new Error(`公共提示词包包含非编辑器管理文件：${file.path}`);
-    }
+/** Only the minimal managed route is refreshed. Never traverse or synchronize project Docs/skills. */
+export async function syncAgentWorkspace(workspace: string): Promise<void> {
+  const entry = await info(workspace);
+  if (entry && (entry.isSymbolicLink() || !entry.isDirectory())) throw new Error('UIEditorWorkspace 必须是普通目录。');
+  for (const name of ['AGENTS.md', 'AGENTS.LOCAL.md', '.gitignore']) {
+    const file = await info(join(workspace, name));
+    if (file && (file.isSymbolicLink() || !file.isFile())) throw new Error(`AI 工作区文件必须是普通文件：${name}`);
   }
-  const agent = workspace;
-  const agentInfo = await info(agent);
-  if (agentInfo && (agentInfo.isSymbolicLink() || !agentInfo.isDirectory())) throw new Error('UIEditorWorkspace 必须是普通目录。');
-  const dotAgents = await info(join(agent, '.agents'));
-  if (dotAgents && (dotAgents.isSymbolicLink() || !dotAgents.isDirectory())) throw new Error('.agents 必须是普通目录。');
-  const skills = join(agent, '.agents', 'skills');
-  await inspect(join(agent, 'Docs'));
-  await inspect(skills);
-  for (const path of [join(agent, 'AGENTS.md'), join(agent, 'AGENTS.LOCAL.md'), join(workspace, '.gitignore')]) {
-    const entry = await info(path);
-    if (entry && (entry.isSymbolicLink() || !entry.isFile())) throw new Error(`AI 工作区文件必须是普通文件：${path}`);
-  }
-  const local = join(agent, 'AGENTS.LOCAL.md');
-  const localInfo = await info(local);
-  await mkdir(agent, { recursive: true });
-  if (!localInfo) await writeFile(local, LOCAL_INSTRUCTIONS, { flag: 'wx' });
-  const wanted = new Set(common.map(file => join(agent, file.path)));
-  const stale = [...await inspect(join(agent, 'Docs')), ...await inspect(skills)].filter(path => !wanted.has(path));
-  for (const file of common.filter(file => file.path !== 'AGENTS.md')) await writeChanged(join(agent, file.path), file.content);
-  for (const path of stale) await unlink(path);
-  await pruneEmpty(join(agent, 'Docs'));
-  await pruneEmpty(skills);
-  await writeChanged(join(agent, 'AGENTS.md'), common.find(file => file.path === 'AGENTS.md')!.content);
+  await mkdir(workspace, { recursive: true });
+  if (!await info(join(workspace, 'AGENTS.LOCAL.md'))) await writeFile(join(workspace, 'AGENTS.LOCAL.md'), LOCAL_INSTRUCTIONS, { flag: 'wx' });
+  const path = join(workspace, 'AGENTS.md');
+  const content = await readFile(path, 'utf8').catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+  // Preserve custom entries; only the editor's explicit marker permits replacement.
+  if (content === null || content.includes('<!-- UIEditor managed workspace:')) await writeChanged(path, WORKSPACE_INSTRUCTIONS);
   const ignorePath = join(workspace, '.gitignore');
   const ignore = await readFile(ignorePath, 'utf8').catch(error => { if (error.code === 'ENOENT') return ''; throw error; });
   const lines = new Set(ignore.split(/\r?\n/).map(line => line.trim()));

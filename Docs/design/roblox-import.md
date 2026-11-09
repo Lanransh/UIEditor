@@ -60,7 +60,7 @@ UIEditor 生成的 ScreenGui 和全部 GuiObject 使用文档中的 AutoLocalize
 不启用屏幕适配时保留原 Size，动画仅调整原 Position 与 UIScale，动画结束恢复原显示比例。
 
 窗口入口与关闭按钮调用 Show/Hide；Render 不提前隐藏整窗主体。制作提示词与 HUD 覆写示例见
-[工程类型合同](../../ProjectTypes/Roblox/Docs/presentation-contract.md#通用打开与关闭动画)。
+[随包展示合同](../../Editor/ai-docs/Docs/presentation-contract.md#通用打开与关闭动画)。
 App 宿主不提供 SetOpenAnimation，继续立即显隐，不创建控制器或模拟游戏相机动画。
 
 ## 游戏业务继承

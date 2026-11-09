@@ -1,6 +1,6 @@
 ---
 name: roblox-localization
-description: UIEditor 文案翻译接入：Text.Define 声明、文件内去重、动态节点关闭自动翻译及文本验收。
+description: 制作或修改 UI 文本、接入翻译及验收时使用，处理 Text.Define 声明、文件内去重和动态节点自动翻译属性。
 ---
 
 # UI 文案翻译
@@ -67,10 +67,10 @@ local ownedText = Text.Tr(CWeaponShopView.BaseViewTranslationTexts.Owned, {
 ## 4. 怎么检查
 
 - 检查文件内 Key/Source 去重、完整英文及参数；不手改翻译产物或自动上传。
-- 保存重开后读取 [文本验收脚本](scripts/audit-text.luau)，核对 View 及全部文本节点（含隐藏原型），
+- 保存重开后读取 [文本验收脚本](references/audit-text.md)，核对 View 及全部文本节点（含隐藏原型），
   按稳定 ID 编写 `local expectations = { ["节点ID"] = {dynamic=true, autoLocalize=false} }`。
   静态文案通常为 false/true，静态纯数值或图标为 false/false；按职责填写，不照抄当前属性。
-- 将清单与脚本原文拼接，用 `uie.code.execute` 携带最新 sessionId/revision 执行；
+- 将清单与参考文档中完整 Luau 代码块拼接，用 `uie.code.execute` 携带最新 sessionId/revision 执行；
   确认 success=true、changed=false、日志无失败。失败修复后保存重开重验，不删清单项绕过。
   超出任务范围的问题报告未通过及原因，不擅自批量修改。
 - Run 检查首次显示、状态和参数变化、数据缺失及克隆复用，核对实际文字、布局及开关继承；

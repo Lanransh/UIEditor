@@ -12,42 +12,45 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 - 批处理和打包默认使用与参考工程相同的 npm Electron 镜像；可通过 `ELECTRON_MIRROR` 环境变量覆盖。
 - 可将 Windows 便携 Node.js 放到 `ToolRuntime/Runtime/nodejs/`，批处理优先使用其中的 `node.exe` 和 `npm.cmd`。
 - 打包入口：`ToolRuntime/UIEditor-win32-x64/UIEditor.exe`。运行打包应用无需额外安装 Node.js；分发时需保留整个应用目录，不能只复制 exe。
-- app.asar 只收集 `dist`、`dist-electron` 和 `package.json`，Luau、MCP、工程类型包与模板风格通过额外资源复制；运行依赖已由 Vite/esbuild 打入构建产物，不再复制或扫描 `node_modules`。打包过程显示阶段与耗时，首次下载、解压 Electron 仍需等待。
+- app.asar 只收集 `dist`、`dist-electron` 和 `package.json`，Luau、MCP（含随包文档）与模板风格通过额外资源复制；运行依赖已由 Vite/esbuild 打入构建产物，不再复制或扫描 `node_modules`。打包过程显示阶段与耗时，首次下载、解压 Electron 仍需等待。
 
 ## 使用
 
-1. 点击“创建工程”，先选择整套模板风格，再选择父文件夹。程序创建固定的 `UIEditorWorkspace/project.json`，不要求输入名称；所有新工程从 `ProjectTypes/Roblox/` 创建工作区根目录，包含公共入口与制作技能；选定风格再从 `TemplateStyles/Roblox/` 复制模板到 `styles/templates/`，视觉规范、资源和专项 skills 进入 `styles/`。默认也可选择空白工程；有历史时保留仅克隆模板的兼容入口，与风格选择互斥。
+1. 点击“创建工程”，先选择整套模板风格，再选择父文件夹。程序创建固定的 `UIEditorWorkspace/project.json`，不要求输入名称；所有新工程生成最小 MCP 读取入口，`Editor/ai-docs/` 的公共指南与技能通过 `uie.docs.read/search` 按需读取，不复制到工作区；选定风格再从 `TemplateStyles/Roblox/` 复制模板到 `styles/templates/`，视觉规范、资源和专项 skills 进入 `styles/`。默认也可选择空白工程；有历史时保留仅克隆模板的兼容入口，与风格选择互斥。
 2. 工程创建后进入工作台，通过“文件 → 新建界面”创建 ScreenGui 或在底部“模板参考”中打开独立副本。鼠标移到左侧节点行，点击右侧“+”展开类型列表，选择类型即添加子节点；右侧编辑名称、父节点和属性，中间为 1280×720 画布。
 3. 点击“打开工程”选择已有的 `UIEditorWorkspace` 文件夹，或点击最近工程卡片。
 4. 同一父目录已有有效工程时，会询问是否打开；已有无效目录时不覆盖内容。
 5. 历史卡片的垃圾桶仅移出记录，不删除工程。工程移动后使用“打开工程”重新登记。
 
-创建或打开工程会生成工作区 `Run.bat`，双击可直接打开该工程；移动工程或更换编辑器位置后，重新打开工程以更新启动路径。工作区 `.gitignore` 仅追加 `/Run.bat`，工程 `project.json`、UI 文件和项目图片资产均可提交。已有忽略规则保留，用户自建 Run.bat 不会被覆盖。
+创建或打开工程会生成工作区 `Run.bat`，双击可直接打开该工程；移动工程或更换编辑器位置后，重新打开工程以更新启动路径。工作区 `.gitignore` 仅追加 `/Run.bat` 和 `/AGENTS.md`，工程 `project.json`、UI 文件和项目图片资产均可提交。已有忽略规则保留，用户自建 Run.bat 不会被覆盖。
 
 工作台顶部“批量导出”支持多选项目UI并依次导出到 Toolkit 当前唯一连接的工程，每项等待 Studio 回执后继续，显示逐项状态和总进度。支持停止队列、继续查询和取消当前任务；提交结果未知时暂停整轮，重试当前快照后再继续。离开工作台会停止后续提交，已发出的操作仍可能完成。批量导出使用已保存的界面与脚本，当前修改请先保存；缺少图片 Roblox ID 时先通过单界面导出处理。
 
 ### 模板风格与项目 AI
 
-工程公共入口和技能维护于 `ProjectTypes/Roblox/`；视觉风格维护于
-`TemplateStyles/Roblox/<风格名>/`。打包版读取 resources 下同名目录。
+工程公共入口和技能维护于 `Editor/ai-docs/`；视觉风格维护于
+`TemplateStyles/Roblox/<风格名>/`。公共文档随 MCP 发布于 resources/mcp-dist/ai-docs，风格读取 resources 下同名目录。
 风格必需 `Game-DESIGN.md` 及 `template-references/**/*.rbxui.json`，
 可提供资源和专项 skills，不提供工程入口或重复公共代码规范。
-规则见 [工程类型包](ProjectTypes/README.md) 和 [风格库说明](TemplateStyles/README.md)。
+规则见 [MCP 随包文档](Docs/design/mcp-automation.md#随包指南与文档定位) 和 [风格库说明](TemplateStyles/README.md)。
 当前 **多彩棋格风格** 包含 7 个鲜明配色独立模板，标题可按主题选色，
 保留 Stud 平铺纹理，不包含 TemplatePage 展示页或全画布展示背景。
 
 修改维护源后重新构建打包并运行新版 App，新建工程即使用新版，无需手动同步。
 旧 `ToolRuntime/TemplateStyles/` 不再读取且不自动清理；其中的定制画风需纳入维护源。
 项目 styles 是独立副本：库修改不更新已有项目风格，项目修改不回写库；
-打开工程自动同步公共 AGENTS.md、Docs 与 skills，缺失时创建 AGENTS.LOCAL.md。
-公共内容由生成的 .gitignore 排除，AGENTS.LOCAL.md 和 styles 应提交；
-打开工程不覆盖项目定制提示词。移动时带上整个 UIEditorWorkspace 即可。
+打开工程仅刷新带编辑器标记的最小 MCP 路由，缺失时创建 AGENTS.LOCAL.md。
+不再复制、覆盖或清理工作区 Docs/skills；旧副本不再更新，以 MCP 随包说明为准。
+自定义入口、LOCAL 和 styles 保留；LOCAL 和 styles 应提交，已有忽略规则不移除。
+移动时带上整个 UIEditorWorkspace 即可。
 缺文档、坏模板、资源链接不闭合、链接目录或权限错误会给出具体反馈；
 复制失败清理本次创建内容，目标已有文件不会被覆盖。
 
 在 Codex 中以项目 `UIEditorWorkspace/` 为 AI 工作目录，
 启用 `ui-editor` MCP 后，可由 AI 调用 `uie.project.open` 打开该项目，无需人工先启动工作区。
-项目入口要求 AI 先读规范及实际模板结构，按用途自动选择窗口和组件，
+首次使用 MCP 或开始在工作区工作时，先调用 `uie.docs.read({file:"AGENTS.md"})` 读取入口与技能摘要，
+再按任务读取相关 skill/参考；已知路径直接 read，不知道位置时 search。相同修订可复用。
+文档服务无需启动 App 或打开工程；业务操作仍须确认目标和授权。项目入口要求 AI 先读规范及实际模板结构，按用途自动选择窗口和组件，
 沿用本风格的字体、字号、加粗、语义色与纹理，通过 MCP 制作、测试、
 截图、保存和重开。不能用模拟领取/购买状态代替真实资格校验、支付或发奖。
 
@@ -63,7 +66,7 @@ Hub 的布局参考同级 BlockModelEditor：上次打开、最近工程、路�
 
 ## 开发与验证
 
-Hub 右上角“设置”提供 Codex MCP 配置以启用 `ui-editor`。 新版 App 运行一次后，AI 可通过 `uie.project.open({path:"工作区绝对路径",minimized:true})` 自主启动并打开已有 UIEditorWorkspace；默认最小化，传 false 正常显示。重复打开同工程复用会话；无法安全切换时明确要求人工保存并关闭，不自动丢弃修改。`uie.editor.get_state` 返回当前 workspacePath，Hub 时为 null。AI 在当前打开的工程内通过节点查询和代码事务制作界面，可用文件工具直接修改同名 `.view.luau` 交互代码与 `.example.luau` 模拟接入代码，再运行、模拟点击、读取日志和截图。执行结果可在 App 内撤销重做，MCP 不提供 undo/redo。所有新工程从项目 `UIEditorWorkspace` 根目录开始；工程类型提供平台技能，风格提供视觉规范和专项技能。运行、保存或重开界面时重新读取磁盘；同一文件两侧修改冲突时提示处理。工作区启动不迁移旧结构。接口与边界见 [MCP 自动化](Docs/design/mcp-automation.md)。
+Hub 右上角“设置”提供 Codex MCP 配置以启用 `ui-editor`。 新版 App 运行一次后，AI 可通过 `uie.project.open({path:"工作区绝对路径",minimized:true})` 自主启动并打开已有 UIEditorWorkspace；默认最小化，传 false 正常显示。重复打开同工程复用会话；无法安全切换时明确要求人工保存并关闭，不自动丢弃修改。`uie.editor.get_state` 返回当前 workspacePath，Hub 时为 null。AI 在当前打开的工程内通过节点查询和代码事务制作界面，可用文件工具直接修改同名 `.view.luau` 交互代码与 `.example.luau` 模拟接入代码，再运行、模拟点击、读取日志和截图。执行结果可在 App 内撤销重做，MCP 不提供 undo/redo。所有新工程从项目 `UIEditorWorkspace` 根目录开始；MCP 随包文档提供公共技能，风格提供视觉规范和专项技能。运行、保存或重开界面时重新读取磁盘；同一文件两侧修改冲突时提示处理。工作区启动不迁移旧结构。接口与边界见 [MCP 自动化](Docs/design/mcp-automation.md)。
 
 ```powershell
 cd Editor
@@ -91,6 +94,7 @@ npm run dev
 | `npm run test:mouse` | 构建并验证鼠标事件、固定适应画布、滚动条及稳定 MCP 鼠标接口；需要已有原生宿主 |
 | `npm run test:runtime` | 构建并验证脚本、按钮动作、数据刷新、重置及错误恢复 |
 | `npm run build:mcp` | 构建独立 stdio MCP 服务，普通 build 已包含 |
+| `npm run test:docs` | 构建并验证随包文档发现、读取/搜索边界、真实离线 stdio 与工作区路由保护 |
 | `npm run test:mcp` | 构建并通过真实 stdio MCP 验证制作、查询、历史、运行与保存 |
 | `npm run test:project-opening` | 构建并验证 MCP 工作区冷启动、重复打开、安全切换与最小化 |
 | `npm run test:mcp:packaged` | 验证已打包程序的 MCP 完整链路，需先 package |
@@ -110,6 +114,7 @@ npm run dev
 ## 目录
 
 - `Editor/`：开发工程，包含 package.json、锁定依赖和构建配置。
+- `Editor/ai-docs/`：MCP 随包指南、自动发现的技能和只读参考文档，不复制到项目。
 - `Editor/src/`：React Hub、静态 UI 工作台、策略与共享接口类型。
 - `Editor/electron/`：文件管理、原生目录选择、受限 IPC 和应用生命周期。
 - `Editor/scripts/`、`Editor/tests/`：开发、打包脚本及自动化验证。

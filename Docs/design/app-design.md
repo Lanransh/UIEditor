@@ -10,7 +10,7 @@ Windows 桌面应用，使用 Electron、React、TypeScript 和 Vite。采用中
 启动进入 Hub，不自动进入上次工程。Hub 参考 BlockModelEditor 的浅灰背景、白色单列卡片和青绿色操作按钮，分为“上次打开”和“最近工程”。主操作区提供创建工程、打开工程和“画风库”，右上角“设置”提供 Codex 与 Cursor MCP 配置。“画风库”无需工程即可只读查看当前应用实际使用的模板库，切换模板、缩放与刷新；不修改工程或运行模板脚本，详细边界见 [模板风格与项目 AI 工作区](template-styles.md)。
 最新记录只显示在“上次打开”，其余按最近成功打开顺序展示。卡片显示父文件夹名称、完整工程路径、Roblox 标签及上次打开时间。
 
-创建工程始终先显示“选择模板风格”，从统一库列出风格名、作者说明、模板数量及不可用原因；默认空白工程。所有新工程从 Roblox 工程类型包创建工作区根目录，获得公共入口与制作技能；选择风格再复制视觉规范、模板、资源及专项 skills。有历史时保留“从历史工程克隆模板”兼容入口，与风格选择互斥；历史克隆仅复制模板及子目录，不复制来源提示词、项目UI、项目图片或来源元数据，AI 工作区由当前工程类型包创建。下一步选择父文件夹，自动创建固定名称 `UIEditorWorkspace`；不设置独立显示名称。复制内容独立，来源读取或校验失败时取消创建并提示，不留下半成品。目标已存在且有效时只询问是否打开，不复制或覆盖模板与工作区；无效时提示更换位置，不覆盖内容。库路径、文件约定及保护规则见 [模板风格与项目 AI 工作区](template-styles.md)。
+创建工程始终先显示“选择模板风格”，从统一库列出风格名、作者说明、模板数量及不可用原因；默认空白工程。所有新工程生成最小 MCP 读取入口，通过随包文档服务获得公共指南与制作技能；选择风格再复制视觉规范、模板、资源及专项 skills。有历史时保留“从历史工程克隆模板”兼容入口，与风格选择互斥；历史克隆仅复制模板及子目录，不复制来源提示词、项目UI、项目图片或来源元数据，AI 工作区仅生成最小 MCP 读取入口，不依赖公共文档源目录。下一步选择父文件夹，自动创建固定名称 `UIEditorWorkspace`；不设置独立显示名称。复制内容独立，来源读取或校验失败时取消创建并提示，不留下半成品。目标已存在且有效时只询问是否打开，不复制或覆盖模板与工作区；无效时提示更换位置，不覆盖内容。库路径、文件约定及保护规则见 [模板风格与项目 AI 工作区](template-styles.md)。
 打开已有工程要求选择 `UIEditorWorkspace` 目录。每次打开都重新读取并验证元数据，成功后更新历史再进入工作台。
 取消对话框保留当前界面。文件损坏、缺失、权限或格式问题显示具体提示；失败操作不加入历史。
 
@@ -41,10 +41,10 @@ React 通过 `useEditorHistory(initialState)` 获取 `state`、`execute`、`undo
 | `createdAt` | 创建时保存 ISO 时间戳 |
 
 工程元数据不包含节点或业务数据；界面在独立同名目录内另存为 `.json` 与同名 `.view.luau`、`.example.luau`。创建工程目录和元数据采用非覆盖操作；失败时仅清理本次创建的文件及空目录。
-所有新工程都有 `interfaces/`、`Docs/`、`.agents/skills/` 和根目录 AI 入口，有模板时位于 `styles/templates/`；公共提示词在实际打开时同步，项目风格只在新建时复制，重开不更新 styles。不增加全局来源路径到 project.json。
+所有新工程都有 `interfaces/` 和根目录最小 MCP 读取入口，公共 Docs/skills 只随工具发布；模板位于 `styles/templates/`。实际打开时只刷新带管理标记的入口，不复制覆盖公共提示词或删除旧副本；自定义入口和项目 LOCAL 保留。项目风格只在新建时复制，重开不更新 styles。不增加全局来源路径到 project.json。
 工程不依赖最近列表，可独立移动后重新打开。
 每次创建或成功打开工程时生成本地 `Run.bat`，指向当前编辑器并通过 `UI_EDITOR_OPEN_WORKSPACE` 打开批处理所在工程；普通启动仍进入 Hub。已有编辑器实例时恢复并显示主窗口，再将工程交给该实例；当前界面未保存或工程操作未完成时提示用户先完成操作。仅更新带 UIEditor 生成标记的启动文件，不覆盖用户自建 Run.bat。
-工作区 `.gitignore` 追加 `/Run.bat`、`/AGENTS.md`、`/Docs/` 和 `/.agents/skills/` 并保留已有规则。AGENTS.LOCAL.md 与 styles/ 由项目维护并提交。工程元数据、`interfaces` 中的 UI 文件、模板参考 `styles/templates` 及 Roblox 项目图片所在同级 `ArtSource/UI` 的原图与 `.meta` 均应提交到 Git；启动文件含本机路径，不提交。永久图片及其 Roblox ID 保存于编辑器仓库的 `SharedAssets/image-assets/catalog.json`，随 UIEditor 提交并跨电脑复用；Runtime 不作为永久图片的权威来源，存储与旧数据迁移边界见 [图片资产](image-assets.md)。
+工作区 `.gitignore` 追加 `/Run.bat`、`/AGENTS.md` 并保留已有规则，不再为公共 Docs/skills 增加忽略项。AGENTS.LOCAL.md 与 styles/ 由项目维护并提交。工程元数据、`interfaces` 中的 UI 文件、模板参考 `styles/templates` 及 Roblox 项目图片所在同级 `ArtSource/UI` 的原图与 `.meta` 均应提交到 Git；启动文件含本机路径，不提交。永久图片及其 Roblox ID 保存于编辑器仓库的 `SharedAssets/image-assets/catalog.json`，随 UIEditor 提交并跨电脑复用；Runtime 不作为永久图片的权威来源，存储与旧数据迁移边界见 [图片资产](image-assets.md)。
 
 仓库根目录保留启动批处理与说明；`Editor/` 集中源码、依赖、开发脚本、测试和构建产物；`Docs/design/` 保存设计文档。
 `ToolRuntime/UIEditor-win32-x64/` 保存打包应用；开发模式与打包应用均使用根目录的 `ToolRuntime/Runtime/` 保存历史、Electron 用户数据、会话、日志和缓存。

@@ -28,7 +28,7 @@ test('新工程仅克隆模板参考，保留子文件夹、同名文件和完�
   await mkdir(parent);
   const target = (await createProject(parent, source.path)).project;
   assert.notEqual(target.manifest.id, source.manifest.id);
-  assert.deepEqual((await readdir(target.path)).sort(), ['.agents', '.gitignore', 'AGENTS.LOCAL.md', 'AGENTS.md', 'Docs', 'interfaces', 'project.json', 'styles']);
+  assert.deepEqual((await readdir(target.path)).sort(), ['.gitignore', 'AGENTS.LOCAL.md', 'AGENTS.md', 'interfaces', 'project.json', 'styles']);
   assert.equal((await listDocumentAssets(target.path, 'templates')).length, 2);
   const copy = join(target.path, 'styles', 'templates', '中文 分类', 'Reward', 'Reward.json');
   assert.deepEqual(await readDocument(copy), document);
@@ -44,7 +44,7 @@ test('不克隆或来源没有模板时创建空工程', async t => {
     const parent = join(root, templateSource ? 'empty-source' : 'no-clone');
     await mkdir(parent);
     const target = (await createProject(parent, templateSource)).project;
-    assert.deepEqual((await readdir(target.path)).sort(), ['.agents', '.gitignore', 'AGENTS.LOCAL.md', 'AGENTS.md', 'Docs', 'interfaces', 'project.json']);
+    assert.deepEqual((await readdir(target.path)).sort(), ['.gitignore', 'AGENTS.LOCAL.md', 'AGENTS.md', 'interfaces', 'project.json']);
   }
 });
 

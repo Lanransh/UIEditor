@@ -83,13 +83,13 @@ export function validateSkillNames(files: StyleFile[]) {
     const header = file.content.toString('utf8').match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1];
     const name = header?.match(/^name:[ \t]*["']?([a-z0-9-]+)["']?[ \t]*\r?$/m)?.[1];
     if (!name) throw new Error(`技能缺少有效 name：${file.path}`);
-    if (names.has(name)) throw new Error(`工程类型与风格技能同名：${name}`);
+    if (names.has(name)) throw new Error(`风格技能同名：${name}`);
     names.add(name);
   }
 }
 
-export async function readAgentPackage(directory: string, required: string[]): Promise<StyleFile[]> {
-  const label = required.includes('AGENTS.md') ? '工程类型' : '模板风格';
+async function readStylePackage(directory: string): Promise<StyleFile[]> {
+  const required = ['Game-DESIGN.md'], label = '模板风格';
   try { await regular(dirname(directory), true); await regular(directory, true); }
   catch (error) { throw new Error(`无法读取${label} ${basename(directory)}：${(error as Error).message}`); }
   const root = await realpath(directory);
@@ -135,7 +135,7 @@ export async function readAgentPackage(directory: string, required: string[]): P
 // Snapshot the allowlisted package before creating any project files. Documents
 // and resources are copied byte-for-byte; user-authored prompts are never rewritten.
 export async function readTemplateStyle(directory: string): Promise<{ files: StyleFile[]; description: string; templateCount: number; preview: UIDocument; templates: TemplateStylePreview['templates'] }> {
-  const files = await readAgentPackage(directory, ['Game-DESIGN.md']);
+  const files = await readStylePackage(directory);
   const templates = files.filter(file => file.path.startsWith(`template-references${sep}`) && file.path.toLowerCase().endsWith('.json'));
   if (!templates.length) throw new Error('风格没有可读取的 .json 模板。');
   const documents = new Map<string, UIDocument>();

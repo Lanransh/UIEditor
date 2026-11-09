@@ -36,7 +36,7 @@ itemDefinition 按原文求值得到 item。无参数时返回 Source，不改�
 公共本地化 skill 要求新增动态原文在各 Luau 顶层独立用 Text.Define 声明 TranslationTexts，
 Key 在收集范围唯一且不随文件或类名变化；App 不实现静态收集器或全项目 Key 校验。
 静态节点与配置引用不补表，View 已处理的动态文案不在模拟或游戏接入中重复翻译。
-详细作者合同见 [UI 文本与翻译接口](../../ProjectTypes/Roblox/Docs/text-localization.md)。
+详细作者合同见 [UI 文本与翻译接口](../../Editor/ai-docs/Docs/text-localization.md)。
 
 ### 脚本格式
 

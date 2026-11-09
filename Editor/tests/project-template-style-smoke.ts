@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 import { readDocument, documentFiles } from '../electron/documents';
-import { readTemplateStyle, projectStylePath, relocateStyleFile, readAgentPackage } from '../electron/template-styles';
+import { readTemplateStyle, projectStylePath, relocateStyleFile } from '../electron/template-styles';
+
+import { WORKSPACE_INSTRUCTIONS } from '../electron/agent-workspace';
 
 const packaged = process.argv.includes('--packaged');
 const executable = process.env.UI_EDITOR_PACKAGED_EXECUTABLE ?? resolve(process.env.UI_EDITOR_PACKAGE_OUTPUT || '../ToolRuntime', 'UIEditor-win32-x64', 'UIEditor.exe');
@@ -91,10 +93,9 @@ try {
     } else assert.deepEqual(await readFile(join(workspace, projectStylePath(file.path))), relocateStyleFile(file).content, file.path);
   }
   assert.ok((await readdir(workspace)).includes('interfaces'));
-  const typeRoot = packaged ? join(dirname(executable), 'resources', 'ProjectTypes', 'Roblox') : resolve('../ProjectTypes/Roblox');
-  for (const file of await readAgentPackage(typeRoot, ['AGENTS.md'])) {
-    assert.deepEqual(await readFile(join(workspace, file.path)), file.content, file.path);
-  }
+  assert.equal(await readFile(join(workspace, 'AGENTS.md'), 'utf8'), WORKSPACE_INSTRUCTIONS);
+  await assert.rejects(readdir(join(workspace, 'Docs')), /ENOENT/);
+  await assert.rejects(readdir(join(workspace, '.agents')), /ENOENT/);
   await page.getByRole('button', { name: '模板参考', exact: true }).click();
   await page.getByRole('button', { name: 'UI 资产 SmallWindow', exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: 'UI 资产 TemplatePage', exact: true }).count(), 0);
@@ -132,7 +133,8 @@ try {
 
   const agents = join(workspace, 'AGENTS.LOCAL.md');
   await writeFile(agents, '# 用户的项目定制入口\n绝不覆盖。');
-  await writeFile(join(workspace, 'AGENTS.md'), '# 过期公共入口');
+  await writeFile(join(workspace, 'AGENTS.md'), '<!-- UIEditor managed workspace: 旧入口 -->');
+  await mkdir(join(workspace, 'Docs'));
   await writeFile(join(workspace, 'Docs', 'runtime-api.md'), '# 过期接口');
   // Choosing a style for an already-existing project must only open it.
   await pick(source);
@@ -141,8 +143,8 @@ try {
   await dialog.getByRole('button', { name: '下一步', exact: true }).click();
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
   assert.equal(await readFile(agents, 'utf8'), '# 用户的项目定制入口\n绝不覆盖。');
-  assert.deepEqual(await readFile(join(workspace, 'AGENTS.md')), await readFile(join(typeRoot, 'AGENTS.md')));
-  assert.deepEqual(await readFile(join(workspace, 'Docs', 'runtime-api.md')), await readFile(join(typeRoot, 'Docs', 'runtime-api.md')));
+  assert.equal(await readFile(join(workspace, 'AGENTS.md'), 'utf8'), WORKSPACE_INSTRUCTIONS);
+  assert.equal(await readFile(join(workspace, 'Docs', 'runtime-api.md'), 'utf8'), '# 过期接口');
   await hub();
   await application.close();
   await launch();
@@ -150,8 +152,8 @@ try {
   await page.getByRole('button', { name: '打开工程', exact: true }).click();
   await page.getByText('请打开一个工程', { exact: true }).waitFor();
   assert.equal(await readFile(agents, 'utf8'), '# 用户的项目定制入口\n绝不覆盖。');
-  assert.deepEqual(await readFile(join(workspace, 'AGENTS.md')), await readFile(join(typeRoot, 'AGENTS.md')));
-  assert.deepEqual(await readFile(join(workspace, 'Docs', 'runtime-api.md')), await readFile(join(typeRoot, 'Docs', 'runtime-api.md')));
+  assert.equal(await readFile(join(workspace, 'AGENTS.md'), 'utf8'), WORKSPACE_INSTRUCTIONS);
+  assert.equal(await readFile(join(workspace, 'Docs', 'runtime-api.md'), 'utf8'), '# 过期接口');
   await hub();
   const unknown = await page.evaluate(() => window.projects.create({ kind: 'style', id: '../outside' }));
   assert.ok(!unknown.ok && unknown.error.includes('标识无效'));

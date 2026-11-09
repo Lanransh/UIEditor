@@ -2,7 +2,7 @@
 
 `UIEditorWorkspace` 是从 Roblox_Y1 的福利工程复制的独立快照，使用新的工程 UUID。
 保留完整设计节点、模板参考与风格规范；风格与模板位于 AgentWorkspace/styles，AGENTS.LOCAL.md 保存项目要求；
-公共 AI 入口、Docs 和 skills 在编辑器打开时从当前 Roblox 工程类型包同步，不纳入 Git。
+编辑器仅维护最小 MCP 读取入口，公共 Docs 和 skills 通过 uie.docs.read/search 随包提供，不复制到工作区。
 没有运行时来源路径依赖，不修改原游戏工程。编辑器打开后生成的 Run.bat 含本机路径，已忽略。
 
 ## 使用与验证

@@ -1,22 +1,25 @@
 # 模板风格与项目 AI 工作区
 
-## 工程类型与风格边界
+## 随包文档与风格边界
 
-工程类型包维护平台节点、脚本语言、展示与业务接入合同、MCP 制作及验证流程。
+MCP 随包文档维护平台节点、脚本语言、展示与业务接入合同、MCP 制作及验证流程。
 风格包维护视觉规范、模板、资源和可选专项技能；不再提供项目 AGENTS.md。
 当前只支持 Roblox，不增加其他平台实现或工程类型选择界面。
 
 所有新工程，包括空白和历史模板克隆工程，都拥有工作区根目录。
-工程公共技能从 ProjectTypes/Roblox 分发；选择风格时再叠加对应视觉包。
-工程类型技能与风格技能共同使用，风格不能声明平台未支持的接口或覆盖公共技能。
+工程公共技能从 Editor/ai-docs 随 MCP 发布，按需读取；选择风格时复制对应视觉包。
+公共技能通过 MCP 读取，风格技能通过项目文件读取，两者不合并安装；风格不能声明平台未支持的接口。
 
 ## 维护源与分发路径
 
-- 平台维护源为仓库 ProjectTypes/Roblox；风格维护源为 TemplateStyles/Roblox/<风格名>。
-- 开发版读取维护源；打包版读取应用 resources/ProjectTypes/Roblox 与
-  resources/TemplateStyles/Roblox，不依赖 ToolRuntime 的外置 AI 工作区或风格库。
+- 公共文档维护源为 Editor/ai-docs；风格维护源为 TemplateStyles/Roblox/<风格名>。
+- MCP 统一读取构建生成的 mcp-dist/ai-docs（打包后位于 resources 下）。
+  创建工程不读取或校验公共文档包，只生成最小读取入口并校验可选风格。
+  风格读取 TemplateStyles/Roblox（打包后位于 resources 下），不依赖旧外置 AI 工作区或风格库。
 - 两种资源包随应用打包，修改维护源后需重新构建打包才能影响打包版新建工程。
-- 公共 AGENTS.md、Docs/、.agents/skills/ 在创建和实际打开工程时同步；相同内容不重写，废弃公共文件清理。
+- 公共 AGENTS.md、Docs/、.agents/skills/ 通过 uie.docs.read/search 提供，不复制到工作区。
+  工作区只生成简短 MCP 路由；重开仅刷新带编辑器管理标记的入口，自定义入口保留。
+  旧 Docs/skills 副本不覆盖、不清理、不再更新；项目自有资料继续由项目维护。
 - 风格只在新建时复制到 styles/，之后归项目维护，打开和重开不读取或更新 styles/。
   AGENTS.LOCAL.md 仅缺失时创建，已有内容保留。工程移动后继续使用相对引用。
 - ToolRuntime/AgentWorkspace 已退役。旧 Stud 资源、来源与视觉示例保存在
@@ -47,15 +50,16 @@ TemplatePage 展示页；没有修改来源工程原件。
 
 ## 制作包协议
 
-工程类型包必需非空 AGENTS.md。风格包必需非空 Game-DESIGN.md 和至少一份
+随包文档必需非空 AGENTS.md，其发现和读取规则见 [MCP 自动化](mcp-automation.md)。
+风格包必需非空 Game-DESIGN.md 和至少一份
 有效 template-references/**/*.rbxui.json；风格根 AGENTS.md 不复制到工程。
 风格可选根 Markdown、assets/、references/、examples/ 和 .agents/skills/，保留子目录。
 公共包使用 AGENTS.md、Docs/ 与 .agents/skills/。
-技能 SKILL.md 声明有效 name；专项技能从 Game-DESIGN.md 链接，公共技能从平台入口链接。
+技能 SKILL.md 声明有效 name；专项技能从 Game-DESIGN.md 链接，公共技能由 MCP 自动发现。
 
-合并时拒绝重复目标路径、同名技能目录及重复技能 name，不静默覆盖或合并技能内部文件。
+只在风格包内部校验重复技能 name；不再将公共文档包与风格文件合并或校验跨包技能身份。
 包内 Markdown 相对链接独立闭合；不允许绝对本机链接、越界或遗漏资源。
-工程类型入口对可选 Game-DESIGN.md 使用存在时读取的约定，不硬链接不存在的风格文件。
+随包指南对项目可选 Game-DESIGN.md 使用存在时读取的约定，不硬链接不存在的风格文件。
 HTTP 链接仅作补充资料；App 不下载。复制忽略 node_modules、Git、缓存、构建输出、日志
 和临时文件；拒绝符号链接、目录联接及特殊文件。
 
@@ -63,10 +67,8 @@ HTTP 链接仅作补充资料；App 不下载。复制忽略 node_modules、Git�
 UIEditorWorkspace/
 ├─ project.json
 ├─ interfaces/XXUI/             # XXUI.json、XXUI.view.luau、XXUI.example.luau
-├─ AGENTS.md                    # 编辑器维护，不提交
+├─ AGENTS.md                    # 最小 MCP 读取路由，不提交
 ├─ AGENTS.LOCAL.md              # 项目维护，提交
-├─ Docs/                       # 编辑器公共规范，不提交
-├─ .agents/skills/              # 编辑器技能入口，不提交
 └─ styles/                     # 项目风格，新建时复制，以后不自动更新
    ├─ Game-DESIGN.md
    ├─ templates/XXUI/          # 同样使用 UI JSON 与两份 Luau 文件
@@ -113,17 +115,18 @@ Hub 的“画风库”打开独立只读查看窗口：左侧列出真实封面�
 
 对话框显示风格描述、模板数量及缺失文档/坏模板/访问错误；
 坏风格保留可见但禁选。库读取错误明确展示，仍可创建空白工程。
-历史克隆仅从来源工程复制模板；平台公共入口和技能来自当前工程类型包，不复制来源风格提示词。
+历史克隆仅从来源工程复制模板；工作区生成最小 MCP 路由，不复制公共手册或来源风格提示词。
 
 选择父文件夹后独占创建工程目录。有效目标已存在时仅询问打开；
 无效目标提示更换位置，不改已有模板、规范或工作区。
-新建时重新读取并校验工程类型包和可选风格包，检查冲突，先取得完整快照再复制；
+新建时仅校验可选风格包；仅复制风格快照及最小工作区入口，公共手册不落盘；
 文件使用独占创建。失败仅清理本次创建的文件及空目录，不递归删除用户内容。
 清理受权限等阻碍时报告具体未清理路径，不谎称成功回滚。
 
 工程内容不依赖全局库，项目移动后仍能使用相对引用；
 修改项目不回写风格库，修改库不更新已建工程。
-实际打开前同步公共提示词，并补齐 Git 忽略规则；不覆盖 AGENTS.LOCAL.md 或 styles。
+实际打开前仅刷新带管理标记的 MCP 路由，并补齐 Run.bat/AGENTS.md 的 Git 忽略规则；
+不复制、删除或覆盖 Docs/skills，不覆盖自定义入口、AGENTS.LOCAL.md 或 styles，已有忽略规则保留。
 只读校验工程及列出最近工程不触发同步。同步失败时不激活工程，显示具体错误，可修复后重试。
 编辑器不包含通用旧工作区迁移逻辑，也不自动修改 Git 索引。
 project.json 保持既有版本和字段，不保存源工程本机路径。
@@ -131,7 +134,8 @@ project.json 保持既有版本和字段，不保存源工程本机路径。
 ## 项目 AI 工作入口
 
 AGENTS.md 是编辑器维护的入口，明确要求读取 AGENTS.LOCAL.md。
-制作使用 roblox-ui-authoring，编写 Luau 同时使用 roblox-luau-standards；具体规范位于 Docs/。
+入口引导显式读取 uie.docs.read({file:"AGENTS.md"})，再按返回摘要选择制作、Luau 或本地化技能；
+具体规范位于随包 Docs/，通过 MCP 读取。首次使用和修订复用规则见 [MCP 自动化](mcp-automation.md)。
 存在 styles/Game-DESIGN.md 时读取风格规范及其明确链接的专项技能，不依赖 styles/skills 自动发现。
 没有选定风格也能使用平台能力，不强制套用默认蓝色窗口、签到示例或多彩棋格主题。
 
@@ -148,11 +152,11 @@ UIEditor 模拟状态不能作为真实资格、支付或发奖依据；App 检�
 
 ## 验证
 
-`tests/template-styles.test.ts` 覆盖发现、损坏、访问受限、平台与风格独立复制、技能冲突、空白工程工作区、
+`tests/template-styles.test.ts` 覆盖发现、损坏、访问受限、公共手册不复制及风格独立复制、风格内部技能冲突、空白工程工作区、
 独立性、移动、已有目标保护、相对引用、链接拒绝、复制失败回滚、
 开发/打包的单一读取路径、外置旧副本隔离，以及更新后新工程使用新版、
-已有工程风格保留原快照。agent-workspace.test.ts 验证公共规范更新、LOCAL/styles 保护、
-重复同步不改写、Git 忽略与链接路径拒绝。
+已有工程风格保留原快照。agent-workspace.test.ts 验证最小路由、旧 Docs/skills 不再同步、LOCAL/styles 保护、
+重复生成不改写、Git 忽略及受管入口链接拒绝（不遍历用户 Docs/skills）。
 `npm run test:styles` 构建后运行相关单元测试、真实风格选择与历史克隆冒烟；
 `npm run test:styles:packaged` 验证已打包应用的同一流程。
 可使用 UI_EDITOR_PACKAGE_OUTPUT/ UI_EDITOR_PACKAGED_EXECUTABLE 隔离打包验证，

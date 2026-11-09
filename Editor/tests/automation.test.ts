@@ -119,8 +119,8 @@ test('MCP export takes no arguments and accepts no alternate source or target', 
   }
 });
 test('MCP directory is static and bridge authenticates forwarding and screenshots', async () => {
-  assert.equal(definitions.length, 26); assert.ok(!definitions.some(tool => tool.name.includes('selection')));
-  for (const name of ['uie.assets.search', 'uie.assets.get', 'uie.assets.configure', 'uie.assets.import']) assert.ok(definitions.some(tool => tool.name === name));
+  assert.equal(definitions.length, 28); assert.ok(!definitions.some(tool => tool.name.includes('selection')));
+  for (const name of ['uie.docs.read', 'uie.docs.search', 'uie.assets.search', 'uie.assets.get', 'uie.assets.configure', 'uie.assets.import']) assert.ok(definitions.some(tool => tool.name === name));
   assert.deepEqual(definitions.find(tool => tool.name === 'uie.assets.import')!.inputSchema.required, ['sessionId', 'revision', 'library', 'filePath']);
   assert.ok(definitions.some(tool => tool.name === 'uie.scripts.get'));
   assert.ok(definitions.some(tool => tool.name === 'uie.scripts.set'));

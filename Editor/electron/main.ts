@@ -408,7 +408,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null, mc
       });
     }
     async function remember(project: Project, interactive = true, requestId?: string): Promise<Project> {
-      await syncAgentWorkspace(project.path, join(app.isPackaged ? process.resourcesPath : dirname(app.getAppPath()), 'ProjectTypes', 'Roblox'));
+      await syncAgentWorkspace(project.path);
       await ensureWorkspaceLauncher(project.path, process.execPath, app.isPackaged ? undefined : app.getAppPath());
       if (!interactive) await recent.record(project.path);
       if (requestId && !pending.has(requestId)) throw intervention('工程切换请求已超时或失效');
@@ -452,7 +452,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null, mc
       }
       const parent = await pick('选择父文件夹 — 将自动创建 UIEditorWorkspace');
       if (!parent) return null;
-      const result = await createProject(parent, source, style, join(app.isPackaged ? process.resourcesPath : dirname(app.getAppPath()), 'ProjectTypes', 'Roblox'));
+      const result = await createProject(parent, source, style);
       if (result.kind === 'existing') {
         const answer = await dialog.showMessageBox(window, { type: 'question', title: '工程已存在', message: '此位置已有有效工程，是否打开？', detail: result.project.path, buttons: ['打开工程', '取消'], defaultId: 0, cancelId: 1 });
         if (answer.response !== 0) return null;

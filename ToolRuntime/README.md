@@ -7,5 +7,6 @@
 - `Runtime/nodejs/`：可选的便携 Node.js；批处理优先使用其中的 Node 和 npm。
 
 本说明纳入 Git，运行产物不纳入 Git。重新打包只替换应用目录，保留 Runtime。
-AI 入口随 ProjectTypes 工程类型包分发到各工程，不再维护 ToolRuntime 下的工作区。
+公共 AI 文档由 `Editor/ai-docs` 构建到 MCP 随包目录，通过 docs.read/search 按需读取；
+各工程只生成最小读取入口，不再维护 ToolRuntime 下的 AI 工作区。
 用户工程保存在选择的外部父文件夹下，不存入此目录。

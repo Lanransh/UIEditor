@@ -2,9 +2,50 @@
 
 ## 架构与工程能力
 
-`ui-editor` stdio MCP 服务通过 Electron 本机桥接操作当前编辑会话。工具目录静态声明，App 未启动时也可以发现；实际调用读取 Runtime/ui-editor-automation.json，连接随机回环端口并使用随机令牌。除显式 project.open 可启动 App 并打开工程外，其他工具不启动 App；Hub 不隐式激活工程。桥接和渲染 IPC 都校验来源或令牌，请求串行执行，文档切换和会话卸载使旧请求失效。
+`ui-editor` stdio MCP 服务通过 Electron 本机桥接操作当前编辑会话。工具目录静态声明，App 未启动时也可以发现；docs.read/search 由 stdio 服务直接提供，其他调用读取 Runtime/ui-editor-automation.json，连接随机回环端口并使用随机令牌。除显式 project.open 可启动 App 并打开工程外，其他工具不启动 App；Hub 不隐式激活工程。桥接和渲染 IPC 都校验来源或令牌，请求串行执行，文档切换和会话卸载使旧请求失效。
 
 工程策略声明制作语言、版本、API、节点属性、父子规则和运行能力。当前 Roblox 使用 Luau 0.694，制作与运行能力分别声明。主进程的 CodeAdapter 提供执行器，通用 executeCode 检查语言后路由；其他语言需要自己的适配器，不自动翻译或降级。MCP 工具和通用查询不包含 Roblox 节点规则。当前文档格式仍为 version 3。
+
+## 随包指南与文档定位
+
+公共说明的维护源为 `Editor/ai-docs/`，不再复制进用户工作区。
+构建时复制到 `mcp-dist/ai-docs/`，与 stdio 服务一起打包；从其他 cwd、App 未运行或未打开工程时均可读取。
+服务启动时扫描固定文档根目录，拒绝根目录链接，跳过文件/目录链接及非 Markdown 文件；
+所有读取和搜索仅使用这次启动建立的 Markdown 白名单、正文快照及包级 SHA-256 documentRevision。
+修改源文档后需重新构建并重启 MCP 才可见；一次运行中不热更新或执行包内脚本。
+
+`uie.docs.read({file:"AGENTS.md"})` 显式读取入口，额外返回自动发现的 skills 摘要
+（name、description、file）；其他 Markdown 只返回 file、documentRevision、完整 content。
+file 必填，不接受空值、绝对路径、路径穿越、未登记文件或额外参数，也不自动展开链接。
+沿用物理目录 `.agents/skills/<name>/SKILL.md`；服务解析 YAML frontmatter，校验
+name 与目录一致、名称及描述长度、重复键/身份，非法技能及其参考子树不发布并记录服务端诊断，
+不影响其他合法技能。无需手写技能目录，也不会自动注册为客户端原生 skill。
+链接按所在文档目录解析；调用始终使用包根相对路径，例如 `Docs/editor-api.md`。
+文本验收脚本作为技能 Markdown 参考内的完整 Luau 代码块提供，文档服务不执行。
+
+`uie.docs.search` 搜索正文，只返回 `{documentRevision,files,truncated}`：
+
+- pattern 必填，非空且最多 512 字符；mode 默认 literal，区分大小写。
+  显式 regex 使用 ECMAScript Unicode 正则，不接收标志；支持字符类、转义、分组、选择、
+  量词和行首尾锚点；分组只支持普通括号和 `(?:...)`，不支持环视、命名组、反向引用及内联标志，
+  不承诺 rg 兼容。
+  按行匹配，不能跨行；编译和匹配在固定程序的 100ms VM 执行预算内完成，
+  查询和正文只作为数据传入。超时返回 DOCS_SEARCH_LIMIT，非法/不支持语法返回 DOCS_INVALID_REGEX。
+- path 可限定包内已登记 Markdown 或目录（可带末尾 `/`），目录按组件边界匹配，
+  不能借此搜索用户工程、未登记文件或绕过路径校验。
+- maxResults 默认 10、范围 1–20，按去重文件计数，按路径稳定排序。
+  JSON 最多 2,000 字符；超限减少文件数，不截断路径或 JSON。
+  不附正文、行号、命中次数或总数，不分页。确认无遗漏才返回 truncated=false；
+  truncated=true 时缩小范围，不自动读取所有结果。
+
+服务 instructions、docs 工具说明、业务工具短提示及工作区最小入口共同引导按需加载：
+本会话首次使用 MCP，或开始在 UIEditorWorkspace 工作时显式读取入口，再读任务所需技能。
+当前上下文已有相同修订说明时复用；修订变化重读入口与任务依赖。
+已知路径直接 read，不知道位置才 search。文档读取不切换工程、改变授权或执行任务。
+项目 LOCAL、风格和项目自有资料仍使用受授权的文件读取。
+
+验证入口为 `npm run test:docs`：涵盖参数、路径/链接边界、YAML 发现、参考链接、
+一致快照、搜索语法/超时/输出预算，以及无 App 的真实 stdio 和重定位资源目录。
 
 ## 工具与查询
 
@@ -12,7 +53,7 @@ get_capabilities 省略参数或 detail="full" 保持完整能力返回；detail
 
 nodes.get/find 可传 compact=true，JSON 节点摘要仅保留 id/name/className，省略重复 path/parentId；get 仍保留属性、图片引用、children 和截断信息，find 保留分页。文本树不受 compact 影响。省略或传 false 保持原返回。
 
-固定工具包含 editor.get_state/get_capabilities、nodes.get/find、code.execute、scripts.get/set、document.list/new/open/save/export、runtime.control/click/hover/scroll/drag/batch、debug.get_diagnostics/screenshot、assets.search/get/configure/import 和 project.list/open，均带 uie 前缀。不提供选中节点、MCP undo/redo 或制作代码内部的历史 API。尚未新建或打开界面时，get_state 返回 nodeCount=0，full 详情的 document 为 null；状态同时返回 projectId、projectName 和当前 documentId（无文档时为 null），当前文件 library、库内 relativePath 和 mode（edit/unsaved），以及绝对路径 workspacePath、agentWorkspacePath、gameDesignPath 和 gameDesignExists；文档编辑、保存、运行及当前画布截图要求先新建或打开界面。图片查询、配置、本地导入和 ui.assets.apply 见 [图片资产](image-assets.md)。
+固定工具包含 docs.read/search、editor.get_state/get_capabilities、nodes.get/find、code.execute、scripts.get/set、document.list/new/open/save/export、runtime.control/click/hover/scroll/drag/batch、debug.get_diagnostics/screenshot、assets.search/get/configure/import 和 project.list/open，均带 uie 前缀。不提供选中节点、MCP undo/redo 或制作代码内部的历史 API。尚未新建或打开界面时，get_state 返回 nodeCount=0，full 详情的 document 为 null；状态同时返回 projectId、projectName 和当前 documentId（无文档时为 null），当前文件 library、库内 relativePath 和 mode（edit/unsaved），以及绝对路径 workspacePath、agentWorkspacePath、gameDesignPath 和 gameDesignExists；文档编辑、保存、运行及当前画布截图要求先新建或打开界面。图片查询、配置、本地导入和 ui.assets.apply 见 [图片资产](image-assets.md)。
 
 scripts.get 读取交互代码 source、接入代码 integration，可用 kind 指定其中一份，省略时读取两份。scripts.set 要求 sessionId/revision，可传 source、integration 或同时传两者，未传字段保持原值。源码长度及结构校验沿用文档边界；语法错误允许保存并在运行时反馈。运行中禁止修改源码。code.execute 内的 ui.scripts.get/set 仍可将源码与节点修改组合提交。
 
@@ -99,13 +140,13 @@ document.save 无路径时保存当前绑定的项目 UI 或模板原件；带 r
 
 `uie.document.export` 无参数，要求编辑态，直接导出当前编辑器中的最新设计（包括未保存修改）；通过与工具栏相同的 Toolkit 发现与提交接口，导出当前设计快照和交互脚本；不要求保存、不修改 dirty 或历史、不使用运行副本、不弹导出对话框。图片缺少 Roblox ID 时报告节点路径并拒绝提交，不自动上传；连接必须是唯一可用工程，不接受目标覆盖或跨工程文档来源。会话与 revision 由内部捕获，发现连接后再次校验，避免提交已失效的快照，不要求调用方先读取状态。返回 target 与 task，awaiting_studio 仅表示等待回执，不代表 Studio 已导入或保存；完整流程见 [Roblox 一次性导入](roblox-import.md)。导出等待 Toolkit 提交的超时预算单独放宽，其他 MCP 工具不变。
 
-工作区 AGENTS.md 要求只有用户提出或同意时才能修改模板原件；普通制作仅参考模板或使用副本。该授权是 AI 工作规则，不新增确认弹窗或授权令牌。规范文件 styles/Game-DESIGN.md 由 AI 根据 get_state 返回的绝对路径使用文件工具读写；路径不会授予文件系统权限，不新增 MCP Markdown 读写接口。修改规范不自动修改模板，修改模板不自动更新已有项目 UI、其他工作区或全局画风库。
+随包指南要求只有用户提出或同意时才能修改模板原件；普通制作仅参考模板或使用副本。该授权是 AI 工作规则，不新增确认弹窗或授权令牌。规范文件 styles/Game-DESIGN.md 由 AI 根据 get_state 返回的绝对路径使用文件工具读写；路径不会授予文件系统权限，不提供项目 Markdown 写接口。修改规范不自动修改模板，修改模板不自动更新已有项目 UI、其他工作区或全局画风库。
 
 ## Hub、工作区与打包
 
 Hub 右上角“设置”提供 Codex 与 Cursor MCP 配置，不提供 AI 工作区打开按钮。配置管理 CODEX_HOME/config.toml（未设置时为用户 .codex/config.toml）中的 ui-editor command/args/enabled，保留其他配置并验证 TOML。启动路径包含显式发现文件地址，不依赖 Codex 工作目录；写入前检查配置是否变化，再原子替换。Cursor 提供独立启用/禁用开关及启动路径修复，固定读写用户主目录 `~/.cursor/mcp.json`，不写工程目录。启用时添加或更新 `mcpServers.ui-editor` 的 Node 启动命令与绝对路径参数，禁用时移除该服务；保留其他服务及顶层字段。JSON 或配置结构无效时拒绝写入；同样检查外部修改并原子替换。Cursor 开关表示全局文件中是否注册该服务，不读取客户端内部的连接或工具开关状态。
 
-开发构建输出 Editor/mcp-dist/server.mjs；打包复制到 resources/mcp-dist，ASAR 外由 Node 启动，原生宿主位于 resources/native-bin。Hub 检查服务文件与 Node。所有新工程在 UIEditorWorkspace 根目录拥有公共入口、Docs、.agents/skills 和 styles，由 ProjectTypes/Roblox 提供公共入口、节点与代码技能，TemplateStyles/Roblox 提供可选视觉规范、模板和风格专项技能。节点制作和运行通过 MCP，源码也可通过文件工具修改；重开同步公共说明并保留项目 LOCAL/styles；流程见 [模板风格与项目 AI 工作区](template-styles.md)。旧全局 AI 入口已退役，历史视觉示例仅作为仓库参考资料保留。
+开发构建输出 Editor/mcp-dist/server.mjs 和 ai-docs；打包复制到 resources/mcp-dist，ASAR 外由 Node 启动，原生宿主位于 resources/native-bin。Hub 检查服务文件与 Node。新工程只生成最小 MCP 读取入口和缺失的 LOCAL，不复制公共 Docs/skills；可选视觉规范、模板和专项技能仍从 TemplateStyles/Roblox 复制到 styles。重开仅刷新带管理标记的入口，保留自定义入口、LOCAL/styles 和旧公共副本，不再覆盖或清理 Docs/skills；旧副本不再更新，应以随包文档为准。流程见 [模板风格与项目 AI 工作区](template-styles.md)。
 
 ## 验证
 

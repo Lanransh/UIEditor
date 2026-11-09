@@ -62,7 +62,7 @@ AI 编写交互脚本时，必须在 source 文件头或 Render 附近写明完�
 使导出的 View 本身足以供接入者使用；仅写 `@param state table` 或让使用者翻模拟代码不够。
 字段需注明类型、含义、单位、必填/缺省行为、枚举与 ID 对应关系，同时说明首次准备、
 刷新方式和动作参数。具体制作要求维护在
-[工程类型的接入规范](../../ProjectTypes/Roblox/Docs/presentation-contract.md)。
+[随包接入规范](../../Editor/ai-docs/Docs/presentation-contract.md)。
 现有福利示例的实际字段说明见
 [福利接入契约](../../Editor/tests/fixtures/roblox-welfare/README.md#state-数据契约)。
 此要求约束后续脚本制作；并不表示已有脚本均已补齐注释或已有自动类型校验。

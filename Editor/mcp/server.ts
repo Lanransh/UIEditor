@@ -1,12 +1,17 @@
 import { createInterface } from 'node:readline';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { definitions, validateTool } from '../src/shared/automation-tools';
 import { openEditor, requestEditor } from './editor-launch';
+import { loadDocumentation } from './documentation';
+import { documentationInstructions } from '../src/shared/documentation';
 
 export { definitions } from '../src/shared/automation-tools';
+let documentation: ReturnType<typeof loadDocumentation> | undefined;
+function docs() { return documentation ??= loadDocumentation(fileURLToPath(new URL('./ai-docs/', import.meta.url))); }
 export async function callTool(name: string, args: Record<string, unknown>, discoveryPath: string) {
   validateTool(name, args);
-  const result = { value: name === 'uie.project.open' ? await openEditor(args, discoveryPath) : await requestEditor(name, args, discoveryPath) };
+  const result = { value: name === 'uie.docs.read' ? (await docs()).read(args) : name === 'uie.docs.search' ? (await docs()).search(args)
+    : name === 'uie.project.open' ? await openEditor(args, discoveryPath) : await requestEditor(name, args, discoveryPath) };
   if (result.value?.png) return { content: [{ type: 'image', mimeType: 'image/png', data: result.value.png }, { type: 'text', text: JSON.stringify(result.value.metadata) }] };
   if (name === 'uie.assets.get' && result.value?.asset?.previewImage) {
     const { previewImage, ...asset } = result.value.asset;
@@ -16,13 +21,14 @@ export async function callTool(name: string, args: Record<string, unknown>, disc
   return { content: [{ type: 'text', text: JSON.stringify(result.value) }] };
 }
 export function serve(discoveryPath: string) {
+  void docs().catch(() => {}); // Freeze one startup snapshot; discovery still works if the package is broken.
   const lines = createInterface({ input: process.stdin }); let queue = Promise.resolve();
   lines.on('line', line => { queue = queue.then(async () => {
     let request: any;
     try {
       request = JSON.parse(line); if (request.id === undefined) return;
       let result: unknown;
-      if (request.method === 'initialize') result = { protocolVersion: request.params?.protocolVersion ?? '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'ui-editor', version: '0.1.0' } };
+      if (request.method === 'initialize') result = { protocolVersion: request.params?.protocolVersion ?? '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'ui-editor', version: '0.1.0' }, instructions: documentationInstructions };
       else if (request.method === 'tools/list') result = { tools: definitions };
       else if (request.method === 'ping') result = {};
       else if (request.method === 'tools/call') {

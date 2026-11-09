@@ -1,10 +1,10 @@
 import { mkdir, readFile, writeFile, unlink, rmdir, rename, realpath, lstat } from 'node:fs/promises';
 import { basename, dirname, join, resolve, relative, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { AGENT_IGNORE_RULES, LOCAL_INSTRUCTIONS } from './agent-workspace';
+import { AGENT_IGNORE_RULES, LOCAL_INSTRUCTIONS, WORKSPACE_INSTRUCTIONS } from './agent-workspace';
 import { WORKSPACE_DIRECTORY, type Project, type ProjectManifest, type RecentProject } from '../src/shared/project';
 import { listDocumentAssets, readDocument, documentAssetDirectory, documentFiles, documentStem, documentScriptPaths, documentBundlePath } from './documents';
-import { relocateStyleFile, projectStylePath, readTemplateStyle, readAgentPackage, validateDocumentLinks, validateSkillNames } from './template-styles';
+import { relocateStyleFile, projectStylePath, readTemplateStyle } from './template-styles';
 
 function code(error: unknown): string | undefined {
   return (error as NodeJS.ErrnoException)?.code;
@@ -41,7 +41,7 @@ export async function openProject(directory: string): Promise<Project> {
 
 export type CreateResult = { kind: 'created' | 'existing'; project: Project };
 
-export async function createProject(parent: string, templateSource?: string, styleSource?: string, projectTypeSource = resolve('../ProjectTypes/Roblox')): Promise<CreateResult> {
+export async function createProject(parent: string, templateSource?: string, styleSource?: string): Promise<CreateResult> {
   if (templateSource !== undefined && styleSource !== undefined) throw new Error('模板风格与历史工程克隆不能同时使用。');
   const directory = join(await realpath(parent), WORKSPACE_DIRECTORY);
   try {
@@ -58,23 +58,15 @@ export async function createProject(parent: string, templateSource?: string, sty
   const templateFiles: string[] = [];
   const templateDirectories = new Set<string>();
   try {
-    const common = await readAgentPackage(projectTypeSource, ['AGENTS.md']);
-    validateDocumentLinks(common);
-    validateSkillNames(common);
-    const templates: { path: string; content: string | Buffer }[] = common.map(item => ({ path: item.path, content: item.content }));
+    const templates: { path: string; content: string | Buffer }[] = [{ path: 'AGENTS.md', content: WORKSPACE_INSTRUCTIONS }];
     templates.push({ path: 'AGENTS.LOCAL.md', content: LOCAL_INSTRUCTIONS });
     templates.push({ path: '.gitignore', content: AGENT_IGNORE_RULES.join('\n') + '\n' });
     await mkdir(join(directory, 'interfaces'));
     templateDirectories.add(join(directory, 'interfaces'));
     if (styleSource !== undefined) {
       const style = await readTemplateStyle(styleSource);
-      validateSkillNames([...common, ...style.files]);
-      const commonSkills = new Set(common.filter(item => item.path.startsWith(join('.agents', 'skills') + sep)).map(item => item.path.split(sep)[2].toLowerCase()));
-      const occupied = new Set(common.map(item => item.path.toLowerCase()));
       const scriptFiles = new Set(style.files.filter(item => item.path.startsWith(`template-references${sep}`) && item.path.toLowerCase().endsWith('.json')).flatMap(item => Object.values(documentScriptPaths(item.path))));
       for (const item of style.files) {
-        const skill = item.path.startsWith(join('.agents', 'skills') + sep) ? item.path.split(sep)[2].toLowerCase() : null;
-        if (occupied.has(item.path.toLowerCase()) || (skill && commonSkills.has(skill))) throw new Error(`工程类型与风格文件或技能冲突：${item.path}`);
         if (item.path.startsWith(`template-references${sep}`) && item.path.toLowerCase().endsWith('.json')) {
           templates.push(...documentFiles(projectStylePath(item.path), await readDocument(join(styleSource, item.path))));
         } else if (!scriptFiles.has(item.path)) {

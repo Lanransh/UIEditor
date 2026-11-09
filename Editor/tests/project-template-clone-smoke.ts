@@ -5,6 +5,8 @@ import { join, resolve } from 'node:path';
 import { listDocumentAssets, readDocument, writeDocument } from '../electron/documents';
 import { robloxStrategy } from '../src/editor/roblox';
 
+import { WORKSPACE_INSTRUCTIONS } from '../electron/agent-workspace';
+
 const output = resolve('test-results');
 await mkdir(output, { recursive: true });
 const root = await mkdtemp(join(output, 'project-template-clone-'));
@@ -83,8 +85,8 @@ try {
   assert.deepEqual(await readDocument(join(clone, 'styles', 'templates', '奖励', 'Reward', 'Reward.json')), document);
   assert.deepEqual(await readdir(join(clone, 'interfaces')), []);
   for (const workspace of [source, clone, join(emptyParent, 'UIEditorWorkspace')]) {
-    assert.equal(await readFile(join(workspace, 'AGENTS.md'), 'utf8'), await readFile(resolve('../ProjectTypes/Roblox/AGENTS.md'), 'utf8'));
-    assert.ok((await readdir(join(workspace, '.agents', 'skills'))).includes('roblox-ui-authoring'));
+    assert.equal(await readFile(join(workspace, 'AGENTS.md'), 'utf8'), WORKSPACE_INSTRUCTIONS);
+    await assert.rejects(readdir(join(workspace, '.agents', 'skills')), /ENOENT/);
     await assert.rejects(readFile(join(workspace, 'Game-DESIGN.md')), /ENOENT/);
   }
   await page.getByRole('button', { name: '模板参考', exact: true }).click();
