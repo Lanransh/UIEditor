@@ -26,6 +26,7 @@ test('新工程只生成 MCP 路由，不复制公共 Docs/skills；重开不覆
   const project = (await createProject(root, undefined, resolve('../TemplateStyles/Roblox/多彩棋格风格'))).project;
   const agent = project.path;
   assert.equal(await readFile(join(agent, 'AGENTS.md'), 'utf8'), WORKSPACE_INSTRUCTIONS);
+  assert.ok(WORKSPACE_INSTRUCTIONS.includes('uie.docs.read({files:["AGENTS.md"]})'));
   for (const name of ['Docs', '.agents']) await assert.rejects(stat(join(agent, name)), /ENOENT/);
   await mkdir(join(agent, 'Docs'));
   await mkdir(join(agent, '.agents', 'skills', 'custom'), { recursive: true });

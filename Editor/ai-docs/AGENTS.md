@@ -2,18 +2,22 @@
 
 本工具负责可继续编辑的 Roblox UI、Luau 展示与模拟预览，以及向 Roblox 导出。
 平时不主动加载全部说明。本会话首次使用 MCP 或开始在 UIEditorWorkspace 工作时，
-显式调用 `uie.docs.read({file:"AGENTS.md"})`，获取本指南和服务自动发现的 skills 摘要，
+显式调用 `uie.docs.read({files:["AGENTS.md"]})`，获取本指南和服务自动发现的 skills 摘要，
 按任务读取相关 SKILL.md 及参考文档；当前上下文已有同修订说明时复用。
 技能摘要由服务生成，不在此维护完整技能目录，也不自动安装为客户端原生 skills。
 
 ## 按需读取
 
-- `uie.docs.read` 的 file 必填；所有路径相对于随工具发布的文档包，不是用户工作区。
-  返回完整 Markdown（skill 保留 YAML 文件头），不展开链接。相对链接以当前文件所在目录解析，
+- `uie.docs.read` 只接受必填的非空字符串数组 `files`，不再接受 `file`；单文件也使用数组。
+  例如 `uie.docs.read({files:["AGENTS.md","Docs/editor-api.md"]})`。所有路径相对于随工具发布的文档包，不是用户工作区。
+  返回 `{documentRevision,documents:[{file,documentRevision,content,skills?}]}`，按输入顺序保留重复项；
+  任一文件无效则整次报错，不部分返回。只有 AGENTS.md 对象带 skills 摘要。
+  content 为完整 Markdown（skill 保留 YAML 文件头），不展开链接。相对链接以当前文件所在目录解析，
   调用时仍传包根相对路径。技能在 `.agents/skills/<name>/SKILL.md`，参考位于 `Docs/` 或技能子目录。
 - 已知路径直接 read；不知道细节位置时调用 `uie.docs.search({pattern:"关键词"})`，
   仅按需读取命中路径。搜索不替代指南或技能流程；无命中不代表没有规则。
-- read/search 共用启动时只读快照和 documentRevision。修订变化时重新读取入口及任务依赖。
+- read/search 可彼此并发，也不等待排队中的 App 操作；响应按请求 ID 对应，不保证输入顺序。
+  非 docs 业务仍按原顺序串行。read/search 共用启动时只读快照和 documentRevision。修订变化时重新读取入口及任务依赖。
   不搜索用户工程，不修改文件、切换工程或授予任何操作权限。
 
 ## 项目边界

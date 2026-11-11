@@ -7,9 +7,11 @@ export const WORKSPACE_INSTRUCTIONS = `# UIEditor 工作区
 <!-- UIEditor managed workspace: MCP 文档读取入口。 -->
 
 本工作区由 UIEditor 管理。开始在这里工作时，先调用 ui-editor MCP 的
-uie.docs.read({file:"AGENTS.md"})，读取通用指南与自动发现的技能摘要，
+uie.docs.read({files:["AGENTS.md"]})，读取通用指南与自动发现的技能摘要，
 再按任务读取相关 skill 和参考；当前上下文已有相同 documentRevision 时可复用。
-已知包内路径直接 uie.docs.read，不知道位置时用 uie.docs.search 定位后按需读取。
+已知包内路径用 uie.docs.read({files:["包内路径"]}) 批量按需读取，不接受 file 参数。
+返回 documents 数组，按输入顺序保留重复；任一文件无效整次报错。只有 AGENTS.md 对象含技能摘要。
+不知道位置时用 uie.docs.search 定位后按需读取。
 公共说明不再复制到工作区；旧 Docs/ 与 .agents/skills/ 副本不再更新，以 MCP 随包文档为准。
 
 先读取项目补充要求 AGENTS.LOCAL.md（@AGENTS.LOCAL.md）。

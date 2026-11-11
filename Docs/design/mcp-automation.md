@@ -2,7 +2,7 @@
 
 ## 架构与工程能力
 
-`ui-editor` stdio MCP 服务通过 Electron 本机桥接操作当前编辑会话。工具目录静态声明，App 未启动时也可以发现；docs.read/search 由 stdio 服务直接提供，其他调用读取 Runtime/ui-editor-automation.json，连接随机回环端口并使用随机令牌。除显式 project.open 可启动 App 并打开工程外，其他工具不启动 App；Hub 不隐式激活工程。桥接和渲染 IPC 都校验来源或令牌，请求串行执行，文档切换和会话卸载使旧请求失效。
+`ui-editor` stdio MCP 服务通过 Electron 本机桥接操作当前编辑会话。工具目录静态声明，App 未启动时也可以发现；docs.read/search 由 stdio 服务直接提供，其他调用读取 Runtime/ui-editor-automation.json，连接随机回环端口并使用随机令牌。除显式 project.open 可启动 App 并打开工程外，其他工具不启动 App；Hub 不隐式激活工程。桥接和渲染 IPC 都校验来源或令牌，非 docs 请求串行执行，文档切换和会话卸载使旧请求失效。
 
 工程策略声明制作语言、版本、API、节点属性、父子规则和运行能力。当前 Roblox 使用 Luau 0.694，制作与运行能力分别声明。主进程的 CodeAdapter 提供执行器，通用 executeCode 检查语言后路由；其他语言需要自己的适配器，不自动翻译或降级。MCP 工具和通用查询不包含 Roblox 节点规则。当前文档格式仍为 version 3。
 
@@ -14,9 +14,11 @@
 所有读取和搜索仅使用这次启动建立的 Markdown 白名单、正文快照及包级 SHA-256 documentRevision。
 修改源文档后需重新构建并重启 MCP 才可见；一次运行中不热更新或执行包内脚本。
 
-`uie.docs.read({file:"AGENTS.md"})` 显式读取入口，额外返回自动发现的 skills 摘要
-（name、description、file）；其他 Markdown 只返回 file、documentRevision、完整 content。
-file 必填，不接受空值、绝对路径、路径穿越、未登记文件或额外参数，也不自动展开链接。
+`uie.docs.read({files:["AGENTS.md"]})` 显式读取入口；只接受必填非空字符串数组 files，
+不接受旧 file 参数。单文件和多文件统一返回 `{documentRevision,documents:[{file,documentRevision,content,skills?}]}`。
+每个 documents 对象保留完整 Markdown；仅 AGENTS.md 对象额外带自动发现的 skills 摘要
+（name、description、file）。按输入顺序返回，重复路径保留；任一文件无效则整次报错，不部分成功。
+不接受空值、绝对路径、路径穿越、未登记文件或额外参数，也不自动展开链接。
 沿用物理目录 `.agents/skills/<name>/SKILL.md`；服务解析 YAML frontmatter，校验
 name 与目录一致、名称及描述长度、重复键/身份，非法技能及其参考子树不发布并记录服务端诊断，
 不影响其他合法技能。无需手写技能目录，也不会自动注册为客户端原生 skill。
@@ -30,6 +32,7 @@ name 与目录一致、名称及描述长度、重复键/身份，非法技能�
   量词和行首尾锚点；分组只支持普通括号和 `(?:...)`，不支持环视、命名组、反向引用及内联标志，
   不承诺 rg 兼容。
   按行匹配，不能跨行；编译和匹配在固定程序的 100ms VM 执行预算内完成，
+  每次搜索在独立异步 worker 内执行，避免 VM 阻塞 stdio 或文档读取；
   查询和正文只作为数据传入。超时返回 DOCS_SEARCH_LIMIT，非法/不支持语法返回 DOCS_INVALID_REGEX。
 - path 可限定包内已登记 Markdown 或目录（可带末尾 `/`），目录按组件边界匹配，
   不能借此搜索用户工程、未登记文件或绕过路径校验。
@@ -37,6 +40,10 @@ name 与目录一致、名称及描述长度、重复键/身份，非法技能�
   JSON 最多 2,000 字符；超限减少文件数，不截断路径或 JSON。
   不附正文、行号、命中次数或总数，不分页。确认无遗漏才返回 truncated=false；
   truncated=true 时缩小范围，不自动读取所有结果。
+
+stdio 仅让 docs.read/search 绕过原串行队列：读取可越过未完成搜索和慢 App 操作，
+多个搜索也可重叠；其他请求维持原顺序，不放开有副作用的业务并发。响应使用请求 ID 匹配，
+不承诺按输入顺序返回。输入 EOF 后等待全部已接收请求完成，单次错误不阻断后续请求。
 
 服务 instructions、docs 工具说明、业务工具短提示及工作区最小入口共同引导按需加载：
 本会话首次使用 MCP，或开始在 UIEditorWorkspace 工作时显式读取入口，再读任务所需技能。
@@ -150,7 +157,9 @@ Hub 右上角“设置”提供 Codex 与 Cursor MCP 配置，不提供 AI 工�
 
 ## 验证
 
-`npm run test:project-opening` 构建并验证真实 stdio 冷启动、默认/可选最小化、同工程复用、未保存/运行保护、工程切换与保存重开；只有窗口状态专项验证使用隔离的真实窗口，其余检查保持后台隐藏。`npm run build:runtime` 构建原生宿主与编辑入口；`npm run build` 包含 MCP bundle。`tests/automation-reader.test.ts` 检查 UUID 来源、默认工程、全局库、文件重命名、重复身份、图片来源、树截断与校验；`tests/automation.test.ts` 检查真实 Luau、事务、查询、文件、配置及桥接；`npm run test:mcp` 使用真实 stdio 与隔离 Electron 工程检查制作、历史、运行、点击、日志、截图及保存重开；导出使用隔离 Toolkit IPC 替身验证无参数导出最新未保存快照、空白/运行态、缺失图片、唯一连接、提交错误、慢提交回执与文档/历史不变，不向真实 Studio 投递；并验证空白/脏画布下读取模板和跨工程查询不改变会话、独立截图的像素/尺寸及窗口清理。`npx tsx tests/template-editing-smoke.ts` 验证模板卡片直接打开、人工与 MCP 混合编辑及撤销重做、原件保存重开、外部冲突、副本隔离和风格文件重开保留。先 package 后执行 `npm run test:mcp:packaged` 验证打包路径。所有 App 测试不能替代 Studio 或设备验收。
+`npm run test:docs` 验证 files-only 批量读取、白名单与快照、正则限制、迁移后的工作区入口，
+并通过真实 stdio 与可控 worker/桥接 gate 验证 docs 并发、业务串行、EOF 排空和错误恢复；
+测试不依赖耗时阈值判断并发。`npm run test:project-opening` 构建并验证真实 stdio 冷启动、默认/可选最小化、同工程复用、未保存/运行保护、工程切换与保存重开；只有窗口状态专项验证使用隔离的真实窗口，其余检查保持后台隐藏。`npm run build:runtime` 构建原生宿主与编辑入口；`npm run build` 包含 MCP bundle。`tests/automation-reader.test.ts` 检查 UUID 来源、默认工程、全局库、文件重命名、重复身份、图片来源、树截断与校验；`tests/automation.test.ts` 检查真实 Luau、事务、查询、文件、配置及桥接；`npm run test:mcp` 使用真实 stdio 与隔离 Electron 工程检查制作、历史、运行、点击、日志、截图及保存重开；导出使用隔离 Toolkit IPC 替身验证无参数导出最新未保存快照、空白/运行态、缺失图片、唯一连接、提交错误、慢提交回执与文档/历史不变，不向真实 Studio 投递；并验证空白/脏画布下读取模板和跨工程查询不改变会话、独立截图的像素/尺寸及窗口清理。`npx tsx tests/template-editing-smoke.ts` 验证模板卡片直接打开、人工与 MCP 混合编辑及撤销重做、原件保存重开、外部冲突、副本隔离和风格文件重开保留。先 package 后执行 `npm run test:mcp:packaged` 验证打包路径。所有 App 测试不能替代 Studio 或设备验收。
 
 需要保留正在运行的打包应用时，可用 UI_EDITOR_PACKAGE_OUTPUT 指定隔离打包目录，再以 UI_EDITOR_PACKAGED_EXECUTABLE 指定该 exe 执行打包 MCP 测试，不需要终止现有用户会话。
 

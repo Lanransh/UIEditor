@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { lstat, readFile, readdir, realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { Script } from 'node:vm';
+import { Worker } from 'node:worker_threads';
 import { parseDocument } from 'yaml';
 import { documentationPath, validateDocumentationArgs } from '../src/shared/documentation';
 
@@ -9,7 +9,7 @@ interface Skill { name: string; description: string; file: string }
 
 // Only this fixed program executes. Patterns and document contents are data, never source.
 // Compilation and matching stay inside the timed context, including pathological RegExp work.
-const searchProgram = new Script(`(() => {
+const searchProgram = `(() => {
   const regexp = mode === 'regex' ? new RegExp(pattern, 'u') : null;
   const result = { documentRevision, files: [], truncated: false };
   for (const [file, content] of documents) {
@@ -22,7 +22,7 @@ const searchProgram = new Script(`(() => {
     }
   }
   return JSON.stringify(result);
-})()`);
+})()`;
 
 export class Documentation {
   readonly documentRevision: string;
@@ -31,11 +31,14 @@ export class Documentation {
   }
   read(args: unknown) {
     validateDocumentationArgs('uie.docs.read', args);
-    const file = documentationPath(args.file), content = this.documents.get(file);
-    if (content === undefined) throw new Error('DOCS_NOT_FOUND: 未登记此 Markdown 文档。');
-    return { file, documentRevision: this.documentRevision, content, ...(file === 'AGENTS.md' ? { skills: this.skills.map(skill => ({ ...skill })) } : {}) };
+    const documents = (args.files as string[]).map(file => {
+      const content = this.documents.get(file);
+      if (content === undefined) throw new Error('DOCS_NOT_FOUND: 未登记此 Markdown 文档。');
+      return { file, documentRevision: this.documentRevision, content, ...(file === 'AGENTS.md' ? { skills: this.skills.map(skill => ({ ...skill })) } : {}) };
+    });
+    return { documentRevision: this.documentRevision, documents };
   }
-  search(args: unknown): { documentRevision: string; files: string[]; truncated: boolean } {
+  async search(args: unknown): Promise<{ documentRevision: string; files: string[]; truncated: boolean }> {
     validateDocumentationArgs('uie.docs.search', args);
     const pattern = args.pattern as string, mode = args.mode ?? 'literal';
     // A documented subset, rather than an rg compatibility claim.
@@ -53,14 +56,30 @@ export class Documentation {
     const path = args.path === undefined ? undefined : documentationPath(args.path, true);
     const documents = [...this.documents].filter(([file]) => path === undefined || file === path || file.startsWith(path + '/'));
     if (path !== undefined && !documents.length) throw new Error('DOCS_NOT_FOUND: 未登记此 Markdown 文件或目录。');
-    try {
-      return JSON.parse(searchProgram.runInNewContext({
+    // Each search has its own worker: VM's synchronous timeout must not block stdio/read.
+    return new Promise((resolve, reject) => {
+      const worker = new Worker(`
+        const { parentPort, workerData } = require('node:worker_threads');
+        const { Script } = require('node:vm');
+        try {
+          parentPort.postMessage({ value: JSON.parse(new Script(workerData.program).runInNewContext(workerData.context,
+            { timeout: 100, contextCodeGeneration: { strings: false, wasm: false } })) });
+        } catch (error) {
+          parentPort.postMessage({ error: error.code === 'ERR_SCRIPT_EXECUTION_TIMEOUT'
+            ? 'DOCS_SEARCH_LIMIT: 搜索超过 100ms，请缩小范围或简化表达式。'
+            : 'DOCS_INVALID_REGEX: 正则表达式无效。' });
+        }
+      `, { eval: true, workerData: { program: searchProgram, context: {
         pattern, mode, documents, documentRevision: this.documentRevision, maxResults: args.maxResults ?? 10,
-      }, { timeout: 100, contextCodeGeneration: { strings: false, wasm: false } }));
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ERR_SCRIPT_EXECUTION_TIMEOUT') throw new Error('DOCS_SEARCH_LIMIT: 搜索超过 100ms，请缩小范围或简化表达式。');
-      throw new Error('DOCS_INVALID_REGEX: 正则表达式无效。');
-    }
+      } } });
+      let received = false;
+      worker.once('message', message => {
+        received = true;
+        if (message.error) reject(new Error(message.error)); else resolve(message.value);
+      });
+      worker.once('error', reject);
+      worker.once('exit', code => { if (!received) reject(new Error(`DOCS_SEARCH_FAILED: 搜索进程退出 (${code})。`)); });
+    });
   }
 }
 

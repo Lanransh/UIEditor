@@ -10,7 +10,7 @@ let documentation: ReturnType<typeof loadDocumentation> | undefined;
 function docs() { return documentation ??= loadDocumentation(fileURLToPath(new URL('./ai-docs/', import.meta.url))); }
 export async function callTool(name: string, args: Record<string, unknown>, discoveryPath: string) {
   validateTool(name, args);
-  const result = { value: name === 'uie.docs.read' ? (await docs()).read(args) : name === 'uie.docs.search' ? (await docs()).search(args)
+  const result = { value: name === 'uie.docs.read' ? (await docs()).read(args) : name === 'uie.docs.search' ? await (await docs()).search(args)
     : name === 'uie.project.open' ? await openEditor(args, discoveryPath) : await requestEditor(name, args, discoveryPath) };
   if (result.value?.png) return { content: [{ type: 'image', mimeType: 'image/png', data: result.value.png }, { type: 'text', text: JSON.stringify(result.value.metadata) }] };
   if (name === 'uie.assets.get' && result.value?.asset?.previewImage) {
@@ -20,13 +20,13 @@ export async function callTool(name: string, args: Record<string, unknown>, disc
   }
   return { content: [{ type: 'text', text: JSON.stringify(result.value) }] };
 }
-export function serve(discoveryPath: string) {
+export async function serve(discoveryPath: string) {
   void docs().catch(() => {}); // Freeze one startup snapshot; discovery still works if the package is broken.
   const lines = createInterface({ input: process.stdin }); let queue = Promise.resolve();
-  lines.on('line', line => { queue = queue.then(async () => {
-    let request: any;
+  const pending = new Set<Promise<void>>();
+  async function handle(line: string, request: any) {
     try {
-      request = JSON.parse(line); if (request.id === undefined) return;
+      request ??= JSON.parse(line); if (request.id === undefined) return;
       let result: unknown;
       if (request.method === 'initialize') result = { protocolVersion: request.params?.protocolVersion ?? '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'ui-editor', version: '0.1.0' }, instructions: documentationInstructions };
       else if (request.method === 'tools/list') result = { tools: definitions };
@@ -37,10 +37,22 @@ export function serve(discoveryPath: string) {
       } else { process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, error: { code: -32601, message: 'Method not found' } }) + '\n'); return; }
       process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result }) + '\n');
     } catch (error) { process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request?.id ?? null, error: { code: -32700, message: String(error) } }) + '\n'); }
-  }); });
+  }
+  lines.on('line', line => {
+    let request: any;
+    try { request = JSON.parse(line); } catch { /* handle reports malformed JSON. */ }
+    const name = request?.method === 'tools/call' ? request.params?.name : undefined;
+    const independent = name === 'uie.docs.read' || name === 'uie.docs.search';
+    const task = independent ? handle(line, request) : queue.then(() => handle(line, request));
+    if (!independent) queue = task;
+    pending.add(task);
+    void task.finally(() => pending.delete(task));
+  });
+  await new Promise<void>(resolve => lines.once('close', resolve));
+  await Promise.all(pending); // EOF closes input, not work already accepted.
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const index = process.argv.indexOf('--discovery');
   if (index < 0 || !process.argv[index + 1]) throw new Error('--discovery path is required');
-  serve(process.argv[index + 1]);
+  await serve(process.argv[index + 1]);
 }

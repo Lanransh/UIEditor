@@ -134,7 +134,7 @@ project.json 保持既有版本和字段，不保存源工程本机路径。
 ## 项目 AI 工作入口
 
 AGENTS.md 是编辑器维护的入口，明确要求读取 AGENTS.LOCAL.md。
-入口引导显式读取 uie.docs.read({file:"AGENTS.md"})，再按返回摘要选择制作、Luau 或本地化技能；
+入口引导显式读取 uie.docs.read({files:["AGENTS.md"]})，再按返回摘要选择制作、Luau 或本地化技能；
 具体规范位于随包 Docs/，通过 MCP 读取。首次使用和修订复用规则见 [MCP 自动化](mcp-automation.md)。
 存在 styles/Game-DESIGN.md 时读取风格规范及其明确链接的专项技能，不依赖 styles/skills 自动发现。
 没有选定风格也能使用平台能力，不强制套用默认蓝色窗口、签到示例或多彩棋格主题。
