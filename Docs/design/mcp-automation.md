@@ -60,7 +60,7 @@ get_capabilities 省略参数或 detail="full" 保持完整能力返回；detail
 
 nodes.get/find 可传 compact=true，JSON 节点摘要仅保留 id/name/className，省略重复 path/parentId；get 仍保留属性、图片引用、children 和截断信息，find 保留分页。文本树不受 compact 影响。省略或传 false 保持原返回。
 
-固定工具包含 docs.read/search、editor.get_state/get_capabilities、nodes.get/find、code.execute、scripts.get/set、document.list/new/open/save/export、runtime.control/click/hover/scroll/drag/batch、debug.get_diagnostics/screenshot、assets.search/get/configure/import 和 project.list/open，均带 uie 前缀。不提供选中节点、MCP undo/redo 或制作代码内部的历史 API。尚未新建或打开界面时，get_state 返回 nodeCount=0，full 详情的 document 为 null；状态同时返回 projectId、projectName 和当前 documentId（无文档时为 null），当前文件 library、库内 relativePath 和 mode（edit/unsaved），以及绝对路径 workspacePath、agentWorkspacePath、gameDesignPath 和 gameDesignExists；文档编辑、保存、运行及当前画布截图要求先新建或打开界面。图片查询、配置、本地导入和 ui.assets.apply 见 [图片资产](image-assets.md)。
+固定工具包含 docs.read/search、editor.get_state/get_capabilities、nodes.get/find、code.execute、scripts.get/set、document.list/new/open/save/delete/export、runtime.control/click/hover/scroll/drag/batch、debug.get_diagnostics/screenshot、assets.search/get/configure/import 和 project.list/open，均带 uie 前缀。不提供选中节点、MCP undo/redo 或制作代码内部的历史 API。尚未新建或打开界面时，get_state 返回 nodeCount=0，full 详情的 document 为 null；状态同时返回 projectId、projectName 和当前 documentId（无文档时为 null），当前文件 library、库内 relativePath 和 mode（edit/unsaved），以及绝对路径 workspacePath、agentWorkspacePath、gameDesignPath 和 gameDesignExists；文档编辑、保存、运行及当前画布截图要求先新建或打开界面。图片查询、配置、本地导入和 ui.assets.apply 见 [图片资产](image-assets.md)。
 
 scripts.get 读取交互代码 source、接入代码 integration，可用 kind 指定其中一份，省略时读取两份。scripts.set 要求 sessionId/revision，可传 source、integration 或同时传两者，未传字段保持原值。源码长度及结构校验沿用文档边界；语法错误允许保存并在运行时反馈。运行中禁止修改源码。code.execute 内的 ui.scripts.get/set 仍可将源码与节点修改组合提交。
 
@@ -144,6 +144,12 @@ AI 优先一次取得关键节点 ID，再提交带明确预期的验证批次�
 document.open 接受 interfaces 内的 relativePath，或 UUID target，二者互斥；target 只允许当前工程 project/templates。模板必须显式指定 mode=edit（原件）或 copy（未保存副本）。编辑原件绑定实际文件位置并保留文档与既有节点 ID，复用 code.execute、scripts.set 和 App 历史。
 
 document.save 无路径时保存当前绑定的项目 UI 或模板原件；带 relativePath 时在 interfaces 独占新建，不覆盖。模板原件保存使用打开时的文件内容版本检查外部修改、移动或删除，发生冲突时保留画布修改并报错；成功后更新版本。路径检查越界与符号链接。切换未保存界面需先保存或显式 discardChanges；MCP 不弹系统文件对话框，不自动放弃修改。
+
+document.delete 接收 sessionId、revision、UUID target 和可选 discardChanges。仅删除当前工程的
+project/templates 或全局 permanent 库 UI；不接受跨工程删除。模板原件删除须由用户提出或同意。
+删除 JSON 及同名两份 Luau 脚本并保留其他文件，不弹对话框，不支持文档撤销。
+要求停止预览；删除当前打开文件时，未保存修改须先保存或明确 discardChanges=true，成功后清空编辑区。
+删除其他文件保留当前修改；没有打开 UI 时也能删除已保存资产。成功后更新会话标识，后续修改需重读状态。
 
 `uie.document.export` 无参数，要求编辑态，直接导出当前编辑器中的最新设计（包括未保存修改）；通过与工具栏相同的 Toolkit 发现与提交接口，导出当前设计快照和交互脚本；不要求保存、不修改 dirty 或历史、不使用运行副本、不弹导出对话框。图片缺少 Roblox ID 时报告节点路径并拒绝提交，不自动上传；连接必须是唯一可用工程，不接受目标覆盖或跨工程文档来源。会话与 revision 由内部捕获，发现连接后再次校验，避免提交已失效的快照，不要求调用方先读取状态。返回 target 与 task，awaiting_studio 仅表示等待回执，不代表 Studio 已导入或保存；完整流程见 [Roblox 一次性导入](roblox-import.md)。导出等待 Toolkit 提交的超时预算单独放宽，其他 MCP 工具不变。
 

@@ -7,7 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { createProject, describeError, openProject, RecentProjects } from './projects';
 import type { Project, Result, RecentProjectView } from '../src/shared/project';
-import { readDocument, writeDocument, safeFileName, listDocumentAssets, openDocumentAsset, moveDocumentAsset, listTemplateFolders, templateFolderPath, documentAssetDirectory, documentBundlePath, saveDocumentBundle } from './documents';
+import { readDocument, writeDocument, safeFileName, listDocumentAssets, openDocumentAsset, moveDocumentAsset, deleteDocumentAsset, listTemplateFolders, templateFolderPath, documentAssetDirectory, documentBundlePath, saveDocumentBundle } from './documents';
 import { robloxStrategy } from '../src/editor/roblox';
 import { LuauSession, RuntimeError } from './runtime';
 import { ToolkitClient } from './toolkit';
@@ -221,7 +221,7 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null, mc
       }
       if (request.name === 'uie.project.list') return reader.listProjects();
       if (request.name === 'uie.document.list' && (a.projectId !== undefined || a.library === 'permanent' || !automationReady)) return reader.listDocuments(a);
-      if (a.target !== undefined && request.name !== 'uie.document.open') {
+      if (a.target !== undefined && !['uie.document.open', 'uie.document.delete'].includes(request.name)) {
         const saved = await reader.read(a.target);
         switch (request.name) {
           case 'uie.nodes.get': return { target: saved.target, ...(a.format === 'tree' ? nodeTree(saved.document, a) : { node: getNode(saved.document, a) }) };
@@ -319,6 +319,20 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null, mc
           if (argument.target && result.document.id.toLowerCase() !== argument.target.documentId.toLowerCase()) throw new Error('界面身份已变化，请重新查询。');
           if (argument.mode === 'copy') { documentPath = null; templateVersion = null; return { document: result.document, path: null }; }
           bindFile(result); return result;
+        }
+        case 'file:delete': {
+          if (!activeProject || !automationReady || runtimeSession) throw new Error('请打开工程并停止运行后删除界面。');
+          const target = argument.target;
+          if (target?.projectId !== undefined && target.projectId.toLowerCase() !== activeProject.manifest.id.toLowerCase()) throw new Error('只允许删除当前工程或永久库的界面。');
+          const saved = await reader.read(target);
+          const library = saved.target.library;
+          const root = library === 'permanent' ? runtime : activeProject.path;
+          const path = join(documentAssetDirectory(root, library), saved.relativePath);
+          const current = documentPath === path;
+          if (current && dirty && argument.discardChanges !== true) throw new Error('当前界面未保存，请先保存或明确 discardChanges。');
+          await deleteDocumentAsset(root, path, library);
+          if (current) { documentPath = null; templateVersion = null; dirty = false; }
+          return { deleted: true, current, target: saved.target };
         }
         case 'file:list': return reader.listDocuments(argument ?? {});
         case 'file:new': if (!automationReady) throw new Error('请先打开工程。'); documentPath = null; return null;
@@ -545,6 +559,19 @@ if (!app.requestSingleInstanceLock({ workspacePath: startupWorkspace ?? null, mc
         if (templateVersion && templateVersion.path === argument.path) templateVersion.path = asset.path;
         else if (argument.target === 'templates') templateVersion = { path: asset.path, version: await fileVersion(asset.path) };
       }
+      return asset;
+    });
+    handle('document:delete-asset', async argument => {
+      if (!argument || typeof argument !== 'object' || !('path' in argument) || !('library' in argument) || typeof argument.path !== 'string') throw new Error('删除参数无效。');
+      const storage = documentStorage(argument.library);
+      const path = argument.path;
+      const asset = (await listDocumentAssets(storage.root, storage.library)).find(asset => asset.path === path);
+      if (!asset) throw new Error('界面资产不在指定库中，请刷新后重试。');
+      const current = documentPath === asset.path;
+      const answer = await dialog.showMessageBox(window, { type: 'warning', title: '删除UI', message: `确定删除“${asset.name}”？`, detail: `将永久删除界面 JSON 和同名的两份 Luau 脚本，无法撤销。${current && dirty ? '\n当前界面未保存的修改也将丢弃。' : ''}\n${asset.path}`, buttons: ['删除', '取消'], defaultId: 1, cancelId: 1 });
+      if (answer.response !== 0) return null;
+      await deleteDocumentAsset(storage.root, asset.path, storage.library);
+      if (current) { stopRuntime(); documentPath = null; templateVersion = null; dirty = false; }
       return asset;
     });
     ipcMain.handle('document:template-folders', async event => {

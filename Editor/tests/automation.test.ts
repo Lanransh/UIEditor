@@ -119,7 +119,7 @@ test('MCP export takes no arguments and accepts no alternate source or target', 
   }
 });
 test('MCP directory is static and bridge authenticates forwarding and screenshots', async () => {
-  assert.equal(definitions.length, 28); assert.ok(!definitions.some(tool => tool.name.includes('selection')));
+  assert.equal(definitions.length, 29); assert.ok(!definitions.some(tool => tool.name.includes('selection')));
   for (const name of ['uie.docs.read', 'uie.docs.search', 'uie.assets.search', 'uie.assets.get', 'uie.assets.configure', 'uie.assets.import']) assert.ok(definitions.some(tool => tool.name === name));
   assert.deepEqual(definitions.find(tool => tool.name === 'uie.assets.import')!.inputSchema.required, ['sessionId', 'revision', 'library', 'filePath']);
   assert.ok(definitions.some(tool => tool.name === 'uie.scripts.get'));
@@ -149,4 +149,17 @@ test('MCP create and setProperties reject fractional offsets during execution an
   assert.equal(JSON.stringify(before), saved);
   const result = await executeCode(robloxCodeAdapter, directory, before, 'luau', 'ui.nodes.create("ImageButton", {properties={TileSize=UDim2.new(.125,28,.25,-28)}})');
   assert.deepEqual(result.document.root.children[0].properties.TileSize, {x:{scale:.125,offset:28},y:{scale:.25,offset:-28}});
+});
+
+
+test('document.delete requires session, revision and a validated UUID target', () => {
+  const args = { sessionId: 'session', revision: 0, target: { library: 'project', documentId: '00000000-0000-4000-8000-000000000000' } };
+  validateTool('uie.document.delete', args);
+  validateTool('uie.document.delete', { ...args, discardChanges: true });
+  for (const key of ['sessionId', 'revision', 'target']) {
+    const invalid: Record<string, unknown> = { ...args }; delete invalid[key];
+    assert.throws(() => validateTool('uie.document.delete', invalid));
+  }
+  assert.throws(() => validateTool('uie.document.delete', { ...args, target: { documentId: '../outside' } }));
+  assert.throws(() => validateTool('uie.document.delete', { ...args, discardChanges: 'yes' }));
 });

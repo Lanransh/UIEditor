@@ -177,6 +177,21 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
     setError('');
   });
   const back = () => run(async () => { if (await consent()) onBack(); });
+  function clearDocument() {
+    reset(strategy.createDocument(), null);
+    setHasDocument(false);
+    clipboard.current = null;
+    window.documents.setDirty(false);
+  }
+  const deleteAsset = (assetPath: string, library: DocumentLibrary) => run(async () => {
+    if (fileState.current.path === assetPath && assetConfigurationDirty) { setError('请先保存或放弃图片资产属性修改。'); return; }
+    const result = await window.documents.deleteAsset(assetPath, library);
+    if (!result.ok) { setError(result.error); return; }
+    if (!result.value) return;
+    if (fileState.current.path === assetPath) clearDocument();
+    setDocumentAssetRevision(value => value + 1);
+    setError('');
+  });
   useEffect(() => window.documents.onCloseRequest(() => { void run(async () => { if (await consent()) window.documents.close(); }); }));
   useEffect(() => {
     const listener = (event: KeyboardEvent) => {
@@ -195,7 +210,7 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
         if (!runtime.active) window.dispatchEvent(new CustomEvent('uie:delete-image-asset', { detail: inspectedAssetId }));
         return;
       }
-      if (event.key === 'Delete' && target instanceof HTMLElement && target.closest('.image-assets, dialog')) { event.preventDefault(); return; }
+      if (event.key === 'Delete' && target instanceof HTMLElement && target.closest('.image-assets, .document-assets, .asset-context-menu, dialog')) { event.preventDefault(); return; }
       if (!hasDocument) return;
       if (event.key === 'Delete' && !event.ctrlKey && !event.metaKey) {
         event.preventDefault(); remove(); return;
@@ -287,9 +302,9 @@ export function useDocumentEditor(project: Project, onBack: () => void) {
     imageAssetRevision, documentAssetRevision, imageAssets, inspectImages: () => liveImageAssets.current, assetsLoading, refreshImages, configureImage, configureImageRobloxId, importImage, useImage, bakeImage,
     moveImage: (id: string, folder: string) => changeProjectImages(() => window.imageAssets.move(id, folder)),
     removeImage: (id: string) => changeProjectImages(() => window.imageAssets.remove(id)),
-    location: documentLocation(project.path, path), newDocument, openDocument, openTemplate, saveTemplate, moveAsset, save: (saveAs = false) => run(async () => { await save(saveAs); }),
+    location: documentLocation(project.path, path), newDocument, openDocument, openTemplate, saveTemplate, moveAsset, deleteAsset, save: (saveAs = false) => run(async () => { await save(saveAs); }),
     saveProjectUI: () => run(async () => { await save(false, true); }), refreshSavedDocument, startRuntime, back, dirty, path, error, busy: busy || runtime.active || assetsLoading, runtime };
-  useAutomation(editor, { reset, saved: () => fileState.current.saved, path: () => fileState.current.path, busy: value => { operating.current = value; setBusy(value); }, markSaved: (value, file) => { fileState.current = { path: file, saved: JSON.stringify(value) }; setPath(file); setSaved(fileState.current.saved); } });
+  useAutomation(editor, { reset, clear: clearDocument, saved: () => fileState.current.saved, path: () => fileState.current.path, busy: value => { operating.current = value; setBusy(value); }, markSaved: (value, file) => { fileState.current = { path: file, saved: JSON.stringify(value) }; setPath(file); setSaved(fileState.current.saved); } });
   return editor;
 }
 export type DocumentEditor = ReturnType<typeof useDocumentEditor>;

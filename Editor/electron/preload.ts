@@ -33,6 +33,7 @@ const documents: DocumentAPI = {
   previewAsset: (path, library = 'project') => ipcRenderer.invoke('document:preview-asset', { path, library }),
   openTemplate: (path, library = 'templates') => ipcRenderer.invoke('document:open-template', { path, library }),
   moveAsset: (path, source, target) => ipcRenderer.invoke('document:move-asset', { path, source, target }),
+  deleteAsset: (path, library) => ipcRenderer.invoke('document:delete-asset', { path, library }),
   listTemplateFolders: () => ipcRenderer.invoke('document:template-folders'),
   createTemplateFolder: name => ipcRenderer.invoke('document:create-template-folder', name),
   saveTemplate: (document, folder) => ipcRenderer.invoke('document:save-template', { document, folder }),

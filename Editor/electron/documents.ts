@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, rename, unlink, stat, readdir, copyFile, lstat, rmdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rename, unlink, stat, readdir, copyFile, lstat, rmdir, realpath } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { dirname, basename, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -70,6 +70,28 @@ export async function moveDocumentAsset(sourceRoot: string, path: unknown, sourc
   }
   if (basename(dirname(source.path)) === documentStem(basename(source.path))) await rmdir(dirname(source.path)).catch((error: NodeJS.ErrnoException) => { if (error.code !== 'ENOTEMPTY') throw error; });
   return { path: target, name: documentStem(basename(target)) };
+}
+
+export async function deleteDocumentAsset(root: string, path: unknown, library: DocumentLibrary): Promise<DocumentAsset> {
+  const directory = documentAssetDirectory(await realpath(root), library);
+  if ((await realpath(directory)).toLowerCase() !== directory.toLowerCase()) throw new Error('UI 资产库不允许符号链接。');
+  const asset = (await listDocumentAssets(root, library)).find(item => item.path === path);
+  if (!asset) throw new Error('界面资产不在指定库中，请刷新后重试。');
+  const files: { path: string; content: Buffer }[] = [];
+  for (const file of [...Object.values(documentScriptPaths(asset.path)), asset.path]) {
+    if (!await fileInfo(file)) continue;
+    if ((await realpath(file)).toLowerCase() !== file.toLowerCase()) throw new Error('界面路径不允许符号链接。');
+    files.push({ path: file, content: await readFile(file) });
+  }
+  const removed: typeof files = [];
+  try { for (const file of files) { await unlink(file.path); removed.push(file); } }
+  catch (error) {
+    for (const file of removed) await writeFile(file.path, file.content, { flag: 'wx' });
+    throw error;
+  }
+  // Remove only an empty UI bundle; leave project-authored companion files alone.
+  if (basename(dirname(asset.path)) === documentStem(basename(asset.path))) await rmdir(dirname(asset.path)).catch((error: NodeJS.ErrnoException) => { if (error.code !== 'ENOTEMPTY' && error.code !== 'EEXIST') throw error; });
+  return asset;
 }
 
 export function safeFileName(name: string): string {

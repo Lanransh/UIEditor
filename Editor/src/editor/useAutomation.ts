@@ -10,7 +10,7 @@ import { resolveImageAssets } from '../shared/imageAssets';
 import { executeRuntimeBatch } from '../shared/runtime-batch';
 import { findUnconfiguredRobloxImages } from '../shared/robloxImport';
 
-interface Files { reset(document: UIDocument, path: string | null): void; saved(): string; markSaved(document: UIDocument, path: string): void; path(): string | null; busy(value: boolean): void }
+interface Files { reset(document: UIDocument, path: string | null): void; clear(): void; saved(): string; markSaved(document: UIDocument, path: string): void; path(): string | null; busy(value: boolean): void }
 export function useAutomation(editor: DocumentEditor, files: Files) {
   const sessionId = useRef(crypto.randomUUID());
   const current = useRef({ editor, files }); current.current = { editor, files };
@@ -47,7 +47,7 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
           try { return await window.automation.invoke('project:open', { path: a.path, requestId: request.requestId }); }
           finally { f.busy(false); }
         }
-        if (!e.hasDocument && !['uie.editor.get_state', 'uie.editor.get_capabilities', 'uie.document.list', 'uie.document.new', 'uie.document.open', 'uie.assets.search', 'uie.assets.get', 'uie.assets.configure', 'uie.assets.import', 'uie.debug.get_diagnostics'].includes(request.name)) throw new Error('请先新建或打开界面。');
+        if (!e.hasDocument && !['uie.editor.get_state', 'uie.editor.get_capabilities', 'uie.document.list', 'uie.document.delete', 'uie.document.new', 'uie.document.open', 'uie.assets.search', 'uie.assets.get', 'uie.assets.configure', 'uie.assets.import', 'uie.debug.get_diagnostics'].includes(request.name)) throw new Error('请先新建或打开界面。');
         switch (request.name) {
           case 'uie.runtime.batch': return { ...await executeRuntimeBatch(a, handle, () => current.current.editor.runtime.inspect().frame, verify, () => current.current.editor.runtime.inspect().interaction), ...state() };
           case 'uie.editor.get_state': return { ...state(), ...(a.detail === 'full' ? { document: e.hasDocument ? resolved() : null } : { nodeCount: e.hasDocument ? allNodes(h.state.root).length : 0 }) };
@@ -110,6 +110,17 @@ export function useAutomation(editor: DocumentEditor, files: Files) {
             return { ...state(), changed: e.history.inspect().revision !== beforeRevision };
           }
           case 'uie.document.list': return { ...stamp(), ...await window.automation.invoke('file:list', a) };
+          case 'uie.document.delete': {
+            writable();
+            if (e.assetConfigurationDirty) throw new Error('请先保存或放弃图片资产属性修改。');
+            f.busy(true);
+            try {
+              const result = await window.automation.invoke('file:delete', a);
+              if (result.current) { f.clear(); documentId.current = e.history.inspect().state.id; }
+              sessionId.current = crypto.randomUUID();
+              return { ...stamp(), ...result };
+            } finally { f.busy(false); }
+          }
           case 'uie.document.new': case 'uie.document.open': {
             writable(); if (dirty() && a.discardChanges !== true) throw new Error('当前界面未保存，请先保存或明确 discardChanges。');
             f.busy(true);

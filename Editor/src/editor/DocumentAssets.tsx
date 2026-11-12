@@ -98,6 +98,11 @@ export function DocumentAssets({ editor, library }: { editor: DocumentEditor; li
         else void editor.saveProjectUI();
       }}>{menu.path ? assetLibrary === 'permanent' ? '打开副本' : '打开' : '保存为项目UI'}</button>}
       {!menu.moving && <button role="menuitem" disabled={editor.busy || !menu.path} title={!menu.path ? '请先保存界面再移动' : undefined} onClick={() => setMenu({ ...menu, moving: true })}>移动</button>}
+      {!menu.moving && <button role="menuitem" disabled={editor.busy || !menu.path} title={!menu.path ? '界面尚未保存' : undefined} onClick={() => {
+        const path = menu.path;
+        setMenu(null);
+        if (path) void editor.deleteAsset(path, assetLibrary);
+      }}>删除</button>}
       {menu.moving && (Object.keys(libraryNames) as DocumentLibrary[]).filter(target => target !== assetLibrary).map((target, index) => <button key={target} role="menuitem" autoFocus={index === 0} disabled={editor.busy} onClick={() => {
         const path = menu.path;
         setMenu(null);

@@ -65,6 +65,12 @@ library 也可明确选择 permanent；导入只读取 PNG/JPEG/WebP/GIF 普通�
 
 `uie.document.new` 接收 name；open 二选一接收 interfaces 内 relativePath，或 `{target:{library,documentId,projectId?},mode?}`。target 仅允许当前工程的 project/templates；打开模板必须明确 mode=edit（原件）或 copy（未保存副本）。修改模板原件必须由用户提出或同意。
 
+`uie.document.delete({sessionId,revision,target:{library,documentId,projectId?},discardChanges?})`
+永久删除已保存 UI 的 JSON 及同名两份 Luau 脚本，保留其他文件；不弹对话框、不能文档撤销。
+仅允许当前工程的 project/templates 或全局 permanent 库，模板原件删除须由用户提出或同意。
+先 document.list 确认 UUID，并停止运行。删除当前界面时未保存修改须先保存或明确
+discardChanges=true；成功后清空编辑区。删除其他 UI 不丢弃当前修改。成功后重读状态获取新会话。
+
 save 不带路径保存当前绑定文件（包括模板原件），带 relativePath 在 interfaces 新建文件且拒绝覆盖。模板原件保存检查磁盘版本，发生外部修改、移动或删除时保留编辑内容并报冲突；不要盲目重试。所有变更工具要求 sessionId/revision。切换脏文档需先保存或明确 discardChanges=true。
 
 运行中禁止制作和历史操作。停止后才能修改。普通运行属性变化不会写回设计文档。

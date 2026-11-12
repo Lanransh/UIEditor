@@ -3,8 +3,46 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, writeFile, readdir, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset, moveDocumentAsset, documentScriptPaths } from '../electron/documents';
+import { readDocument, writeDocument, readPreviewImage, safeFileName, listDocumentAssets, openDocumentAsset, moveDocumentAsset, deleteDocumentAsset, documentScriptPaths } from '../electron/documents';
 import { robloxStrategy } from '../src/editor/roblox';
+
+test('删除 UI 及两份脚本，保留同目录其他文件和其他界面，支持损坏 JSON', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'ui-delete-'));
+  for (const [library, directory] of [['project', 'interfaces'], ['templates', 'styles/templates'], ['permanent', 'ui-assets']] as const) {
+    const path = join(root, directory, 'Reward', 'Reward.json');
+    const other = join(root, directory, 'Other.json');
+    await writeDocument(path, robloxStrategy.createDocument('Reward'));
+    await writeDocument(other, robloxStrategy.createDocument('Other'));
+    await writeFile(join(root, directory, 'Reward', 'notes.txt'), 'keep');
+    await writeFile(path, '{invalid');
+    await deleteDocumentAsset(root, path, library);
+    for (const file of [path, ...Object.values(documentScriptPaths(path))]) await assert.rejects(readFile(file), /ENOENT/);
+    assert.equal(await readFile(join(root, directory, 'Reward', 'notes.txt'), 'utf8'), 'keep');
+    assert.equal((await readDocument(other)).name, 'Other');
+    await assert.rejects(deleteDocumentAsset(root, path, library), /指定库/);
+  }
+});
+
+test('删除拒绝库外路径和脚本链接，空 bundle 删除后不残留目录', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'ui-delete-safe-'));
+  const outside = join(root, 'Outside.json'), path = join(root, 'interfaces', 'Reward', 'Reward.json');
+  await writeDocument(outside, robloxStrategy.createDocument('Outside'));
+  await writeDocument(path, robloxStrategy.createDocument('Reward'));
+  await assert.rejects(deleteDocumentAsset(root, outside, 'project'), /指定库/);
+  const scripts = documentScriptPaths(path);
+  const { unlink } = await import('node:fs/promises');
+  await unlink(scripts.integration);
+  await symlink(join(root), join(root, 'interfaces', 'Linked'), 'junction');
+  await assert.rejects(deleteDocumentAsset(root, join(root, 'interfaces', 'Linked', 'Outside.json'), 'project'), /指定库/);
+  await mkdir(scripts.integration);
+  await assert.rejects(deleteDocumentAsset(root, path, 'project'), /普通文件/);
+  assert.equal((await readDocument(outside)).name, 'Outside');
+  assert.ok(await readFile(scripts.source));
+  const { rmdir } = await import('node:fs/promises');
+  await rmdir(scripts.integration);
+  await deleteDocumentAsset(root, path, 'project');
+  await assert.rejects(readdir(join(root, 'interfaces', 'Reward')), /ENOENT/);
+});
 
 test('工程资产列出界面文件，打开校验文档并拒绝工程外路径', async () => {
   const project = await mkdtemp(join(tmpdir(), 'ui-assets-'));
