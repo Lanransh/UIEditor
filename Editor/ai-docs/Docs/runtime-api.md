@@ -2,11 +2,11 @@
 
 文档 scripts.source 返回交互类，scripts.integration 返回继承交互类的模拟接入类。两份源码保存于同名 .view.luau 与 .example.luau，可通过文件工具直接修改；App 内运行，不是实际游戏接入。
 
-交互类继承 CUIView：OnReady 先用 `local root = FX.Loader:PlayerGui("ExampleUI")` 获取实际命名的 ScreenGui，再用 `FX.Loader:Here(root, "Panel.HintTxt")` 查子节点。也可直接调用 `FX.Loader:PlayerGui("ExampleUI.Panel.HintTxt")`。PlayerGui 仅模拟当前文档的界面；Here 从指定节点的子节点开始，PlayerGui 从界面名开始。只接受 `.` 分隔，斜杠、空路径和空段报错。生成代码不通过 GetRootNode 获取节点。TrackConnection 管理 Activated:Connect；Render(state) 更新支持属性；EmitUIAction(name,payload) 交给接入类。
+交互类继承 CUIView：OnReady 先用 `local root = FX.Loader:PlayerGui("ExampleUI")` 获取实际命名的 ScreenGui，再用 `FX.Loader:Here(root, "Panel.HintTxt")` 查子节点。也可直接调用 `FX.Loader:PlayerGui("ExampleUI.Panel.HintTxt")`。PlayerGui 仅模拟当前文档的界面；Here 从指定节点的子节点开始，PlayerGui 从界面名开始。路径使用 `.` 分隔，空路径和空段报错。生成代码不通过 GetRootNode 获取节点。TrackConnection 管理 Activated:Connect；Render(state) 更新支持属性；EmitUIAction(name,payload) 交给接入类。
 
 接入类 Ctor 先调用 Super.Ctor，在自身 Config/State 定义模拟数据；OnUIAction 修改状态并 RefreshUI。App 支持有限 FX.Class，不包含完整游戏框架。停止统一清理连接。
 
-`FX.Loader:RequireShared("Scripts.Game.Shared.Text")` 提供项目 Text 接口（兼容旧斜杠路径）：
+`FX.Loader:RequireShared("Scripts.Framework.Shared.Core.FXText")` 提供框架 Text 接口；模块路径统一使用 `.`，仅允许这一固定模块：
 `Text.Define(prefix, sources)` 展开只读定义，`Text.Tr(definition, arguments?)` 用 Source 展开参数，
 `Text.TrSource(source)` 返回原文。
 不加载真实译文，不支持任意模块加载；定义、格式和制作规则见 [UI 文本与翻译接口](text-localization.md)。

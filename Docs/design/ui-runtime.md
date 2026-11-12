@@ -18,8 +18,9 @@
 
 ### 项目文本接口模拟
 
-App 运行时通过 `FX.Loader:RequireShared("Scripts.Game.Shared.Text")` 提供冻结的 Text
-兼容模块，仅允许这一模块（兼容旧斜杠路径）。`Text.Define(prefix, sources)` 将业务前缀与
+App 运行时通过 `FX.Loader:RequireShared("Scripts.Framework.Shared.Core.FXText")` 提供冻结的框架 Text
+模拟模块，仅允许这一模块，不保留旧模块路径别名。FX.Loader 的模块路径与节点路径统一使用 `.`；
+旧脚本需显式修改，不自动重写。`Text.Define(prefix, sources)` 将业务前缀与
 PascalCase 条目名展开为只读 Key/Source 定义，校验名称和非空原文，不翻译或全局登记。
 `Text.Tr(definition, arguments?)` 校验非空 Key/Source，
 按 Source 展开参数；支持普通和数字索引占位符，以及 Roblox 全部 11 个说明符：
@@ -75,7 +76,7 @@ App 提供 FX.Class、FX.GetClass、Super、New、IsA、GetClassName 的兼容�
 
 ## 节点与支持接口
 
-脚本直接获取节点对象，不需要额外绑定引用名。FX.Loader:Here(root, "父节点.子节点") 按层级查找，只接受点分隔路径；FX.Loader:PlayerGui("界面名.子节点") 从模拟 PlayerGui 查找当前 ScreenGui 或其子节点。生成脚本优先用 PlayerGui 获取界面、Here 获取子节点，不通过 GetRootNode 查找。PlayerGui 仅包含当前文档，空路径、空段和斜杠明确报错。节点支持 Name/ClassName/Parent、FindFirstChild、WaitForChild、GetChildren、IsA、子节点字段、支持属性的读写，以及按钮 Activated:Connect。支持通过 Clone 克隆已有模板子树、修改 Name、设置 Parent 和 Destroy；不支持 Instance.new。节点路径不存在、同级重名导致歧义或属性不支持时明确报错；修改节点名称或层级后需同步脚本路径。
+脚本直接获取节点对象，不需要额外绑定引用名。FX.Loader:Here(root, "父节点.子节点") 按层级查找，只接受点分隔路径；FX.Loader:PlayerGui("界面名.子节点") 从模拟 PlayerGui 查找当前 ScreenGui 或其子节点。生成脚本优先用 PlayerGui 获取界面、Here 获取子节点，不通过 GetRootNode 查找。PlayerGui 仅包含当前文档，空路径和空段明确报错。节点支持 Name/ClassName/Parent、FindFirstChild、WaitForChild、GetChildren、IsA、子节点字段、支持属性的读写，以及按钮 Activated:Connect。支持通过 Clone 克隆已有模板子树、修改 Name、设置 Parent 和 Destroy；不支持 Instance.new。节点路径不存在、同级重名导致歧义或属性不支持时明确报错；修改节点名称或层级后需同步脚本路径。
 
 常用交互代码以 App 预览和 Roblox 游戏复用为目标，节点方法使用 Roblox 的调用写法与主要生命周期语义。App 执行真实 Luau，但节点、布局与事件由宿主模拟，只覆盖公开支持的接口；不是 Roblox 引擎。WaitForChild 找不到时立即报错，不等待引擎对象出现。Roblox 导入保留交互源码，Clone/Parent/Destroy 在游戏中直接使用原生 Instance 接口。
 

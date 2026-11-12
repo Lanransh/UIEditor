@@ -42,7 +42,7 @@ View 的声明与 Render 片段如下（节点已由现有 View 获取）：
 
 ```lua
 local FX = _G.FX
-local Text = FX.Loader:RequireShared("Scripts.Game.Shared.Text")
+local Text = FX.Loader:RequireShared("Scripts.Framework.Shared.Core.FXText")
 local CWeaponShopView = FX.Class("CWeaponShopView", "CUIView")
 
 local TranslationTexts = Text.Define("WeaponShop", {

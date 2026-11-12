@@ -13,7 +13,7 @@ test('Text module formats source parameters in View and Preview without translat
   const document = strategy.createDocument('TextPreview');
   document.root.children.push(strategy.createNode('TextLabel'));
   document.scripts.source = `local FX = _G.FX
-local Text = FX.Loader:RequireShared("Scripts/Game/Shared/Text")
+local Text = FX.Loader:RequireShared("Scripts.Framework.Shared.Core.FXText")
 local TranslationTexts = Text.Define("TextPreview", {
     Reward = "{player} received {count:int} {item}: {value}",
     Item = "Coins",
@@ -27,7 +27,7 @@ function UI:Render(state)
 end
 return UI`;
   document.scripts.integration = `local FX = _G.FX
-local Text = FX.Loader:RequireShared("Scripts/Game/Shared/Text")
+local Text = FX.Loader:RequireShared("Scripts.Framework.Shared.Core.FXText")
 local Preview = FX.Class("CTextPreviewPreview", "CTextPreviewView")
 function Preview:Ctor(owner)
     Preview.Super.Ctor(self, owner)
@@ -49,7 +49,7 @@ function Preview:Ctor(owner)
     assert(not pcall(Text.Tr, {Key = " ", Source = "text"}))
     assert(not pcall(Text.Tr, {Key = "TextPreview.Missing", Source = "{count}"}, {}))
     assert(not pcall(Text.Tr, {Key = "TextPreview.Unsupported", Source = "{date:unknown}"}, {date = 0}))
-    assert(not pcall(function() FX.Loader:RequireShared("Other/Module") end))
+    assert(not pcall(function() FX.Loader:RequireShared("Other.Module") end))
     assert(not pcall(function() Text.Tr = function() end end))
 end
 return Preview`;
@@ -59,17 +59,48 @@ return Preview`;
     assert.equal(frame.document.root.children[0].properties.Text, 'Player%1 received 100 Coins: 1.2K');
     assert.equal(JSON.stringify(document), original);
     const exported = createRobloxImportPackage(document);
-    assert.ok(JSON.stringify(exported).includes('Scripts/Game/Shared/Text'));
+    assert.ok(JSON.stringify(exported).includes('Scripts.Framework.Shared.Core.FXText'));
+    assert.ok(!JSON.stringify(exported).includes('Scripts/Framework/Shared/Core/FXText'));
+    assert.ok(!JSON.stringify(exported).includes('Scripts.Game.Shared.Text'));
     assert.ok(JSON.stringify(exported).includes('TranslationTexts'));
     assert.ok(JSON.stringify(exported).includes('Text.Define'));
     assert.ok(!JSON.stringify(exported).includes('TextPreview.Format'));
   } finally { await session.stop(); }
 });
 
+test('RequireShared only accepts the dot-separated framework FXText path without legacy aliases', async () => {
+  const document = strategy.createDocument('LoaderPaths');
+  document.scripts.source = `local FX = _G.FX
+local Text = FX.Loader:RequireShared("Scripts.Framework.Shared.Core.FXText")
+local UI = FX.Class("CLoaderPathsView", "CUIView")
+function UI:OnReady()
+    assert(Text == FX.Loader:RequireShared("Scripts.Framework.Shared.Core.FXText"))
+    for _, path in ipairs({
+        "Scripts.Game.Shared.Text",
+        "Scripts/Game/Shared/Text",
+        "Scripts/Framework/Shared/Core/FXText",
+        "Scripts.Framework/Shared.Core.FXText",
+        "",
+        ".Scripts.Framework.Shared.Core.FXText",
+        "Scripts.Framework.Shared.Core.FXText.",
+        "Scripts..Framework.Shared.Core.FXText",
+        "Scripts.Framework.Shared.Core.Other",
+    }) do
+        local ok, message = pcall(function() FX.Loader:RequireShared(path) end)
+        assert(not ok, "Unsupported module path was accepted: " .. path)
+        assert(string.find(tostring(message), "Unsupported shared module:", 1, true), tostring(message))
+    end
+end
+return UI`;
+  document.scripts.integration = 'return _G.FX.Class("CLoaderPathsPreview", "CLoaderPathsView")';
+  const { session } = await LuauSession.start(resolve('native-bin'), document);
+  await session.stop();
+});
+
 test('Text.Tr rejects unsupported string specifiers in welfare text during preview', async () => {
   const document = strategy.createDocument('InvalidTextFormat');
   document.scripts.source = `local FX = _G.FX
-local Text = FX.Loader:RequireShared("Scripts.Game.Shared.Text")
+local Text = FX.Loader:RequireShared("Scripts.Framework.Shared.Core.FXText")
 local UI = FX.Class("CInvalidTextFormatView", "CUIView")
 function UI:OnReady()
     for _, source in ipairs({
@@ -95,7 +126,7 @@ test('Text.Tr supports every Roblox format specifier and preserves templates on 
   const label = strategy.createNode('TextLabel');
   document.root.children.push(label);
   document.scripts.source = `local FX = _G.FX
-local Text = FX.Loader:RequireShared("Scripts.Game.Shared.Text")
+local Text = FX.Loader:RequireShared("Scripts.Framework.Shared.Core.FXText")
 local TranslationTexts = Text.Define("RobloxFormats", {
     Timestamp = "{time:iso8601}",
 })
@@ -157,7 +188,7 @@ return UI`;
 test('Text.Tr validates format argument types, finite values and incompatible specifier types', async () => {
   const document = strategy.createDocument('RobloxTextValidation');
   document.scripts.source = `local FX = _G.FX
-local Text = FX.Loader:RequireShared("Scripts.Game.Shared.Text")
+local Text = FX.Loader:RequireShared("Scripts.Framework.Shared.Core.FXText")
 local UI = FX.Class("CRobloxTextValidationView", "CUIView")
 function UI:OnReady()
     for _, format in ipairs({"int", "fixed", "num", "hex", "HEX", "datetime", "iso8601", "shorttime", "shortdatetime", "shortdate"}) do
@@ -184,15 +215,15 @@ return UI`;
 test('Text.Define expands stable keys, freezes results and validates names and sources without a global registry', async () => {
   const document = strategy.createDocument('TextDefinitions');
   document.scripts.source = `local FX = _G.FX
-local Text = FX.Loader:RequireShared("Scripts.Game.Shared.Text")
+local Text = FX.Loader:RequireShared("Scripts.Framework.Shared.Core.FXText")
 local TranslationTexts = Text.Define("OnlineReward", {
     Progress = "{current:int} / {required:int} minutes",
     Claimable = "Ready!",
 })
 local UI = FX.Class("CTextDefinitionsView", "CUIView")
 function UI:OnReady()
-    assert(Text == FX.Loader:RequireShared("Scripts/Game/Shared/Text"))
-    assert(not pcall(function() FX.Loader:RequireShared("Scripts.Game.Shared.Other") end))
+    assert(Text == FX.Loader:RequireShared("Scripts.Framework.Shared.Core.FXText"))
+    assert(not pcall(function() FX.Loader:RequireShared("Scripts.Framework.Shared.Core.Other") end))
     assert(TranslationTexts.Progress.Key == "OnlineReward.Progress")
     assert(TranslationTexts.Progress.Source == "{current:int} / {required:int} minutes")
     assert(TranslationTexts.Claimable.Key == "OnlineReward.Claimable")

@@ -43,7 +43,7 @@ UIEditor 编写的 View 会作为 Generated 展示类导入游戏，动态文本
 ```lua
 local FX = _G.FX
 local FXLoader = FX.Loader
-local Text = FXLoader:RequireShared("Scripts.Game.Shared.Text")
+local Text = FXLoader:RequireShared("Scripts.Framework.Shared.Core.FXText")
 
 local TranslationTexts = Text.Define("OnlineReward", {
     Progress = "{current:int} / {required:int} minutes",
@@ -125,7 +125,7 @@ self.ProgressTxt.Text = Text.Tr(TranslationTexts.Progress, {
 `Text.TrSource(source)` 独立按原文查询；App 直接返回原文，不登记文案，不展开参数。
 仅在需要完整原文查询时使用，不能用它代替动态模板的定义和 Text.Tr。
 
-只提供上述固定模块的 RequireShared（兼容 `Scripts/Game/Shared/Text`），不代表 App
+只提供上述固定模块的 RequireShared，路径只接受 `Scripts.Framework.Shared.Core.FXText`，不代表 App
 支持任意游戏模块或完整 FXLoader。
 源码保存和导出保留 Text 调用与 TranslationTexts，游戏使用自己的真实 Text 模块。
 已有 View 出现 `:string` 时，先修正源模板、验证参数变化后重新导出；导出不会自动改写

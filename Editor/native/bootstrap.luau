@@ -382,7 +382,7 @@ end
 table.freeze(Text)
 -- 白名单入口，不能借此加载任意游戏模块。
 function Loader:RequireShared(path)
-    assert(path == "Scripts.Game.Shared.Text" or path == "Scripts/Game/Shared/Text",
+    assert(path == "Scripts.Framework.Shared.Core.FXText",
         "Unsupported shared module: " .. tostring(path))
     return Text
 end
