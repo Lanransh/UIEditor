@@ -13,5 +13,7 @@
 - 动态文案遵循 [本地化规范](../.agents/skills/roblox-localization/SKILL.md) 和 [UI 文本与翻译接口](text-localization.md)：新增文案在 Luau 顶层通过 Text.Define 声明 TranslationTexts，View 将原表保存为类字段 BaseViewTranslationTexts，派生类优先复用已有定义。文件内 Key、Source 不重复且 Key 稳定，跨文件允许重复，不新增手写 Key/Source 表；Text.Tr 接收定义和参数，Text.TrSource 仅按原文查询。静态节点和配置引用不补文案表。
 - 所有效果保存为设计节点和属性，不在运行脚本创建效果。不要把可读性改动变成业务或视觉改动。
 - 窗口使用 CUIView 通用动画与 Show/Hide，不重复生成动画代码；常驻 HUD 设置 OpenAnimation = false 并注释原因。ScreenAdaptation 独立控制屏幕适配，关闭时说明由界面自行管理布局。两个类开关均在实例创建前设置；Render 不提前隐藏整窗，完整合同见 [展示与业务接入](presentation-contract.md#通用打开与关闭动画)。
+- 数据刷新保留用户的列表滚动位置，不在 Render/RefreshUI 中反复重置、恢复或夹取 CanvasPosition；CanvasSize 仅在内容尺寸变化时赋值。初始化或明确导航需要定位时单独处理，具体边界见 [滚动位置与刷新](presentation-contract.md#滚动位置与刷新)。
+- 点击只发请求，收到结果后刷新；不生成“领取中 / Waiting...”等中间状态及对应代码。
 
 交付前检查格式、函数标签、节点路径；运行相关 App 模拟验证并停止，保存后重开确认源码保持。App 验证与 Roblox 实机验证分别报告。

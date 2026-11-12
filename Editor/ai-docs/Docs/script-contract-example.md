@@ -29,8 +29,7 @@ Config（RewardConfig）：
 State（RewardState，Render 的完整输入，不是增量）：
   status: string，必填，无默认值；只允许 Locked / Claimable / Claimed，
           分别表示未满足条件 / 可领取 / 已领取，由接入层提供。
-  pending: boolean，可选，省略按 false 处理；请求期间禁用领取。
-  error: string，可选，省略为 nil；失败提示原文，非 pending 时优先显示。
+  error: string，可选，省略为 nil；失败提示原文，优先显示。
 
 初始化与刷新：
   GetUIConfig() 默认读取 self.Config；GetUIState() 默认读取 self.State。
@@ -40,20 +39,18 @@ State（RewardState，Render 的完整输入，不是增量）：
   本例没有列表或加载态；首次刷新前须备齐数据，异步未就绪时不调用 Show。
 
 展示与交互规则：
-  状态文字优先级：pending > error > status。
-  pending：显示“领取中”。
+  状态文字优先级：error > status。
   error：显示失败提示；不自动改变领取资格。
   Locked：显示“尚未满足条件”，不允许点击，也不发送解释原因的动作。
-  Claimable：显示“可领取”，仅非 pending 时允许点击并发送 Claim。
+  Claimable：显示“可领取”，允许点击并发送 Claim。
   Claimed：显示“已领取”，不允许点击。
   本例不动态改按钮颜色，也无其他输入事件。
 
 动作：
   action = "Claim"。
   payload.entryId: string，必填，与 Config.entryId 相同的稳定奖励条目业务 ID。
-  真实接入负责资格校验和请求：请求前 pending=true、error=nil 并刷新；
-  成功后 pending=false、status="Claimed"；失败后 pending=false、error=提示，
-  并按业务结果保留或更新 status。每次状态更新后刷新。
+  真实接入负责资格校验、请求与防重。成功后 status="Claimed"；失败设置 error，
+  并按业务结果保留或更新 status。收到结果后刷新，不显示请求中状态。
 
 接口实现清单：
   必须实现的页面接口：
@@ -92,12 +89,11 @@ State（RewardState，Render 的完整输入，不是增量）：
   3. OnReady 先让父类绑定节点，再调用项目 BindUIData，最后 Show。
      BindUIData 读取最新完整状态并刷新，只建立一次数据订阅并托管连接；
      Show 触发已继承的 OnShow 刷新，不需要项目再写 OnShow。
-  4. 数据订阅收到更新后转换并写入完整 State，再 RefreshUI；
-     请求进行中保留本次 pending，不因覆盖业务快照丢失防重状态。
-  5. 收到 Claim 时核对 entryId，拦截重复请求，设置 pending=true、清 error 并刷新，
+  4. 数据订阅收到更新后转换并写入完整 State，再 RefreshUI。
+  5. 收到 Claim 时核对 entryId，按项目已有机制拦截重复请求，
      再向项目真实服务端发送稳定奖励 ID；服务端校验资格并发奖。
      成功时采用权威结果更新 status；失败时按权威结果保留或更新 status，并设置 error。
-     两条路径均清 pending 并刷新，不在客户端直接认定发奖成功。
+     收到结果后刷新，不在客户端直接认定发奖成功。
   6. 业务入口调用 Hide 关闭；本例隐藏后保留订阅，再次 Show 由父行为显示最新状态。
      关闭不等于销毁，不在重开时重复订阅或绑定按钮。
   7. 销毁时释放未托管资源，取消请求或阻止已过期回调更新本实例；
@@ -111,7 +107,6 @@ State（RewardState，Render 的完整输入，不是增量）：
   }
   self.State = {
       status = "Claimable",
-      pending = false,
   }
 ]]
 local FX = _G.FX
@@ -126,6 +121,10 @@ function CRewardView:OnReady()
     self.ClaimBtn = FXLoader:Here(root, "Panel.ClaimBtn")
     -- 点击时读取当前条目 ID，交给接入层处理。
     self:TrackConnection(self.ClaimBtn.Activated:Connect(function()
+        local state = self:GetUIState()
+        if state.status ~= "Claimable" then
+            return
+        end
         self:EmitUIAction("Claim", { entryId = self:GetUIConfig().entryId })
     end))
 end
@@ -136,13 +135,11 @@ function CRewardView:OnShow()
 end
 
 -- 根据完整展示状态刷新；字段定义与数据样例见文件头 RewardState。
--- @param state table RewardState；status 必填，pending/error 可选
+-- @param state table RewardState；status 必填，error 可选
 function CRewardView:Render(state)
     self.TitleTxt.Text = self:GetUIConfig().title
     local statusText = ""
-    if state.pending then
-        statusText = "领取中"
-    elseif state.error then
+    if state.error then
         statusText = state.error
     elseif state.status == "Locked" then
         statusText = "尚未满足条件"
@@ -154,7 +151,7 @@ function CRewardView:Render(state)
         error("Unknown reward status: " .. tostring(state.status))
     end
     self.StatusTxt.Text = statusText
-    self:SetButtonEnabled(self.ClaimBtn, state.status == "Claimable" and not state.pending)
+    self:SetButtonEnabled(self.ClaimBtn, state.status == "Claimable")
 end
 
 -- 由游戏接入覆写，不在展示层执行业务。
@@ -183,7 +180,6 @@ function CRewardPreview:Ctor(owner)
     }
     self.State = {
         status = "Claimable",
-        pending = false,
     }
 end
 
@@ -194,13 +190,13 @@ function CRewardPreview:OnReady()
     self:Show()
 end
 
--- 模拟立即成功；重复领取与请求中状态不会再次处理。
+-- 模拟立即成功；已领取的奖励不会再次处理。
 -- @param action string 本页面仅支持 Claim
 -- @param payload table { entryId: string }，须与当前配置一致
 function CRewardPreview:OnUIAction(action, payload)
     assert(action == "Claim", "Unsupported reward action: " .. tostring(action))
     assert(payload.entryId == self.Config.entryId, "Unknown reward entry")
-    if self.State.status ~= "Claimable" or self.State.pending then
+    if self.State.status ~= "Claimable" then
         return
     end
     self.State.status = "Claimed"
@@ -212,7 +208,7 @@ return CRewardPreview
 ```
 
 本模拟立即成功，不模拟网络等待或失败。验证其他显示时，在模拟接入中分别提供 Locked、
-Claimable、Claimed、pending=true、error="领取失败，请重试"，再刷新检查文字与按钮。
+Claimable、Claimed、error="领取失败，请重试"，再刷新检查文字与按钮。
 游戏接入继承 CRewardView，按文件头契约连接真实业务；不把 Preview 作为游戏接入导出。
 
 ## 嵌套状态怎样写清楚
@@ -226,7 +222,6 @@ Claimable、Claimed、pending=true、error="领取失败，请重试"，再刷�
 -- entries[kind][id]: table，每个配置条目必填；id = Config.groups 中对应 items 的 id。
 -- entries[kind][id].status: string，必填；Locked / Claimable / Claimed，无默认值。
 -- entries[kind][id].current: number，task 必填；单位与 config.target 相同，无默认值。
--- entries[kind][id].pending: boolean，可选；省略按 false 处理。
 -- 无条目分组使用 {}；缺少配置要求的分组或条目报错，不默认当作 Locked。
 ```
 

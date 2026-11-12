@@ -50,6 +50,9 @@ description: 在 UIEditor 的 Roblox 工程中制作、修改和验证可编辑 
    可变列表的原型集中放在界面内隐藏的 Templates 下，由 source 在运行时克隆到显示容器，
    按稳定业务 ID 更新与清理；具体遵循业务接入参考的 Templates 与运行时克隆约定。
    仅属性变化时直接更新已有节点；普通页面不重复编写通用屏幕适配。
+   数据刷新保留列表滚动位置，不在 Render/RefreshUI 中重置、恢复或夹取 CanvasPosition；
+   CanvasSize 只在内容尺寸变化时更新，主动定位与边界弹性遵循业务接入参考的「滚动位置与刷新」约定。
+   点击只发请求，收到结果后刷新；不生成“领取中 / Waiting...”等中间状态及对应代码。
    普通窗口通过 Show/Hide 开关，CUIView 默认接入整页动画，不重复调用 SetOpenAnimation 或编写 Tween。
    常驻 HUD/MainUI 在 source 交互类设置 OpenAnimation = false，并注释说明不启用整页缩放、模糊和相机效果。
    ScreenAdaptation 默认 true，控制 1280×720 等比居中适配；仅界面自行管理设备布局时设为 false 并注释原因。
@@ -68,6 +71,7 @@ description: 在 UIEditor 的 Roblox 工程中制作、修改和验证可编辑 
 
 - 用 runtime.control/click 验证需求涉及的状态、按钮、禁用、关闭、重置及动态条目身份。
   克隆列表还需检查增删、排序与重复刷新，确认模板隐藏、点击 ID 正确、事件不重复。
+  滚动列表检查数据刷新不拉回当前位置；App 无法覆盖的拖动与惯性滚动列为 Studio/设备待验。
   有 runtime.batch 时优先 compact=true 合并顺序步骤，检查每步结果和实际属性，不只检查调用成功。
   批次失败不自动停止运行，先取证再显式 stop 修复；不盲重试会话冲突。
 - 用 debug.get_diagnostics 检查错误；批次已返回诊断且无异常时不重复读取同一份。
