@@ -8,7 +8,10 @@ import { documentationInstructions } from '../src/shared/documentation';
 export { definitions } from '../src/shared/automation-tools';
 let documentation: ReturnType<typeof loadDocumentation> | undefined;
 function docs() { return documentation ??= loadDocumentation(fileURLToPath(new URL('./ai-docs/', import.meta.url))); }
-export async function callTool(name: string, args: Record<string, unknown>, discoveryPath: string) {
+export async function callTool(name: string, args: Record<string, unknown>, discoveryPath: string): Promise<{
+  content: Array<{ type: string; text?: string; mimeType?: string; data?: string }>;
+  structuredContent?: unknown;
+}> {
   validateTool(name, args);
   const result = { value: name === 'uie.docs.read' ? (await docs()).read(args) : name === 'uie.docs.search' ? await (await docs()).search(args)
     : name === 'uie.project.open' ? await openEditor(args, discoveryPath) : await requestEditor(name, args, discoveryPath) };
@@ -18,7 +21,12 @@ export async function callTool(name: string, args: Record<string, unknown>, disc
     const match = /^data:(image\/[^;]+);base64,(.+)$/.exec(previewImage.dataUrl);
     if (match) return { content: [{ type: 'image', mimeType: match[1], data: match[2] }, { type: 'text', text: JSON.stringify({ ...result.value, asset: { ...asset, previewImage: { name: previewImage.name } } }) }] };
   }
-  return { content: [{ type: 'text', text: JSON.stringify(result.value) }] };
+  return {
+    content: [{ type: 'text', text: name === 'uie.docs.read'
+      ? result.value.documents.map((document: { file: string }) => `读取了 ${document.file} 文件`).join('\n')
+      : JSON.stringify(result.value) }],
+    ...(name === 'uie.docs.read' ? { structuredContent: result.value } : {}),
+  };
 }
 export async function serve(discoveryPath: string) {
   void docs().catch(() => {}); // Freeze one startup snapshot; discovery still works if the package is broken.

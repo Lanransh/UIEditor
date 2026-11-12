@@ -11,11 +11,13 @@
 公共说明的维护源为 `Editor/ai-docs/`，不再复制进用户工作区。
 构建时复制到 `mcp-dist/ai-docs/`，与 stdio 服务一起打包；从其他 cwd、App 未运行或未打开工程时均可读取。
 服务启动时扫描固定文档根目录，拒绝根目录链接，跳过文件/目录链接及非 Markdown 文件；
-所有读取和搜索仅使用这次启动建立的 Markdown 白名单、正文快照及包级 SHA-256 documentRevision。
+所有读取和搜索仅使用这次启动建立的 Markdown 白名单、正文快照。
 修改源文档后需重新构建并重启 MCP 才可见；一次运行中不热更新或执行包内脚本。
 
 `uie.docs.read({files:["AGENTS.md"]})` 显式读取入口；只接受必填非空字符串数组 files，
-不接受旧 file 参数。单文件和多文件统一返回 `{documentRevision,documents:[{file,documentRevision,content,skills?}]}`。
+不接受旧 file 参数。单文件和多文件统一返回 `{documents:[{file,content,skills?}]}`。
+完整结果只放在 `structuredContent`；文本块按请求顺序每行返回 `读取了 <文件路径> 文件`，
+保留重复项，不显示数量、版本或其他提示，也不重复正文。
 每个 documents 对象保留完整 Markdown；仅 AGENTS.md 对象额外带自动发现的 skills 摘要
 （name、description、file）。按输入顺序返回，重复路径保留；任一文件无效则整次报错，不部分成功。
 不接受空值、绝对路径、路径穿越、未登记文件或额外参数，也不自动展开链接。
@@ -25,7 +27,7 @@ name 与目录一致、名称及描述长度、重复键/身份，非法技能�
 链接按所在文档目录解析；调用始终使用包根相对路径，例如 `Docs/editor-api.md`。
 文本验收脚本作为技能 Markdown 参考内的完整 Luau 代码块提供，文档服务不执行。
 
-`uie.docs.search` 搜索正文，只返回 `{documentRevision,files,truncated}`：
+`uie.docs.search` 搜索正文，只返回 `{files,truncated}`：
 
 - pattern 必填，非空且最多 512 字符；mode 默认 literal，区分大小写。
   显式 regex 使用 ECMAScript Unicode 正则，不接收标志；支持字符类、转义、分组、选择、
@@ -47,7 +49,7 @@ stdio 仅让 docs.read/search 绕过原串行队列：读取可越过未完成�
 
 服务 instructions、docs 工具说明、业务工具短提示及工作区最小入口共同引导按需加载：
 本会话首次使用 MCP，或开始在 UIEditorWorkspace 工作时显式读取入口，再读任务所需技能。
-当前上下文已有相同修订说明时复用；修订变化重读入口与任务依赖。
+当前上下文已有必要说明时复用；工具更新后重读入口与任务依赖。
 已知路径直接 read，不知道位置才 search。文档读取不切换工程、改变授权或执行任务。
 项目 LOCAL、风格和项目自有资料仍使用受授权的文件读取。
 

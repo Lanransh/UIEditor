@@ -7,7 +7,7 @@ description: 在 UIEditor 的 Roblox 工程中制作、修改和验证可编辑 
 
 ## 平台与风格
 
-先通过 uie.docs.read({files:["AGENTS.md"]}) 读取随包指南（同修订已读时复用），并读取目标工作区的 AGENTS.LOCAL.md。
+先通过 uie.docs.read({files:["AGENTS.md"]}) 读取随包指南（已读且工具未更新时复用），并读取目标工作区的 AGENTS.LOCAL.md。
 工程有 styles/Game-DESIGN.md 时用文件工具读取它及其中的风格专项技能。
 本技能中的 Markdown 链接均属随包文档，用 uie.docs.read 按包根路径读取，不在工作区寻找副本。
 平台技能管理节点能力、代码和验证；风格技能管理视觉制作，不复制平台流程。

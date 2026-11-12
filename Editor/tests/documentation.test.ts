@@ -25,7 +25,7 @@ async function fixture(t: TestContext) {
   return { root, put };
 }
 
-test('read explicitly selects a Markdown file; entry alone includes parsed skills; snapshot/revision are consistent', async t => {
+test('read explicitly selects a Markdown file; entry alone includes parsed skills; snapshot is immutable', async t => {
   const { root, put } = await fixture(t);
   const docs = await loadDocumentation(root);
   const entry = docs.read({ files: ['AGENTS.md'] }).documents[0];
@@ -34,14 +34,13 @@ test('read explicitly selects a Markdown file; entry alone includes parsed skill
   const skill = docs.read({ files: [entry.skills![0].file] }).documents[0];
   assert.ok(skill.content.startsWith('---\n'));
   assert.equal('skills' in skill, false);
-  assert.equal(skill.documentRevision, entry.documentRevision);
+  assert.equal('documentRevision' in skill, false);
   await put('AGENTS.md', 'changed');
   assert.equal(docs.read({ files: ['AGENTS.md'] }).documents[0].content, entry.content);
-  assert.equal((await docs.search({ pattern: 'entry' })).documentRevision, entry.documentRevision);
-  const changed = (await loadDocumentation(root)).documentRevision;
-  assert.notEqual(changed, entry.documentRevision);
+  assert.deepEqual((await docs.search({ pattern: 'entry' })).files, ['AGENTS.md']);
+  assert.equal((await loadDocumentation(root)).read({ files: ['AGENTS.md'] }).documents[0].content, 'changed');
   await put('Docs/new.md', 'new reference');
-  assert.notEqual((await loadDocumentation(root)).documentRevision, changed);
+  assert.equal((await loadDocumentation(root)).read({ files: ['Docs/new.md'] }).documents[0].content, 'new reference');
   await put('.agents/skills/new-skill/SKILL.md', '---\nname: new-skill\ndescription: New editing task.\n---\n# New skill');
   assert.equal(docs.read({ files: ['AGENTS.md'] }).documents[0].skills?.length, 2);
   assert.equal((await loadDocumentation(root)).read({ files: ['AGENTS.md'] }).documents[0].skills?.length, 3);
@@ -51,10 +50,10 @@ test('files-only read preserves order, duplicates, entry metadata and atomic fai
   const { root } = await fixture(t), docs = await loadDocumentation(root);
   const files = ['.agents/skills/author/SKILL.md', 'AGENTS.md', '.agents/skills/author/SKILL.md'];
   const result = docs.read({ files });
-  assert.deepEqual(Object.keys(result).sort(), ['documentRevision', 'documents']);
+  assert.deepEqual(Object.keys(result).sort(), ['documents']);
   assert.deepEqual(result.documents.map(document => document.file), files);
   assert.deepEqual(result.documents, files.map(file => docs.read({ files: [file] }).documents[0]));
-  assert.ok(result.documents.every(document => document.documentRevision === result.documentRevision));
+  assert.ok(result.documents.every(document => !('documentRevision' in document)));
   assert.equal('skills' in result.documents[0], false);
   assert.equal(result.documents[1].skills?.length, 2);
   for (const args of [{ files: [] }, { files: ['AGENTS.md', null] }, { files: ['AGENTS.md'], file: 'AGENTS.md' },
@@ -70,7 +69,7 @@ test('files-only read preserves order, duplicates, entry metadata and atomic fai
 test('literal/regex search returns only sorted unique paths; line matching and component-scoped paths', async t => {
   const { root } = await fixture(t), docs = await loadDocumentation(root);
   const result = (await docs.search({ pattern: 'keyword', maxResults: 20 }));
-  assert.deepEqual(Object.keys(result).sort(), ['documentRevision', 'files', 'truncated']);
+  assert.deepEqual(Object.keys(result).sort(), ['files', 'truncated']);
   assert.deepEqual(result.files, [...result.files].sort());
   assert.equal(result.files.length, 4);
   assert.equal(result.truncated, false);
@@ -86,7 +85,7 @@ test('literal/regex search returns only sorted unique paths; line matching and c
     '.agents/skills/author/SKILL.md', '.agents/skills/author/references/nodes.md',
   ]);
   assert.deepEqual((await docs.search({ pattern: 'keyword', path: 'AGENTS.md' })).files, ['AGENTS.md']);
-  assert.deepEqual((await docs.search({ pattern: 'nothing' })), { documentRevision: result.documentRevision, files: [], truncated: false });
+  assert.deepEqual((await docs.search({ pattern: 'nothing' })), { files: [], truncated: false });
   for (const file of result.files) assert.equal(docs.read({ files: [file] }).documents[0].file, file);
 });
 
@@ -187,15 +186,22 @@ test('built stdio bundle works offline, from another cwd and a relocated resourc
     const tools = (await request('tools/list')).tools;
     for (const name of ['uie.docs.read', 'uie.docs.search']) assert.deepEqual(tools.find((tool: any) => tool.name === name), definitions.find(tool => tool.name === name));
     const call = (name: string, args: object) => request('tools/call', { name, arguments: args });
-    const entry = JSON.parse((await call('uie.docs.read', { files: ['AGENTS.md'] })).content[0].text);
+    const entryResult = await call('uie.docs.read', { files: ['AGENTS.md'] });
+    assert.deepEqual(entryResult.content, [{ type: 'text', text: '读取了 AGENTS.md 文件' }]);
+    const entry = entryResult.structuredContent;
     assert.equal(entry.documents[0].skills.length, 3);
-    const batch = JSON.parse((await call('uie.docs.read', { files: ['AGENTS.md', entry.documents[0].skills[0].file, 'AGENTS.md'] })).content[0].text);
+    const files = ['AGENTS.md', entry.documents[0].skills[0].file, 'AGENTS.md'];
+    const batchResult = await call('uie.docs.read', { files });
+    assert.deepEqual(batchResult.content, [{ type: 'text', text: files.map(file => `读取了 ${file} 文件`).join('\n') }]);
+    const batch = batchResult.structuredContent;
+    assert.deepEqual(Object.keys(batch), ['documents']);
+    assert.ok(batch.documents.every((document: object) => !('documentRevision' in document)));
     assert.equal(batch.documents.length, 3);
     assert.deepEqual(batch.documents[0], batch.documents[2]);
     assert.equal((await call('uie.docs.read', { files: ['AGENTS.md', 'missing.md'] })).isError, true);
     assert.equal((await call('uie.docs.read', { file: 'AGENTS.md' })).isError, true);
     const search = JSON.parse((await call('uie.docs.search', { pattern: 'Text.Define' })).content[0].text);
-    assert.equal(search.documentRevision, entry.documentRevision);
+    assert.equal('documentRevision' in search, false);
     assert.ok(search.files.length > 0);
     const error = await call('uie.docs.read', { files: ['C:/private.md'] });
     assert.equal(error.isError, true);
@@ -280,7 +286,8 @@ test('real stdio overlaps docs only, survives errors and drains accepted request
   const search2 = send('uie.docs.search', { pattern: '[', mode: 'regex' });
   await Promise.all([waitFor('first'), waitFor('[')]);
   const read = await send('uie.docs.read', { files: ['AGENTS.md', 'AGENTS.md'] });
-  assert.equal(JSON.parse(read.result.content[0].text).documents.length, 2);
+  assert.equal(read.result.structuredContent.documents.length, 2);
+  assert.equal(read.result.content[0].text, '读取了 AGENTS.md 文件\n读取了 AGENTS.md 文件');
   assert.deepEqual([...responses], [5], 'read finishes while two searches and slow App call are gated');
   const invalid = await send('uie.docs.read', { files: ['AGENTS.md', '../escape.md'] });
   assert.equal(invalid.result.isError, true);

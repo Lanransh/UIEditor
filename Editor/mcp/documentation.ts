@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { lstat, readFile, readdir, realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { Worker } from 'node:worker_threads';
@@ -11,7 +10,7 @@ interface Skill { name: string; description: string; file: string }
 // Compilation and matching stay inside the timed context, including pathological RegExp work.
 const searchProgram = `(() => {
   const regexp = mode === 'regex' ? new RegExp(pattern, 'u') : null;
-  const result = { documentRevision, files: [], truncated: false };
+  const result = { files: [], truncated: false };
   for (const [file, content] of documents) {
     if (!content.split(/\\r\\n|[\\n\\r\\u2028\\u2029]/).some(line => regexp ? regexp.test(line) : line.includes(pattern))) continue;
     if (result.files.length === maxResults) { result.truncated = true; break; }
@@ -25,20 +24,17 @@ const searchProgram = `(() => {
 })()`;
 
 export class Documentation {
-  readonly documentRevision: string;
-  constructor(private documents: ReadonlyMap<string, string>, private skills: readonly Skill[]) {
-    this.documentRevision = createHash('sha256').update(JSON.stringify([[...documents], skills])).digest('hex');
-  }
+  constructor(private documents: ReadonlyMap<string, string>, private skills: readonly Skill[]) {}
   read(args: unknown) {
     validateDocumentationArgs('uie.docs.read', args);
     const documents = (args.files as string[]).map(file => {
       const content = this.documents.get(file);
       if (content === undefined) throw new Error('DOCS_NOT_FOUND: 未登记此 Markdown 文档。');
-      return { file, documentRevision: this.documentRevision, content, ...(file === 'AGENTS.md' ? { skills: this.skills.map(skill => ({ ...skill })) } : {}) };
+      return { file, content, ...(file === 'AGENTS.md' ? { skills: this.skills.map(skill => ({ ...skill })) } : {}) };
     });
-    return { documentRevision: this.documentRevision, documents };
+    return { documents };
   }
-  async search(args: unknown): Promise<{ documentRevision: string; files: string[]; truncated: boolean }> {
+  async search(args: unknown): Promise<{ files: string[]; truncated: boolean }> {
     validateDocumentationArgs('uie.docs.search', args);
     const pattern = args.pattern as string, mode = args.mode ?? 'literal';
     // A documented subset, rather than an rg compatibility claim.
@@ -70,7 +66,7 @@ export class Documentation {
             : 'DOCS_INVALID_REGEX: 正则表达式无效。' });
         }
       `, { eval: true, workerData: { program: searchProgram, context: {
-        pattern, mode, documents, documentRevision: this.documentRevision, maxResults: args.maxResults ?? 10,
+        pattern, mode, documents, maxResults: args.maxResults ?? 10,
       } } });
       let received = false;
       worker.once('message', message => {
