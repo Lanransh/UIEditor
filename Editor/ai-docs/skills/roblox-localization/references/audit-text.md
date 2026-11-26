@@ -1,6 +1,6 @@
 # 文本属性验收脚本
 
-通过 uie.docs.read 读取本参考，取下面完整 Luau 代码块，在源码前添加任务的 expectations 清单后执行。文档服务不会执行此脚本。
+将按节点用途填写的 expectations 清单放在下列代码之前，一起交给 uie.code.execute。
 
 ```lua
 -- 在本文件源码前添加 local expectations = { ["节点ID"] = {dynamic=true, autoLocalize=false}, ... }

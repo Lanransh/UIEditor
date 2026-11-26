@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import { robloxStrategy as strategy } from '../src/editor/roblox';
 import { executeCode, robloxCodeAdapter } from '../electron/code-executor';
 
-const reference = await readFile(resolve('ai-docs/.agents/skills/roblox-localization/references/audit-text.md'), 'utf8');
+const reference = await readFile(resolve('ai-docs/skills/roblox-localization/references/audit-text.md'), 'utf8');
 const audit = reference.match(/```lua\r?\n([\s\S]*?)\r?\n```/)![1];
 
 function fixture() {

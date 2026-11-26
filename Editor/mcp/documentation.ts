@@ -87,15 +87,18 @@ export async function loadDocumentation(directory: string, diagnostic: (message:
       const path = join(root, local), info = await lstat(path);
       if (info.isSymbolicLink() || await realpath(path) !== path) { diagnostic(`DOCS_PACKAGE: 跳过链接 ${local}`); return; }
       if (info.isDirectory()) {
-        for (const name of (await readdir(path)).sort()) await collect(local ? local + '/' + name : name);
+        for (const name of (await readdir(path)).sort()) {
+          if (!local && name !== 'AGENTS.md' && name !== 'skills') continue;
+          await collect(local ? local + '/' + name : name);
+        }
       } else if (info.isFile() && local.endsWith('.md')) documents.set(local, await readFile(path, 'utf8'));
     }
     await collect('');
   } catch { throw new Error('DOCS_PACKAGE_UNAVAILABLE: 无法读取随包文档。'); }
   if (!documents.get('AGENTS.md')?.trim()) throw new Error('DOCS_PACKAGE_UNAVAILABLE: 缺少非空 AGENTS.md。');
   const skills: Skill[] = [], invalid = new Set<string>();
-  const skillRoot = '.agents/skills/';
-  const directories = new Set([...documents.keys()].filter(file => file.startsWith(skillRoot)).map(file => file.split('/')[2]));
+  const skillRoot = 'skills/';
+  const directories = new Set([...documents.keys()].filter(file => file.startsWith(skillRoot)).map(file => file.split('/')[1]));
   for (const directory of [...directories].sort()) {
     const file = skillRoot + directory + '/SKILL.md';
     try {
@@ -110,6 +113,6 @@ export async function loadDocumentation(directory: string, diagnostic: (message:
     } catch { invalid.add(directory); diagnostic(`DOCS_SKILL_INVALID: 不发布 ${file}`); }
   }
   // Requiring name === directory makes valid skill identities unique.
-  for (const file of documents.keys()) if (file.startsWith(skillRoot) && invalid.has(file.split('/')[2])) documents.delete(file);
+  for (const file of documents.keys()) if (file.startsWith(skillRoot) && invalid.has(file.split('/')[1])) documents.delete(file);
   return new Documentation(new Map([...documents].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)), skills.filter(skill => !invalid.has(skill.name)));
 }

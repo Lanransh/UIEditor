@@ -1,6 +1,6 @@
 # 制作 API
 
-以 `uie.editor.get_capabilities` 为当前工程的权威能力来源。Roblox 当前使用 Luau 0.694，标准库受限，没有文件、网络、require、game 或 Electron。
+Roblox 当前使用 Luau 0.694，标准库受限，没有文件、网络、require、game 或 Electron。
 
 `uie.code.execute` 接收 `{sessionId, revision, language, source, dryRun?, label?}`。源码最多 256 KiB，单次执行预算 250 ms，VM 64 MiB，主进程 2 秒看门狗。成功返回 `success/changed/revision/logs/operationCount/nodeCount`；执行或校验失败返回 `success:false/error/stage/logs`，此前改动不提交。
 
@@ -17,7 +17,7 @@
 | `ui.nodes.find(options)` | 分页查询，返回 nodes、total、nextOffset |
 | `ui.nodes.create(className, {parentId?,name?,properties?})` | 创建并返回节点快照，父节点缺省为根 |
 | `ui.nodes.setProperties(id, properties)` | 更新传入属性，其他属性保留 |
-| `ui.nodes.setPreviewImage(id, {name,dataUrl} 或 nil)` | ImageLabel/ImageButton 附加嵌入式预览图；nil 清除。事务结束校验格式与长度 |
+| `ui.assets.apply(nodeId, assetId)` | 将图片库资产应用到节点 |
 | `ui.nodes.rename(id, name)` | 修改名称 |
 | `ui.nodes.reparent(id, parentId)` | 移到父节点末尾，禁止根操作和层级环 |
 | `ui.nodes.duplicate(id, parentId?)` | 复制子树并生成新 ID，缺省在原父节点末尾 |
@@ -27,7 +27,7 @@
 
 属性支持 UDim.new、UDim2.new/fromScale/fromOffset、Vector2.new、Color3.new/fromRGB/fromHex、Enum，以及现有 JSON 属性形式。没有隐式像素与 Scale 换算。
 
-平铺图片使用 ImageLabel 的 ScaleType=Enum.ScaleType.Tile，TileSize 按所选风格或模板设置。节点不支持 previewImage 或 setPreviewImage；使用 ui.assets.apply 绑定图片库，或设置 Image 资源 ID。本地预览从图片库查找，图片数据不嵌入节点。制作 VM 本身不能读取文件或下载资源。
+平铺图用 ImageLabel，ScaleType 设为 Enum.ScaleType.Tile，TileSize 取风格规定的值。Image 使用 Roblox 资源 ID，本地预览通过图片库绑定。
 
 `find` 与 MCP 查询共同采用名称 exact/contains、className、parentId、recursive、offset、limit。默认递归，默认 50 条，最多 200 条。过滤条件取交集。parentId 指定时不包含父节点自身；recursive=false 只查直属子节点。
 
@@ -35,25 +35,17 @@ MCP `uie.nodes.get` 使用 `{id?,depth?,view?,target?,format?,maxNodes?,compact?
 
 nodes.get/find 可传 compact=true，JSON 节点摘要仅保留 id/name/className，省略重复 path/parentId；get 仍保留属性、图片引用、children 和截断信息，find 保留分页。文本树不受 compact 影响。省略或传 false 保持原返回。
 
-先取浅层树（如 depth=2、maxNodes=80）定位目标，再按 id/parentId 查询相关子树；按 truncated/nextOffset 补查，不把截断当成不存在。脚本只需一份时指定 kind，已取得且未变更的结果不重复全量打印。
+建议从 depth=2、maxNodes=80 定位子树，再按 id、truncated 和 nextOffset 补查。
 
-## 保存模板与其他工程的读取
+## 读取已保存的界面与图片
 
-先用 `uie.document.list({library:"templates",offset:0,limit:50})` 获取模板的 documentId，再构造 `target={library:"templates",documentId:"实际UUID"}`；省略 projectId 就是当前工程。列表返回 interfaces、total、nextOffset，需读取后续页时传 nextOffset。
+1. 调用 `uie.document.list({library:"templates",offset:0,limit:50})`，从 interfaces 取 documentId，按 nextOffset 翻页。
+2. 将 `target={library:"templates",documentId:"实际UUID"}` 传给 nodes.get/find、scripts.get 或 debug.screenshot。它们读取磁盘版本，截图为静态 1280×720 PNG。修改与运行只作用于当前画布；模板节点 ID 仅用于该模板。
+3. library 默认为 project。跨工程读取时，从 project.list 获取已登记的 projectId；全局 permanent 库省略 projectId。assets.search/get 同样支持来源工程或全局图片库。get_state 返回当前 projectId、projectName 和 documentId。
 
-`uie.nodes.get/find`、`uie.scripts.get`、`uie.debug.screenshot` 共用 target。先截图和读取浅层树，再按节点 ID 取属性；不要把模板节点 ID 当成当前画布节点 ID。target 读取磁盘保存版本，不切换画布、不改变历史，空白画布也可使用；不接受 view=runtime。截图返回静态 1280×720 PNG，不执行交互脚本。
+## 导入本地图片
 
-library 支持 project（默认）、templates、permanent。永久UI全局读取，不传 projectId。跨工程先用 `uie.project.list` 获取已登记工程 UUID，再在 target 加 projectId；App 内打开过的工程才可通过 UUID 查找。UUID 冲突和损坏文件明确返回问题，不按文件名称猜 ID。
-
-`uie.assets.search/get` 可传 projectId 读取来源工程图片；省略使用当前工程，library="permanent" 读取全局图片。`uie.editor.get_state` 返回当前 projectId、projectName、documentId。所有修改与运行仍针对当前编辑会话，不接受 target。
-
-本地素材先登记资产，再应用到节点：先用 `uie.assets.search` 查找可复用资产；缺少时调用
-`uie.assets.import({sessionId,revision,library:"project",filePath:"本地图片绝对路径"})`。
-library 也可明确选择 permanent；导入只读取 PNG/JPEG/WebP/GIF 普通文件，单张不超过 8 MiB，
-不接受远程链接，不上传 Roblox，robloxId 初始为空。成功立即保存资产库，返回资产摘要
-（含 id，不含 previewImage）和新会话；导入不进入文档撤销历史，也不修改节点。
-重读状态后在 `code.execute` 中调用 `ui.assets.apply(nodeId,assetId)`，节点引用和 Image
-一起进入文档历史。运行时禁止导入。节点不接受 `previewImage`，不提供旧字段升级。
+先用 uie.assets.search 查找已有素材。缺少时调用 `uie.assets.import({sessionId,revision,library:"project",filePath:"本地绝对路径"})`。project 和 permanent 库支持 PNG/JPEG/WebP/GIF 普通文件，单张上限 8 MiB。导入立即保存资产，返回 id 和新会话，robloxId 初始为空。重读状态，在 code.execute 中用 ui.assets.apply(nodeId, assetId) 绑定。节点绑定可撤销，资产导入独立保存。
 
 ## 历史、文件与运行边界
 
@@ -75,6 +67,6 @@ save 不带路径保存当前绑定文件（包括模板原件），带 relative
 
 运行中禁止制作和历史操作。停止后才能修改。普通运行属性变化不会写回设计文档。
 
-保存格式为 XXUI.json（version=4，无 scripts）、XXUI.view.luau（交互）、XXUI.example.luau（模拟接入）。文件工具可直接编辑 Luau，运行、保存或重开读取磁盘更新；两侧同一部分修改冲突时拒绝覆盖。workspacePath 与 agentWorkspacePath 均为工作区根目录。Roblox 导出格式不变，不包含 example。
+每份 UI 单独存放，例如 interfaces/OnlineRewardUI/ 下包含同名 .json（version=4）、.view.luau（source）与 .example.luau（integration）。导出只包含 View。通过文件工具修改脚本后，运行、保存或重开会读取磁盘更新；同一部分在两侧均有修改时报冲突。
 
-每份 UI 使用独立同名目录，例如 `interfaces/OnlineRewardUI/OnlineRewardUI.json`，同目录保存 `.view.luau` 与 `.example.luau`。模板安装、历史克隆和库间移动沿用此结构。修改界面名称后普通保存同步改名目录、JSON 和两份 Luau 文件，保留文档及节点 ID；同名目录或目标文件冲突时拒绝覆盖。App 不修改脚本类名、继承、引用或 ScreenGui 节点名称；这些源码与节点变更由 AI 根据用户需求另行完成。文件目录改名在保存时落盘，不属于撤销历史；撤销名称后再次保存可以改回目录与文件名。
+改名后普通保存会同步改名目录和三个文件，保留文档与节点 ID。发生命名冲突时拒绝覆盖；撤销名称后再次保存可改回文件名。类名、脚本引用和 ScreenGui 名称独立管理。

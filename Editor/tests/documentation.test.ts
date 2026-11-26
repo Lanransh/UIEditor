@@ -18,9 +18,11 @@ async function fixture(t: TestContext) {
     await writeFile(join(root, file), content, 'utf8');
   };
   await put('AGENTS.md', '# Entry\nentry keyword');
-  await put('.agents/skills/author/SKILL.md', '---\nname: author\ndescription: >-\n  Make UI.\n  Use when editing.\n---\n# Author\nkeyword\n[Reference](references/nodes.md)');
-  await put('.agents/skills/author/references/nodes.md', '# Nodes\nkeyword keyword\nonClick\nonHover\nliteral a.b\nfirst\nsecond');
-  await put('.agents/skills/author-extra/SKILL.md', '---\nname: author-extra\ndescription: Extra UI task.\n---\nkeyword');
+  await put('skills/author/SKILL.md', '---\nname: author\ndescription: >-\n  Make UI.\n  Use when editing.\n---\n# Author\nkeyword\n[Reference](references/nodes.md)');
+  await put('skills/author/references/nodes.md', '# Nodes\nkeyword keyword\nonClick\nonHover\nliteral a.b\nfirst\nsecond');
+  await put('skills/author-extra/SKILL.md', '---\nname: author-extra\ndescription: Extra UI task.\n---\nkeyword');
+  await put('Docs/legacy.md', 'secret');
+  await put('.agents/skills/old/SKILL.md', 'secret');
   await put('private.txt', 'secret keyword');
   return { root, put };
 }
@@ -39,16 +41,16 @@ test('read explicitly selects a Markdown file; entry alone includes parsed skill
   assert.equal(docs.read({ files: ['AGENTS.md'] }).documents[0].content, entry.content);
   assert.deepEqual((await docs.search({ pattern: 'entry' })).files, ['AGENTS.md']);
   assert.equal((await loadDocumentation(root)).read({ files: ['AGENTS.md'] }).documents[0].content, 'changed');
-  await put('Docs/new.md', 'new reference');
-  assert.equal((await loadDocumentation(root)).read({ files: ['Docs/new.md'] }).documents[0].content, 'new reference');
-  await put('.agents/skills/new-skill/SKILL.md', '---\nname: new-skill\ndescription: New editing task.\n---\n# New skill');
+  await put('skills/author/references/new.md', 'new reference');
+  assert.equal((await loadDocumentation(root)).read({ files: ['skills/author/references/new.md'] }).documents[0].content, 'new reference');
+  await put('skills/new-skill/SKILL.md', '---\nname: new-skill\ndescription: New editing task.\n---\n# New skill');
   assert.equal(docs.read({ files: ['AGENTS.md'] }).documents[0].skills?.length, 2);
   assert.equal((await loadDocumentation(root)).read({ files: ['AGENTS.md'] }).documents[0].skills?.length, 3);
 });
 
 test('files-only read preserves order, duplicates, entry metadata and atomic failure', async t => {
   const { root } = await fixture(t), docs = await loadDocumentation(root);
-  const files = ['.agents/skills/author/SKILL.md', 'AGENTS.md', '.agents/skills/author/SKILL.md'];
+  const files = ['skills/author/SKILL.md', 'AGENTS.md', 'skills/author/SKILL.md'];
   const result = docs.read({ files });
   assert.deepEqual(Object.keys(result).sort(), ['documents']);
   assert.deepEqual(result.documents.map(document => document.file), files);
@@ -73,7 +75,7 @@ test('literal/regex search returns only sorted unique paths; line matching and c
   assert.deepEqual(result.files, [...result.files].sort());
   assert.equal(result.files.length, 4);
   assert.equal(result.truncated, false);
-  assert.deepEqual((await docs.search({ pattern: 'onClick|onHover', mode: 'regex' })).files, ['.agents/skills/author/references/nodes.md']);
+  assert.deepEqual((await docs.search({ pattern: 'onClick|onHover', mode: 'regex' })).files, ['skills/author/references/nodes.md']);
   assert.deepEqual((await docs.search({ pattern: 'onClick|onHover' })).files, []);
   assert.equal((await docs.search({ pattern: 'a.b' })).files.length, 1);
   assert.equal((await docs.search({ pattern: '^on(Click|Hover)$', mode: 'regex' })).files.length, 1);
@@ -81,8 +83,8 @@ test('literal/regex search returns only sorted unique paths; line matching and c
   assert.equal((await docs.search({ pattern: '\\\\1', mode: 'regex' })).truncated, false, 'escaped backslashes are not backreferences');
   assert.ok((await docs.search({ pattern: ' ' })).files.length > 0);
   assert.deepEqual((await docs.search({ pattern: 'first\\s+second', mode: 'regex' })).files, []);
-  assert.deepEqual((await docs.search({ pattern: 'keyword', path: '.agents/skills/author/' })).files, [
-    '.agents/skills/author/SKILL.md', '.agents/skills/author/references/nodes.md',
+  assert.deepEqual((await docs.search({ pattern: 'keyword', path: 'skills/author/' })).files, [
+    'skills/author/SKILL.md', 'skills/author/references/nodes.md',
   ]);
   assert.deepEqual((await docs.search({ pattern: 'keyword', path: 'AGENTS.md' })).files, ['AGENTS.md']);
   assert.deepEqual((await docs.search({ pattern: 'nothing' })), { files: [], truncated: false });
@@ -91,14 +93,14 @@ test('literal/regex search returns only sorted unique paths; line matching and c
 
 test('search file and JSON limits preserve complete paths; exact limit can report complete', async t => {
   const { root, put } = await fixture(t);
-  for (let i = 0; i < 25; ++i) await put(`Docs/${String(i).padStart(2, '0')}.md`, 'match');
+  for (let i = 0; i < 25; ++i) await put(`skills/author/references/${String(i).padStart(2, '0')}.md`, 'match');
   const docs = await loadDocumentation(root);
   assert.equal((await docs.search({ pattern: 'match' })).files.length, 10);
   assert.equal((await docs.search({ pattern: 'match' })).truncated, true);
   assert.equal((await docs.search({ pattern: 'match', maxResults: 20 })).files.length, 20);
   assert.equal((await docs.search({ pattern: 'match', maxResults: 20 })).truncated, true);
   assert.equal((await docs.search({ pattern: 'keyword', maxResults: 4 })).truncated, false);
-  for (let i = 0; i < 12; ++i) await put(`long/${'x'.repeat(180)}${i}.md`, 'huge');
+  for (let i = 0; i < 12; ++i) await put(`skills/author/references/${'x'.repeat(180)}${i}.md`, 'huge');
   const long = await loadDocumentation(root), result = (await long.search({ pattern: 'huge', maxResults: 20 }));
   assert.equal(result.truncated, true);
   assert.ok(result.files.length > 0 && result.files.length < 12);
@@ -108,7 +110,7 @@ test('search file and JSON limits preserve complete paths; exact limit can repor
 
 test('parameters, path escapes, regex errors and resource exhaustion are identifiable', async t => {
   const { root, put } = await fixture(t);
-  await put('Docs/pathological.md', 'a'.repeat(30000) + '!');
+  await put('skills/author/references/pathological.md', 'a'.repeat(30000) + '!');
   const docs = await loadDocumentation(root);
   for (const args of [{}, { files: [] }, { files: '' }, { files: [4] }, { file: 'AGENTS.md' }, { files: ['AGENTS.md'], extra: true }]) {
     assert.throws(() => validateTool('uie.docs.read', args), /DOCS_/);
@@ -125,7 +127,7 @@ test('parameters, path escapes, regex errors and resource exhaustion are identif
   for (const pattern of ['[', '(?=a)', '(a)\\1', '(?<name>a)\\k<name>', '(?i)a']) {
     await assert.rejects(docs.search({ pattern, mode: 'regex' }), /DOCS_INVALID_REGEX/);
   }
-  await assert.rejects(docs.search({ pattern: '(a+)+$', mode: 'regex', path: 'Docs/pathological.md' }), /DOCS_SEARCH_LIMIT/);
+  await assert.rejects(docs.search({ pattern: '(a+)+$', mode: 'regex', path: 'skills/author/references/pathological.md' }), /DOCS_SEARCH_LIMIT/);
   assert.equal(docs.read({ files: ['AGENTS.md'] }).documents[0].file, 'AGENTS.md', 'service remains usable after timeout');
   assert.throws(() => docs.read({ files: ['private.txt'] }).documents[0], /DOCS_NOT_FOUND/);
   await assert.rejects(docs.search({ pattern: 'secret', path: 'private.txt' }), /DOCS_NOT_FOUND/);
@@ -133,21 +135,21 @@ test('parameters, path escapes, regex errors and resource exhaustion are identif
 
 test('invalid skills and linked documents/junctions cannot enter either read or search', async t => {
   const { root, put } = await fixture(t), diagnostics: string[] = [];
-  await put('.agents/skills/bad/SKILL.md', '---\nname: author\ndescription: duplicate identity\n---\nsecret');
-  await put('.agents/skills/bad/references/secret.md', 'secret');
-  await put('.agents/skills/missing/SKILL.md', '---\nname: missing\n---\nsecret');
-  await put('.agents/skills/yaml/SKILL.md', '---\nname: yaml\nname: yaml\ndescription: wrong\n---\nsecret');
+  await put('skills/bad/SKILL.md', '---\nname: author\ndescription: duplicate identity\n---\nsecret');
+  await put('skills/bad/references/secret.md', 'secret');
+  await put('skills/missing/SKILL.md', '---\nname: missing\n---\nsecret');
+  await put('skills/yaml/SKILL.md', '---\nname: yaml\nname: yaml\ndescription: wrong\n---\nsecret');
   const outside = root + '-outside';
   await mkdir(outside);
   t.after(() => rm(outside, { recursive: true, force: true }));
   await writeFile(join(outside, 'escape.md'), 'secret');
-  await symlink(outside, join(root, 'linked'), 'junction');
+  await symlink(outside, join(root, 'skills/author/linked'), 'junction');
   const docs = await loadDocumentation(root, message => diagnostics.push(message));
   assert.deepEqual(docs.read({ files: ['AGENTS.md'] }).documents[0].skills?.map(skill => skill.name), ['author', 'author-extra']);
   assert.equal(diagnostics.length, 4);
   assert.deepEqual((await docs.search({ pattern: 'secret' })).files, []);
-  for (const file of ['linked/escape.md', '.agents/skills/bad/SKILL.md', '.agents/skills/bad/references/secret.md']) assert.throws(() => docs.read({ files: [file] }).documents[0], /DOCS_NOT_FOUND/);
-  await assert.rejects(loadDocumentation(join(root, 'linked')), /DOCS_PACKAGE_UNAVAILABLE/);
+  for (const file of ['Docs/legacy.md', '.agents/skills/old/SKILL.md', 'skills/author/linked/escape.md', 'skills/bad/SKILL.md', 'skills/bad/references/secret.md']) assert.throws(() => docs.read({ files: [file] }).documents[0], /DOCS_NOT_FOUND/);
+  await assert.rejects(loadDocumentation(join(root, 'skills/author/linked')), /DOCS_PACKAGE_UNAVAILABLE/);
 });
 
 test('real package discovers skills and all Markdown links resolve inside the same whitelist', async () => {

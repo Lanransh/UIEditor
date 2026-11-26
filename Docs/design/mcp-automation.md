@@ -21,10 +21,10 @@
 每个 documents 对象保留完整 Markdown；仅 AGENTS.md 对象额外带自动发现的 skills 摘要
 （name、description、file）。按输入顺序返回，重复路径保留；任一文件无效则整次报错，不部分成功。
 不接受空值、绝对路径、路径穿越、未登记文件或额外参数，也不自动展开链接。
-沿用物理目录 `.agents/skills/<name>/SKILL.md`；服务解析 YAML frontmatter，校验
+技能入口位于 `skills/<name>/SKILL.md`；服务解析 YAML frontmatter，校验
 name 与目录一致、名称及描述长度、重复键/身份，非法技能及其参考子树不发布并记录服务端诊断，
 不影响其他合法技能。无需手写技能目录，也不会自动注册为客户端原生 skill。
-链接按所在文档目录解析；调用始终使用包根相对路径，例如 `Docs/editor-api.md`。
+链接按所在文档目录解析；调用始终使用包根相对路径，例如 `skills/roblox-ui-authoring/references/editor-api.md`。
 文本验收脚本作为技能 Markdown 参考内的完整 Luau 代码块提供，文档服务不执行。
 
 `uie.docs.search` 搜索正文，只返回 `{files,truncated}`：

@@ -9,12 +9,12 @@
 ## 按需读取
 
 - `uie.docs.read` 只接受必填的非空字符串数组 `files`，不再接受 `file`；单文件也使用数组。
-  例如 `uie.docs.read({files:["AGENTS.md","Docs/editor-api.md"]})`。所有路径相对于随工具发布的文档包，不是用户工作区。
+  例如 `uie.docs.read({files:["AGENTS.md","skills/roblox-ui-authoring/references/editor-api.md"]})`。所有路径相对于随工具发布的文档包，不是用户工作区。
   返回 `{documents:[{file,content,skills?}]}`，按输入顺序保留重复项；
   完整结果位于 structuredContent；文本块每行只显示 `读取了 <文件路径> 文件`。
   任一文件无效则整次报错，不部分返回。只有 AGENTS.md 对象带 skills 摘要。
   content 为完整 Markdown（skill 保留 YAML 文件头），不展开链接。相对链接以当前文件所在目录解析，
-  调用时仍传包根相对路径。技能在 `.agents/skills/<name>/SKILL.md`，参考位于 `Docs/` 或技能子目录。
+  调用时仍传包根相对路径。技能在 `skills/<name>/SKILL.md`，参考位于对应技能的 `references/` 子目录。
 - 已知路径直接 read；不知道细节位置时调用 `uie.docs.search({pattern:"关键词"})`，
   仅按需读取命中路径。搜索不替代指南或技能流程；无命中不代表没有规则。
 - read/search 可彼此并发，也不等待排队中的 App 操作；响应按请求 ID 对应，不保证输入顺序。
