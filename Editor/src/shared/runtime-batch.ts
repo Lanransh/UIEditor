@@ -7,7 +7,7 @@ const actions = ['run', 'reset', 'stop', 'click', 'hover', 'scroll', 'drag', 'as
 export interface RuntimeBatchStep {
   action: typeof actions[number];
   id?: string | null;
-  to?: Partial<Point>; delta?: Partial<Point>; from?: Point; steps?: number;
+  to?: Partial<Point>; delta?: Partial<Point>; from?: Point; steps?: number; holdMs?: number;
   hovered?: boolean; pressed?: boolean;
   properties?: Record<string, unknown>;
   disabled?: boolean;
@@ -19,7 +19,7 @@ export const runtimeBatchStepsSchema = {
   items: {
     type: 'object', additionalProperties: false, required: ['action'],
     properties: {
-      action: { enum: actions }, id: { type: ['string', 'null'] }, to: pointSchema, delta: pointSchema, from: pointSchema, steps: { type: 'integer', minimum: 1, maximum: 32 }, hovered: { type: 'boolean' }, pressed: { type: 'boolean' },
+      action: { enum: actions }, id: { type: ['string', 'null'] }, to: pointSchema, delta: pointSchema, from: pointSchema, holdMs: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER }, steps: { type: 'integer', minimum: 1, maximum: 32 }, hovered: { type: 'boolean' }, pressed: { type: 'boolean' },
       properties: { type: 'object' }, disabled: { type: 'boolean' },
       dispatched: { type: 'boolean' }, reason: { enum: ['hidden', 'disabled', null] },
     },
@@ -32,7 +32,7 @@ export function validateRuntimeBatchSteps(value: unknown): asserts value is Runt
     if (!step || typeof step !== 'object' || Array.isArray(step) || !actions.includes(step.action)) throw new Error('无效的验证步骤。');
     const mouse = ['hover', 'scroll', 'drag'].includes(step.action);
     if (mouse) validateMouseAction(step);
-    const allowed = mouse ? ['action', 'id', 'dispatched', 'reason', ...(step.action === 'scroll' ? ['to', 'delta'] : step.action === 'drag' ? ['from', 'to', 'steps'] : [])] : step.action === 'click' ? ['action', 'id', 'dispatched', 'reason'] : step.action === 'assert' ? ['action', 'id', 'properties', 'disabled', 'hovered', 'pressed'] : ['action'];
+    const allowed = mouse ? ['action', 'id', 'dispatched', 'reason', ...(step.action === 'scroll' ? ['to', 'delta'] : step.action === 'drag' ? ['from', 'to', 'steps', 'holdMs'] : [])] : step.action === 'click' ? ['action', 'id', 'dispatched', 'reason'] : step.action === 'assert' ? ['action', 'id', 'properties', 'disabled', 'hovered', 'pressed'] : ['action'];
     if (Object.keys(step).some(key => !allowed.includes(key))) throw new Error('验证步骤包含不支持的字段。');
     if (['click', 'assert'].includes(step.action) && (typeof step.id !== 'string' || !step.id)) throw new Error('点击和断言需要稳定节点 id。');
     for (const key of ['disabled', 'dispatched', 'hovered', 'pressed']) if (step[key] !== undefined && typeof step[key] !== 'boolean') throw new Error(`${key} 必须是布尔值。`);

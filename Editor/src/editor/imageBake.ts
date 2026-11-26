@@ -4,7 +4,7 @@ import type { ProjectStrategy } from './strategy';
 import { pixels } from './layout';
 
 export type BakedNodeClass = 'ImageLabel' | 'ImageButton';
-const retainedComponents = new Set(['UIScale', 'UISizeConstraint', 'UIAspectRatioConstraint']);
+const retainedComponents = new Set(['UIDragDetector', 'UIScale', 'UISizeConstraint', 'UIAspectRatioConstraint']);
 
 export function bakeSize(document: UIDocument, id: string, strategy: ProjectStrategy): { width: number; height: number } {
   function visit(parent: UINode, width: number, height: number): { width: number; height: number } | undefined {

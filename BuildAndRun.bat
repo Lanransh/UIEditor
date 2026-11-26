@@ -25,6 +25,10 @@ if errorlevel 1 goto :error
 echo Building UI Editor...
 if not exist native-bin\ui-luau.exe set "UI_EDITOR_BUILD_NATIVE=1"
 if not exist native-bin\editor.luau set "UI_EDITOR_BUILD_NATIVE=1"
+if not defined UI_EDITOR_BUILD_NATIVE (
+  node -e "const fs=require('node:fs');process.exit(fs.statSync('native/main.cpp').mtimeMs > fs.statSync('native-bin/ui-luau.exe').mtimeMs ? 1 : 0)"
+  if errorlevel 1 set "UI_EDITOR_BUILD_NATIVE=1"
+)
 if defined UI_EDITOR_BUILD_NATIVE (
   echo Building Luau host - requires CMake and a C++ compiler...
   call npm run build:runtime

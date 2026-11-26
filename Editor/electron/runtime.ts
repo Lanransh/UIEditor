@@ -5,7 +5,8 @@ import { createInterface } from 'node:readline';
 import { randomUUID } from 'node:crypto';
 import { robloxStrategy } from '../src/editor/roblox';
 import { allNodes, findNode, updateNode, type PropertyValue, type UIDocument, type UINode } from '../src/shared/uiDocument';
-import { applyRuntimePatch, mouseEvents, validateJSON, type RuntimePatch, type RuntimeFrame, type RuntimeLog } from '../src/shared/runtime';
+import { localMousePoint, runtimeHitRegions } from '../src/editor/runtimeMouse';
+import { applyRuntimePatch, dragEvents, mouseEvents, validateJSON, type RuntimePatch, type RuntimeFrame, type RuntimeLog } from '../src/shared/runtime';
 
 export class RuntimeError extends Error {
   constructor(message: string, readonly logs: RuntimeLog[]) { super(message); }
@@ -19,6 +20,14 @@ function readLogs(source: unknown): RuntimeLog[] {
   });
 }
 
+// Luau serializes a newly created empty table as a JSON object.
+function normalizeChildren(node: UINode) {
+  if (node.children && !Array.isArray(node.children) && !Object.keys(node.children).length) node.children = [];
+  if (Array.isArray(node.children)) node.children.forEach(normalizeChildren);
+}
+
+type LayoutNode = Omit<UINode, 'children'> & { children: string[] };
+
 export class LuauSession {
   readonly id = randomUUID();
   onEnded?: (error: string, logs: RuntimeLog[]) => void;
@@ -26,19 +35,28 @@ export class LuauSession {
   private pending: { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> } | null = null;
   private closed = false;
   private document: UIDocument;
+  private layoutNodes = new Map<string, LayoutNode>();
+  private hitRegions?: ReturnType<typeof runtimeHitRegions>;
   private disabled: string[] = [];
   private listeners: Record<string, string[]> | undefined;
   private queue: Promise<unknown> = Promise.resolve();
   private constructor(directory: string, document: UIDocument) {
     this.document = structuredClone(document);
+    for (const node of allNodes(document.root))
+      this.layoutNodes.set(node.id, { ...node, children: node.children.map(child => child.id) });
     this.process = spawn(join(directory, 'ui-luau.exe'), [], { windowsHide: true, stdio: 'pipe' });
     const lines = createInterface({ input: this.process.stdout });
     lines.on('line', line => {
       const pending = this.pending;
       if (!pending) { this.abort(new Error('运行时返回了未请求的消息。')); return; }
-      clearTimeout(pending.timer); this.pending = null;
       try {
         const result = JSON.parse(line);
+        if (result.layoutQuery) {
+          const hits = this.queryLayout(result.layoutQuery);
+          this.process.stdin.write(JSON.stringify(hits) + '\n', error => { if (error) this.abort(error); });
+          return;
+        }
+        clearTimeout(pending.timer); this.pending = null;
         if (!result.ok) throw new RuntimeError(result.error, readLogs(result.logs ?? []));
         pending.resolve(result.value);
       } catch (error) { pending.reject(error as Error); this.abort(error as Error); }
@@ -46,6 +64,33 @@ export class LuauSession {
     this.process.on('error', error => this.abort(error));
     this.process.on('exit', () => this.abort(new Error('Luau 运行进程已退出。')));
     this.process.stderr.on('data', () => { /* Native diagnostics must not block the child pipe. */ });
+  }
+  private queryLayout(query: { x: number; y: number; changes: Record<string, LayoutNode | false> }) {
+    for (const [id, node] of Object.entries(query.changes)) {
+      this.hitRegions = undefined;
+      if (!node) this.layoutNodes.delete(id);
+      else {
+        // Empty Luau child lists can arrive as {}.
+        if (!Array.isArray(node.children) && !Object.keys(node.children).length) node.children = [];
+        this.layoutNodes.set(id, node);
+      }
+    }
+    if (!this.hitRegions) {
+      const tree = (id: string, depth: number): UINode => {
+        const node = this.layoutNodes.get(id);
+        if (!node || depth > 64) throw new Error('无效的命中查询节点树。');
+        return { ...node, children: node.children.map(child => tree(child, depth + 1)) };
+      };
+      const document = robloxStrategy.validate({ ...this.document, root: tree(this.document.root.id, 0) });
+      this.hitRegions = runtimeHitRegions(document.root, robloxStrategy);
+    }
+    const inside = new Set<string>();
+    for (const region of this.hitRegions) {
+      if (region.clip && !inside.has(region.clip)) continue;
+      const { x, y } = localMousePoint(region.matrix, query);
+      if (x >= 0 && x < region.width && y >= 0 && y < region.height) inside.add(region.id);
+    }
+    return Array.from(inside).reverse();
   }
   static async start(directory: string, source: unknown) {
     const document = robloxStrategy.validate(source);
@@ -79,6 +124,10 @@ export class LuauSession {
           return node.children.some(child => visible(child, enabled));
         };
         if (!visible(this.document.root, true) || this.disabled.includes(target.id)) return { document: this.document, disabled: this.disabled, logs: [], listeners: this.listeners };
+      } else if (input.type === 'drag') {
+        const detector = typeof input.node === 'string' && findNode(this.document.root, input.node);
+        if (!detector || detector.className !== 'UIDragDetector' || !dragEvents.includes(input.event as typeof dragEvents[number])
+          || !Number.isFinite(input.x) || !Number.isFinite(input.y)) throw new Error('无效的拖动事件。');
       } else if (input.type === 'mouse') {
         const target = typeof input.node === 'string' && findNode(this.document.root, input.node);
         if (!target || robloxStrategy.nodes[target.className].category !== 'object' || !mouseEvents.includes(input.event as any)
@@ -98,7 +147,7 @@ export class LuauSession {
           ? { ...node, name: value as string }
           : { ...node, properties: { ...node.properties, [property]: value } }) });
       } else if (!['start', 'stop', 'show', 'hide'].includes(input.type as string)) throw new Error('不支持的运行命令。');
-      const line = JSON.stringify(command);
+      const line = JSON.stringify(input);
       if (Buffer.byteLength(line) > 8 * 1024 * 1024) throw new Error('运行消息超过 8 MiB。');
       try {
         const result = await new Promise<unknown>((resolve, reject) => {
@@ -116,8 +165,7 @@ export class LuauSession {
     validateJSON(source);
     const result = source as { root?: UINode; patch?: RuntimePatch; disabled: string[]; listeners?: Record<string, string[]>; logs: { kind: string; message: string; payload?: unknown }[] };
     if ((!result.root && !result.patch) || (result.root && result.patch) || !Array.isArray(result.disabled) || !Array.isArray(result.logs)) throw new Error('无效的运行结果。');
-    const normalize = (node: UINode) => { if (!Array.isArray(node.children) && node.children && Object.keys(node.children).length === 0) node.children = []; if (Array.isArray(node.children)) node.children.forEach(normalize); };
-    if (result.root) normalize(result.root);
+    if (result.root) normalizeChildren(result.root);
     const document = result.root ? { ...this.document, root: result.root } : applyRuntimePatch(this.document, result.patch);
     const validated = robloxStrategy.validate(document);
     for (const id of result.disabled) if (typeof id !== 'string' || !findNode(document.root, id)) throw new Error('无效的禁用节点。');
@@ -125,7 +173,7 @@ export class LuauSession {
       if (!result.listeners || typeof result.listeners !== 'object' || Array.isArray(result.listeners)) throw new Error('无效的运行事件订阅。');
       for (const [id, events] of Object.entries(result.listeners)) {
         const node = findNode(validated.root, id);
-        if (!node || !Array.isArray(events) || events.some(event => typeof event !== 'string' || !(event === 'Activated' || mouseEvents.includes(event as any) || event.startsWith('property:') && Object.hasOwn(node.properties, event.slice(9))))) throw new Error('无效的运行事件订阅。');
+        if (!node || !Array.isArray(events) || events.some(event => typeof event !== 'string' || !(event === 'Activated' || node.className === 'UIDragDetector' && dragEvents.includes(event as typeof dragEvents[number]) || mouseEvents.includes(event as any) || event.startsWith('property:') && Object.hasOwn(node.properties, event.slice(9))))) throw new Error('无效的运行事件订阅。');
       }
     }
     const logs = readLogs(result.logs);

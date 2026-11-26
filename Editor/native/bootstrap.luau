@@ -92,7 +92,9 @@ function FX.GetClass(name) return classes[name] end
 local handlers, disabled = {}, {}
 local logs = {}
 local dirty, structureChanged = {}, true
+local layoutChanges, queryLayout = {}, nil
 local function mark(id)
+    layoutChanges[id] = true
     dirty[id] = dirty[id] or {}
     return dirty[id]
 end
@@ -103,6 +105,36 @@ local function nodeFor(ref)
     assert(id and nodes[id] and not nodes[id].destroyed, "Unknown or destroyed node reference: " .. tostring(ref))
     return nodes[id], id
 end
+local function snapshotNode(id, children)
+    local node = nodes[id]
+    return {
+        id = id, name = node.name, className = node.className,
+        properties = node.properties, children = children, imageAssetId = node.imageAssetId,
+    }
+end
+local function getGuiObjectsAtPosition(_, x, y)
+    number(x)
+    number(y)
+    local hits = {}
+    if x < 0 or x >= 1280 or y < 0 or y >= 720 then return hits end
+    local changes = {}
+    for id, live in pairs(layoutChanges) do
+        changes[id] = live and snapshotNode(id, nodes[id].children) or false
+        nodes[id].layoutKnown = live
+    end
+    local ids = queryLayout({ changes = changes, x = x, y = y })
+    layoutChanges = {}
+    for _, id in ipairs(ids) do table.insert(hits, proxies[id]) end
+    return hits
+end
+local playerGui = table.freeze({
+    Name = "PlayerGui", ClassName = "PlayerGui",
+    IsA = function(_, className)
+        return className == "PlayerGui" or className == "BasePlayerGui" or className == "Instance" or className == "Object"
+    end,
+    GetGuiObjectsAtPosition = getGuiObjectsAtPosition,
+})
+local dragEvents = { DragStart = true, DragContinue = true, DragEnd = true }
 local mouseEvents = { MouseEnter = true, MouseLeave = true, MouseMoved = true, MouseWheelForward = true, MouseWheelBackward = true, InputBegan = true, InputChanged = true, InputEnded = true }
 local function fire(id, event, ...)
     for _, handler in ipairs(table.clone(handlers[id] or {})) do
@@ -141,7 +173,7 @@ function API:Set(ref, property, value)
 end
 function API:On(ref, event, callback)
     local node, id = nodeFor(ref)
-    assert(mouseEvents[event] and node.properties.Visible ~= nil or event == "Activated" and (node.className == "TextButton" or node.className == "ImageButton") or string.sub(event, 1, 9) == "property:" and node.properties[string.sub(event, 10)] ~= nil, "Unsupported node event: " .. event)
+    assert(dragEvents[event] and node.className == "UIDragDetector" or mouseEvents[event] and node.properties.Visible ~= nil or event == "Activated" and (node.className == "TextButton" or node.className == "ImageButton") or string.sub(event, 1, 9) == "property:" and node.properties[string.sub(event, 10)] ~= nil, "Unsupported node event: " .. event)
     assert(type(callback) == "function", "Expected callback")
     local connection = { Connected = true }
     function connection:Disconnect() self.Connected = false end
@@ -180,7 +212,9 @@ local function reparent(id, parentId)
     end
     if node.parent == parentId then return end
     structureChanged = true
+    if parentId then layoutChanges[parentId] = true end
     if node.parent then
+        layoutChanges[node.parent] = true
         local siblings = nodes[node.parent].children
         table.remove(siblings, table.find(siblings, id))
     end
@@ -197,6 +231,7 @@ local function cloneNode(id)
         definitions = source.definitions, children = {},
         imageAssetId = source.imageAssetId,
     }
+    layoutChanges[copiedId] = true
     nodes[copiedId] = copied
     nodeCount += 1
     proxies[copiedId] = makeProxy(copiedId)
@@ -215,6 +250,7 @@ local function destroy(id)
     for _, childId in ipairs(table.clone(node.children)) do destroy(childId) end
     for _, handler in ipairs(handlers[id] or {}) do handler.connection:Disconnect() end
     handlers[id], disabled[id] = nil, nil
+    if node.layoutKnown then layoutChanges[id] = false else layoutChanges[id] = nil end
     node.destroyed = true
     nodeCount -= 1
 end
@@ -224,7 +260,7 @@ makeProxy = function(id)
             local node = nodes[id]
             if key == "Name" then return node.name end
             if key == "ClassName" then return node.className end
-            if key == "Parent" then return proxies[node.parent] end
+            if key == "Parent" then return id == root and playerGui or proxies[node.parent] end
             if key == "Clone" then return function() return proxies[cloneNode(id)] end end
             if key == "Destroy" then return function() destroy(id) end end
             if key == "GetChildren" then return function()
@@ -239,7 +275,7 @@ makeProxy = function(id)
                 assert(node.properties[property] ~= nil, "Unsupported property")
                 return table.freeze({ Connect = function(_, callback) return API:On(id, "property:" .. property, callback) end })
             end end
-            if key == "Activated" or mouseEvents[key] then
+            if key == "Activated" or mouseEvents[key] or dragEvents[key] and node.className == "UIDragDetector" then
                 return table.freeze({ Connect = function(_, callback) return API:On(id, key, callback) end })
             end
             if node.properties[key] ~= nil then return API:Get(id, key) end
@@ -495,9 +531,12 @@ function host.initialize(input)
     end
     table.freeze(Enum)
 end
-function host.prepare(input)
+function host.prepare(input, layout)
+    assert(type(layout) == "function", "Outdated Luau host: run npm run build:runtime")
+    queryLayout = layout
     nodes, root = input.nodes, input.root
     for id, node in pairs(nodes) do
+        node.layoutKnown = true
         proxies[id] = makeProxy(id)
         nodeCount += 1
         for _, childId in ipairs(node.children) do nodes[childId].parent = id end
@@ -534,6 +573,8 @@ function host.command(input)
         end
     elseif input.type == "event" and not disabled[input.node] then
         fire(input.node, "Activated")
+    elseif input.type == "drag" then
+        fire(input.node, input.event, Vector2.new(input.x, input.y))
     elseif input.type == "mouse" then
         local event = input.event
         table.insert(logs, { kind = "input", message = input.node .. " " .. event })
@@ -588,11 +629,7 @@ function host.output()
             end
             return nil
         end
-        return {
-            id = id, name = node.name, className = node.className,
-            properties = node.properties, children = children,
-            imageAssetId = node.imageAssetId,
-        }
+        return snapshotNode(id, children)
     end
     local tree = snapshot(root)
     local result = { disabled = ids, logs = logs, listeners = listeners }

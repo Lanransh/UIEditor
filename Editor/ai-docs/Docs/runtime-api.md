@@ -39,7 +39,34 @@ App 使用真实 Luau 和模拟节点，覆盖公开支持的属性与接口；�
 
 - `uie.runtime.hover({sessionId,revision,id})`：悬停；id=null 移出。
 - `uie.runtime.scroll({sessionId,revision,id,to:{y:300}})`：定位 ScrollingFrame；也可使用 delta:{y:120} 测试滚轮路径，不能同时传 to/delta。单位为逻辑内容像素，自动限制范围。
-- `uie.runtime.drag({sessionId,revision,id,from:{x:0.1,y:0.5},to:{x:0.9,y:0.5},steps:8})`：节点局部归一化坐标；steps 为 1–32；不自动移动节点或激活按钮，由脚本响应输入。
+- `uie.runtime.drag({sessionId,revision,id,from:{x:0.1,y:0.5},to:{x:0.9,y:0.5},steps:8,holdMs:350})`：起止点使用节点局部归一化坐标。holdMs 是按下到首次移动的模拟毫秒数，默认 0，执行时无需等待。移动端在列表道具上用 0 模拟轻划，用 350 模拟长按拖动。steps 为 1–32，批处理中的 drag 支持同样的参数。
+
+道具 GuiObject 下可添加 `UIDragDetector`（Enabled）。PC 和移动端预览会按默认 Offset 方式移动该对象，`DragStart`、`DragContinue`、`DragEnd` 的参数都是画布位置 Vector2。拖动期间用滚轮滚动列表，图标上的抓取点仍跟随指针。移动端沿列表可继续滚动的方向轻划会滚动列表。垂直列表内横划、沿已到达的边界向外划，或列表没有滚动范围时，轻划会拖动道具。按住至少 350 毫秒再移动可直接拖动道具。取消或禁用检测器会用画布外坐标结束已开始的拖动。命中查询反映同一回调内的布局修改。格子放在 UIGridLayout 中，道具作为格子的子节点。在交互脚本中用 ScreenGui.Parent 获取 PlayerGui，按节点身份匹配有效格子。预览中的 PlayerGui 支持 Name、ClassName 和 IsA，沿 Parent 向上遍历会在 PlayerGui 之后得到 nil。下面以名为 DragExample 的 ScreenGui 为例，A、B 两格位于同一父节点，图标在 A 格内，两个格子均允许子节点溢出。游戏接入可在放置时通过 EmitUIAction 提交道具和格子的业务 ID。
+
+```luau
+function UI:OnReady()
+    local screen = FX.Loader:PlayerGui("DragExample")
+    local a, b = screen.Bag.SlotA, screen.Bag.SlotB
+    local item = a.Item
+    local detector = item.UIDragDetector
+    local origin, oldZ
+    self:TrackConnection(detector.DragStart:Connect(function()
+        origin, oldZ = item.Position, item.Parent.ZIndex
+        item.Parent.ZIndex = math.max(a.ZIndex, b.ZIndex) + 1
+    end))
+    self:TrackConnection(detector.DragEnd:Connect(function(p)
+        local source = item.Parent
+        source.ZIndex = oldZ
+        for _, hit in ipairs(screen.Parent:GetGuiObjectsAtPosition(p.X, p.Y)) do
+            if hit == a or hit == b then
+                item.Parent = hit
+                break
+            end
+        end
+        item.Position = origin
+    end))
+end
+```
 
 节点支持 MouseEnter/MouseLeave/MouseMoved、MouseWheelForward/Backward、InputBegan/InputChanged/InputEnded 和 GetPropertyChangedSignal(property)。Input 回调提供鼠标 UserInputType、UserInputState、Position/Delta（X/Y/Z），位置为 1280×720 逻辑画布像素；仅实现有限鼠标数据，不是完整引擎 InputObject。滚动容器的默认滚动无须脚本；监听 CanvasPosition 可响应滚动变化。不支持键盘、文本输入和焦点事件。
 

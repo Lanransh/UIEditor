@@ -7,7 +7,7 @@ const target = { type: 'object', properties: { projectId: uuid, library: { enum:
 const properties = {
   path: { type: 'string' }, minimized: { type: 'boolean', default: true },
   to: pointSchema, from: pointSchema, delta: pointSchema,
-  steps: runtimeBatchStepsSchema,
+  holdMs: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER }, steps: runtimeBatchStepsSchema,
   projectId: uuid, target, mode: { enum: ['edit', 'copy'] }, format: { enum: ['json', 'tree'] }, maxNodes: { type: 'integer', minimum: 1, maximum: 2000 },
   sessionId: { type: 'string' }, revision: { type: 'integer' }, id: { type: 'string' }, parentId: { type: 'string' },
   name: { type: 'string' }, className: { type: 'string' }, match: { enum: ['exact', 'contains'] }, recursive: { type: 'boolean' },
@@ -23,7 +23,7 @@ const fields: Record<string, string[]> = {
   'uie.project.open': ['path', 'minimized'],
   'uie.runtime.hover': ['sessionId', 'revision', 'id'],
   'uie.runtime.scroll': ['sessionId', 'revision', 'id', 'to', 'delta'],
-  'uie.runtime.drag': ['sessionId', 'revision', 'id', 'from', 'to', 'steps'],
+  'uie.runtime.drag': ['sessionId', 'revision', 'id', 'from', 'to', 'steps', 'holdMs'],
   'uie.runtime.batch': ['sessionId', 'revision', 'steps', 'compact'],
   'uie.editor.get_state': ['detail'], 'uie.editor.get_capabilities': ['detail', 'className'],
   'uie.nodes.get': ['id', 'depth', 'view', 'target', 'format', 'maxNodes', 'compact'], 'uie.nodes.find': ['name', 'className', 'match', 'parentId', 'recursive', 'offset', 'limit', 'view', 'target', 'compact'],

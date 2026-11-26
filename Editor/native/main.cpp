@@ -99,6 +99,21 @@ static Json read(lua_State* L, int index, Context& ctx, int depth = 0) {
     }
     throw std::runtime_error("Data must be serializable (no functions or userdata)");
 }
+// Only the trusted bootstrap receives this synchronous layout callback.
+static int layoutRegions(lua_State* L) {
+    auto& ctx = *static_cast<Context*>(lua_callbacks(L)->userdata);
+    try {
+        Json request = { { "layoutQuery", read(L, 1, ctx) } };
+        std::cout << request.dump() << std::endl;
+        std::string reply;
+        if (!std::getline(std::cin, reply) || reply.size() > 8 * 1024 * 1024)
+            throw std::runtime_error("Missing or oversized layout response");
+        push(L, Json::parse(reply), ctx);
+        return 1;
+    } catch (const std::exception& error) {
+        luaL_error(L, "%s", error.what());
+    }
+}
 static void check(lua_State* L, int status) {
     if (status) throw std::runtime_error(lua_tostring(L, -1) ? lua_tostring(L, -1) : "Luau execution failed");
 }
@@ -165,7 +180,7 @@ int main() {
             } else if (input["type"] == "start") {
                 load(L, input["bootstrap"], "=host"); call(L, 0, 1); host = lua_ref(L, -1); lua_pop(L, 1);
                 push(L, input, ctx); hostCall(L, host, "initialize", 1); lua_settop(L, 0);
-                push(L, input, ctx); hostCall(L, host, "prepare", 1); lua_settop(L, 0);
+                push(L, input, ctx); lua_pushcfunction(L, layoutRegions, "layoutRegions"); hostCall(L, host, "prepare", 2); lua_settop(L, 0);
                 int env = environment(L, host);
                 load(L, input["source"], "=interface", env); call(L, 0, 1);
                 hostCall(L, host, "interaction", 1); lua_settop(L, 0);

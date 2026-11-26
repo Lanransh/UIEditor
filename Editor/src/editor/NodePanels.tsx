@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
-import { Layers3 } from 'lucide-react';
+import { Layers3, Move } from 'lucide-react';
 import { allNodes, findParent, type PropertyValue, type UDim, type UDim2, type UINode, type Vector2 } from '../shared/uiDocument';
 import type { PropertyDefinition } from './strategy';
 import type { DocumentEditor } from './useDocumentEditor';
@@ -8,6 +8,11 @@ import { moveNode, nodeDropParent, type NodeDropPosition } from './commands';
 import { BakeImageDialog } from './BakeImageDialog';
 
 const nodeIcons = import.meta.glob<string>('../assets/roblox-node-icons/*.png', { eager: true, query: '?url', import: 'default' });
+
+function NodeIcon({ name }: { name: string }) {
+  if (name === 'UIDragDetector') return <Move className="node-icon" size={16} aria-hidden="true" />;
+  return <img className="node-icon" src={nodeIcons[`../assets/roblox-node-icons/${name}.png`]} width={16} height={16} alt="" draggable={false} />;
+}
 
 export function NodeTree({ editor }: { editor: DocumentEditor }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -126,14 +131,14 @@ export function NodeTree({ editor }: { editor: DocumentEditor }) {
         }}>
         <button className="node-expand" disabled={!node.children.length} aria-label={`${closed ? '展开' : '折叠'} ${node.name}`} onClick={() => setCollapsed(previous => { const next = new Set(previous); if (closed) next.delete(node.id); else next.add(node.id); return next; })}>{node.children.length ? closed ? '▸' : '▾' : ''}</button>
         {renaming?.id === node.id
-          ? <div className="node-select node-renaming"><img className="node-icon" src={nodeIcons[`../assets/roblox-node-icons/${node.className}.png`]} width={16} height={16} alt="" draggable={false} /><input ref={renameInput} aria-label={`重命名节点 ${node.name}`} value={renaming.value} onChange={event => setRenaming({ ...renaming, value: event.target.value })} onBlur={() => {
+          ? <div className="node-select node-renaming"><NodeIcon name={node.className} /><input ref={renameInput} aria-label={`重命名节点 ${node.name}`} value={renaming.value} onChange={event => setRenaming({ ...renaming, value: event.target.value })} onBlur={() => {
             if (renameCancelled.current) { renameCancelled.current = false; return; }
             commitRename();
           }} onKeyDown={event => {
             if (event.key === 'Enter') event.currentTarget.blur();
             else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); renameCancelled.current = true; setRenaming(null); }
           }} /></div>
-          : <button className="node-select" aria-label={`选择节点 ${node.name}`} onClick={() => editor.select(node.id)} onDoubleClick={() => beginRename(node)}><img className="node-icon" src={nodeIcons[`../assets/roblox-node-icons/${node.className}.png`]} width={16} height={16} alt="" draggable={false} /><span>{node.name}</span></button>}
+          : <button className="node-select" aria-label={`选择节点 ${node.name}`} onClick={() => editor.select(node.id)} onDoubleClick={() => beginRename(node)}><NodeIcon name={node.className} /><span>{node.name}</span></button>}
         {editor.strategy.nodes[node.className].category !== 'component' && <button disabled={editor.busy} className="node-add-child" aria-label={`为 ${node.name} 添加子节点`} title="添加子节点" aria-haspopup="menu" aria-expanded={menu?.parent.id === node.id} onClick={event => {
           const bounds = event.currentTarget.getBoundingClientRect();
           setMenu({ parent: node, x: Math.max(8, Math.min(bounds.right, window.innerWidth - 208)), y: Math.max(8, Math.min(bounds.bottom, window.innerHeight - 288)) });
@@ -171,7 +176,7 @@ export function NodeTree({ editor }: { editor: DocumentEditor }) {
         </>}
         {!menu.context && addableNodes.map((name, index) => <button key={name} role="menuitem" autoFocus={index === 0} onClick={() => {
           editor.add(name, menu.parent.id); setMenu(null);
-        }}><img className="node-icon" src={nodeIcons[`../assets/roblox-node-icons/${name}.png`]} width={16} height={16} alt="" />{name}</button>)}
+        }}><NodeIcon name={name} />{name}</button>)}
       </div>}
     </fieldset>
     {baking && <BakeImageDialog editor={editor} node={baking} onClose={() => setBaking(null)} />}

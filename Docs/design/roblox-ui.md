@@ -46,6 +46,7 @@ Ctrl+D 直接复制当前节点到同级末尾，Delete 删除当前节点。根
 | 容器 | Frame、ScrollingFrame、CanvasGroup |
 | 文本 | TextLabel、TextButton、TextBox |
 | 图片 | ImageLabel、ImageButton |
+| 交互 | UIDragDetector（Enabled） |
 | 外观 | UICorner、UIStroke、UIGradient |
 | 布局 | UIListLayout、UIGridLayout、UIPadding |
 | 尺寸 | UIScale、UIAspectRatioConstraint、UISizeConstraint、UITextSizeConstraint |

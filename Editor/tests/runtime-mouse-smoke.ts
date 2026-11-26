@@ -34,6 +34,7 @@ try {
   await createProject(parent);
   const project = join(parent, 'UIEditorWorkspace');
   const fixture = mouseFixture();
+  fixture.scroll.children.push(robloxStrategy.createNode('UIDragDetector'));
   const childButton = robloxStrategy.createNode('TextButton');
   fixture.child.className = childButton.className;
   fixture.child.properties = { ...childButton.properties, ...fixture.child.properties };
@@ -52,9 +53,9 @@ try {
   const editTransform = await artboard.getAttribute('style');
   assert.equal((await mutate('uie.runtime.control', { action: 'run' })).result.ok, true);
   assert.equal(await page.getByRole('combobox', { name: '画布缩放' }).isEnabled(), false);
-  const button = page.locator(`[data-node-id="${fixture.button.id}"]`);
+  const button = artboard.locator(`[data-node-id="${fixture.button.id}"]`);
   await button.click();
-  await page.waitForFunction(id => document.querySelector(`[data-node-id="${id}"]`)?.textContent === 'click', fixture.button.id);
+  await page.waitForFunction(id => document.querySelector(`[data-testid="ui-artboard"] [data-node-id="${id}"]`)?.textContent === 'click', fixture.button.id);
   const fitted = await artboard.getAttribute('style');
   const box = (await button.boundingBox())!;
   await page.mouse.move(box.x+box.width/2, box.y+box.height/2);
@@ -73,22 +74,25 @@ try {
   ] });
   assert.equal(batch.success, true, JSON.stringify(batch));
   await mutate('uie.runtime.scroll', { id: fixture.scroll.id, to: { y: 0 } });
-  const content = page.locator(`[data-node-id="${fixture.child.id}"]`);
+  const content = artboard.locator(`[data-node-id="${fixture.child.id}"]`);
   await content.hover(); await page.mouse.wheel(0, 100);
-  await page.waitForFunction(id => Number(document.querySelector(`[data-node-id="${id}"] [data-scroll-axis="y"]`)?.getAttribute('data-position')) > 0, fixture.scroll.id);
+  await page.waitForFunction(id => Number(document.querySelector(`[data-testid="ui-artboard"] [data-node-id="${id}"] [data-scroll-axis="y"]`)?.getAttribute('data-position')) > 0, fixture.scroll.id);
   const list = await call('uie.nodes.get', { id: fixture.scroll.id, view: 'runtime' });
   assert.equal(list.node.properties.CanvasPosition.y, 100);
-  const bar = page.locator(`[data-node-id="${fixture.scroll.id}"] > div > [data-scroll-axis="y"]`);
+  const bar = artboard.locator(`[data-node-id="${fixture.scroll.id}"] > div > [data-scroll-axis="y"]`);
   const barBox = (await bar.boundingBox())!;
   await page.mouse.move(barBox.x+barBox.width/2, barBox.y+barBox.height/2);
   await page.mouse.down(); await page.mouse.move(barBox.x+barBox.width/2, barBox.y+barBox.height/2+35, { steps: 3 }); await page.mouse.up();
-  await page.waitForFunction(id => Number(document.querySelector(`[data-node-id="${id}"] [data-scroll-axis="y"]`)?.getAttribute('data-position')) > 100, fixture.scroll.id);
+  await page.waitForFunction(id => Number(document.querySelector(`[data-testid="ui-artboard"] [data-node-id="${id}"] [data-scroll-axis="y"]`)?.getAttribute('data-position')) > 100, fixture.scroll.id);
+  await mutate('uie.runtime.hover', { id: null });
+  const afterThumb = await call('uie.nodes.get', { id: fixture.scroll.id, view: 'runtime' });
+  assert.deepEqual(afterThumb.node.properties.Position, list.node.properties.Position);
   // Physical drag produces mouse events without activating the button or moving the artboard.
   await button.hover();
   const dragBox = (await button.boundingBox())!;
   await page.mouse.move(dragBox.x+5, dragBox.y+dragBox.height/2); await page.mouse.down();
   await page.mouse.move(dragBox.x+dragBox.width-5, dragBox.y+dragBox.height/2, { steps: 3 }); await page.mouse.up();
-  await page.waitForFunction(id => document.querySelector(`[data-node-id="${id}"]`)?.textContent === 'up', fixture.button.id);
+  await page.waitForFunction(id => document.querySelector(`[data-testid="ui-artboard"] [data-node-id="${id}"]`)?.textContent === 'up', fixture.button.id);
   assert.equal(await artboard.getAttribute('style'), fitted);
   // Mobile uses the same canvas and session, with single-finger content dragging.
   await mutate('uie.runtime.scroll', { id: fixture.scroll.id, to: { y: 0 } });
@@ -98,20 +102,21 @@ try {
   await button.hover();
   assert.equal(await button.textContent(), 'leave', 'Switching to touch must clear hover');
   await button.click();
-  await page.waitForFunction(id => document.querySelector(`[data-node-id="${id}"]`)?.textContent === 'click', fixture.button.id);
+  await page.waitForFunction(id => document.querySelector(`[data-testid="ui-artboard"] [data-node-id="${id}"]`)?.textContent === 'click', fixture.button.id);
   await content.hover(); await page.mouse.wheel(0, 100);
   assert.equal((await call('uie.nodes.get', { id: fixture.scroll.id, view: 'runtime' })).node.properties.CanvasPosition.y, 0);
   const touchBox = (await content.boundingBox())!;
   await page.mouse.move(touchBox.x+touchBox.width/2, touchBox.y+touchBox.height-5);
   await page.mouse.down(); await page.mouse.move(touchBox.x+touchBox.width/2, touchBox.y+5, { steps: 4 }); await page.mouse.up();
-  await page.waitForFunction(id => Number(document.querySelector(`[data-node-id="${id}"] [data-scroll-axis="y"]`)?.getAttribute('data-position')) > 0, fixture.scroll.id);
+  await page.waitForFunction(id => Number(document.querySelector(`[data-testid="ui-artboard"] [data-node-id="${id}"] [data-scroll-axis="y"]`)?.getAttribute('data-position')) > 0, fixture.scroll.id);
   assert.equal(await button.textContent(), 'click', 'Dragging a child button must not activate it');
   await mutate('uie.runtime.scroll', { id: fixture.scroll.id, to: { y: 0 } });
   await content.click();
-  await page.waitForFunction(id => document.querySelector(`[data-node-id="${id}"]`)?.textContent === 'child-click', fixture.button.id);
+  await page.waitForFunction(id => document.querySelector(`[data-testid="ui-artboard"] [data-node-id="${id}"]`)?.textContent === 'child-click', fixture.button.id);
   await page.screenshot({ path: join(root, 'runtime-toolbar.png') });
   await page.getByRole('button', { name: 'PC', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('.runtime-device-modes button[aria-pressed="true"]')?.textContent === 'PC');
+  const originalSize = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getSize());
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1500, 950));
   await page.waitForFunction(previous => document.querySelector('.ui-artboard')?.getAttribute('style') !== previous, fitted);
   const size = await viewport.boundingBox();
@@ -120,6 +125,8 @@ try {
   const diagnostics = await call('uie.debug.get_diagnostics');
   assert.ok(diagnostics.logs.some((log: any) => log.kind === 'input'));
   assert.ok(!(await raw('uie.debug.screenshot')).isError);
+  await app.evaluate(({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0].setSize(w, h), originalSize);
+  await page.waitForFunction(previous => document.querySelector('.ui-artboard')?.getAttribute('style') === previous, fitted);
   await mutate('uie.runtime.control', { action: 'stop' });
   await page.waitForFunction(expected => document.querySelector('.ui-artboard')?.getAttribute('style') === expected, editTransform);
   const final = await state('full');
@@ -127,13 +134,13 @@ try {
   // A burst over an unobserved list must not enqueue one full frame per wheel tick.
   await mutate('uie.scripts.set', { source: 'local UI = _G.FX.Class("CMouseView", "CUIView") return UI' });
   await mutate('uie.runtime.control', { action: 'run' });
-  await page.waitForFunction(id => !!document.querySelector(`[data-node-id="${id}"] [data-scroll-axis="y"]`), fixture.scroll.id);
+  await page.waitForFunction(id => !!document.querySelector(`[data-testid="ui-artboard"] [data-node-id="${id}"] [data-scroll-axis="y"]`), fixture.scroll.id);
   const beforeBurst = await call('uie.nodes.get', { id: fixture.scroll.id, view: 'runtime' });
   await page.evaluate(id => {
-    const target = document.querySelector(`[data-node-id="${id}"]`)!;
+    const target = document.querySelector(`[data-testid="ui-artboard"] [data-node-id="${id}"]`)!;
     for (let i = 0; i < 50; i++) target.dispatchEvent(new WheelEvent('wheel', { deltaY: 2, bubbles: true, cancelable: true }));
   }, fixture.child.id);
-  await page.waitForFunction(id => Number(document.querySelector(`[data-node-id="${id}"] [data-scroll-axis="y"]`)?.getAttribute('data-position')) === 100, fixture.scroll.id);
+  await page.waitForFunction(id => Number(document.querySelector(`[data-testid="ui-artboard"] [data-node-id="${id}"] [data-scroll-axis="y"]`)?.getAttribute('data-position')) === 100, fixture.scroll.id);
   const afterBurst = await call('uie.nodes.get', { id: fixture.scroll.id, view: 'runtime' });
   assert.equal(afterBurst.frameSequence - beforeBurst.frameSequence, 1);
   await mutate('uie.runtime.control', { action: 'stop' });
@@ -161,6 +168,33 @@ try {
   assert.equal(await artboard.locator('[data-scroll-axis="x"]').count(), 1);
   assert.equal(await artboard.locator('[data-scroll-axis="y"]').count(), 0);
   await mutate('uie.runtime.control', { action: 'stop' });
+  await mutate('uie.code.execute', { language: 'luau', source: `ui.nodes.create("UIDragDetector", {parentId="${fixture.button.id}"})` });
+  for (const device of ['PC', '移动端']) {
+    await page.getByRole('button', { name: '运行', exact: true }).click();
+    await artboard.locator('[data-class-name="TextButton"]').first().waitFor();
+    await page.getByRole('button', { name: device, exact: true }).click();
+    const origin = (await button.boundingBox())!;
+    await page.mouse.move(origin.x + 10, origin.y + 10);
+    await page.mouse.down();
+    const zoom = Number(await viewport.getAttribute('data-zoom'));
+    assert.ok(zoom < 1);
+    const shortMove = Math.ceil(3 * zoom);
+    await page.mouse.move(origin.x + 10 + shortMove, origin.y + 10);
+    await page.mouse.up();
+    await page.waitForFunction(id => document.querySelector(`[data-testid="ui-artboard"] [data-node-id="${id}"]`)?.textContent === 'up', fixture.button.id);
+    // Drain queued input before checking that the short drag did not also activate the button.
+    await mutate('uie.runtime.hover', { id: null });
+    assert.ok(!(await call('uie.debug.get_diagnostics')).logs.some((log: any) => log.message === `click ${fixture.button.id}`));
+    await page.mouse.down();
+    await page.mouse.move(origin.x + 70, origin.y + 30, { steps: 4 });
+    await page.waitForFunction(({ id, x, y }) => {
+      const bounds = document.querySelector(`[data-testid="ui-artboard"] [data-node-id="${id}"]`)?.getBoundingClientRect();
+      return bounds && Math.abs(bounds.x - x) < 2 && Math.abs(bounds.y - y) < 2;
+    }, { id: fixture.button.id, x: origin.x + 60, y: origin.y + 20 });
+    await page.mouse.up();
+    await page.waitForFunction(id => document.querySelector(`[data-testid="ui-artboard"] [data-node-id="${id}"]`)?.textContent === 'up', fixture.button.id);
+    await page.getByRole('button', { name: '停止', exact: true }).click();
+  }
   assert.deepEqual(errors, []);
   assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().every(w => !w.isVisible() && !w.isFocused())), true);
   console.log(`Mouse runtime and MCP smoke passed: ${root}`);

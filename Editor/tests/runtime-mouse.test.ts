@@ -8,6 +8,7 @@ import { RuntimeMouse, runtimeGeometry, localMousePoint } from '../src/editor/ru
 import { robloxStrategy } from '../src/editor/roblox';
 import { findNode } from '../src/shared/uiDocument';
 import { validateTool } from '../src/shared/automation-tools';
+import { createRobloxImportPackage } from '../src/shared/robloxImport';
 import { mouseFixture } from './runtime-mouse-fixture';
 
 test('mouse tools reject malformed actions before execution', () => {
@@ -198,3 +199,234 @@ test('mobile input suppresses mouse events, scrolls content and cancels before m
     await assert.rejects(started.session.command({ type: 'mouse', node: button.id, event: 'MouseMoved', x: 0, y: 0, dx: 0, dy: 0, button: 0, touch: true }), /鼠标/);
   } finally { await started.session.stop(); }
 });
+
+
+for (const mode of ['pc', 'mobile'] as const) {
+  test(`native detector follows the ${mode} pointer and drops into the hit slot`, async () => {
+    const { document, button, scroll, child } = mouseFixture();
+    const detector = robloxStrategy.createNode('UIDragDetector');
+    const label = robloxStrategy.createNode('TextLabel');
+    label.name = 'Caption';
+    button.children.push(detector, label);
+    button.properties.ZIndex = 3;
+    document.scripts.source = document.scripts.source.replace('    local b = root.Button', `    local b = root.Button
+    local detector = b.UIDragDetector
+    self:TrackConnection(detector.DragStart:Connect(function(p)
+        b.Caption.Visible = false
+        print("start", typeof(p), p.X)
+    end))
+    self:TrackConnection(detector.DragContinue:Connect(function(p) print("moving", p.X) end))
+    self:TrackConnection(detector.DragEnd:Connect(function(p)
+        local hits = root.Parent:GetGuiObjectsAtPosition(p.X, p.Y)
+        assert(hits[1] == b and hits[2] == root.List.Content and hits[3] == root.List)
+        b.Visible = false
+        assert(root.Parent:GetGuiObjectsAtPosition(p.X, p.Y)[1] == root.List.Content)
+        b.Visible = true
+        b.Position = UDim2.fromOffset(0, 0)
+        assert(root.Parent:GetGuiObjectsAtPosition(5, 5)[1] == b)
+        b.Parent = hits[2]
+        assert(root.Parent:GetGuiObjectsAtPosition(5, 5)[1] == nil)
+        assert(root.Parent:GetGuiObjectsAtPosition(p.X, p.Y)[1] == b)
+        b.Position = UDim2.fromOffset(0, 0)
+    end))`);
+    const pkg = createRobloxImportPackage(document);
+    assert.equal(pkg.model.children[0].children[0].className, 'UIDragDetector');
+    assert.deepEqual(pkg.model.children[0].children[0].properties, { Enabled: true });
+    assert.ok(pkg.scripts.source.includes('root.Parent:GetGuiObjectsAtPosition(p.X, p.Y)'));
+    const started = await LuauSession.start(resolve('native-bin'), document);
+    let frame = started.frame;
+    const logs: string[] = [];
+    const mouse = new RuntimeMouse(() => frame, async cmd => {
+      frame = await started.session.command(cmd);
+      logs.push(...frame.logs.map(log => log.message));
+    }, robloxStrategy);
+    try {
+      await mouse.setMode(mode);
+      await mouse.pointer('down', label.id, { x: 90, y: 70 });
+      await mouse.pointer('move', button.id, { x: 100, y: 70 });
+      assert.equal(findNode(frame.document.root, label.id)!.properties.Visible, false);
+      await mouse.pointer('move', child.id, { x: 450, y: 90 });
+      assert.deepEqual(findNode(frame.document.root, button.id)!.properties.Position, { x: { scale: 0, offset: 440 }, y: { scale: 0, offset: 80 } });
+      await mouse.pointer('up', child.id, { x: 450, y: 90 });
+      assert.equal(findNode(frame.document.root, child.id)!.children[0].id, button.id);
+      assert.deepEqual(findNode(frame.document.root, scroll.id)!.properties.CanvasPosition, { x: 0, y: 0 });
+      assert.ok(logs.includes('start\tVector2\t90') && logs.includes('moving\t450'));
+    } finally { await started.session.stop(); }
+  });
+}
+
+test('touch swipes scroll a draggable item, held swipes drag, disabling cancels the drop', async () => {
+  const { document, scroll, child } = mouseFixture();
+  const detector = robloxStrategy.createNode('UIDragDetector');
+  child.children.push(detector);
+  document.scripts.source = document.scripts.source.replace('    local b = root.Button', `    local b = root.Button
+    local detector = root.List.Content.UIDragDetector
+    self:TrackConnection(detector.DragStart:Connect(function() print("started") end))
+    self:TrackConnection(detector.DragEnd:Connect(function(p)
+        print(#root.Parent:GetGuiObjectsAtPosition(p.X, p.Y) == 0 and "cancelled" or "dropped")
+    end))`);
+  const started = await LuauSession.start(resolve('native-bin'), document);
+  let frame = started.frame;
+  const logs: string[] = [];
+  const mouse = new RuntimeMouse(() => frame, async cmd => {
+    frame = await started.session.command(cmd);
+    logs.push(...frame.logs.map(log => log.message));
+  }, robloxStrategy);
+  try {
+    await mouse.setMode('mobile');
+    const gesture = { action: 'drag' as const, id: child.id, from: { x: .5, y: .75 }, to: { x: .5, y: .5 }, steps: 1 };
+    const stamp = { sessionId: 's', revision: 0 };
+    validateTool('uie.runtime.drag', { ...stamp, id: child.id, from: gesture.from, to: gesture.to, holdMs: 350 });
+    validateTool('uie.runtime.batch', { ...stamp, steps: [{ ...gesture, holdMs: 350 }] });
+    assert.throws(() => validateTool('uie.runtime.drag', { ...stamp, id: child.id, from: gesture.from, to: gesture.to, holdMs: -1 }));
+    await mouse.perform(gesture);
+    assert.ok(!logs.includes('started'));
+    assert.deepEqual(findNode(frame.document.root, scroll.id)!.properties.CanvasPosition, { x: 0, y: 20 });
+    await mouse.perform({ ...gesture, holdMs: 350 });
+    assert.ok(logs.includes('started') && logs.includes('dropped'));
+    await mouse.scroll(scroll.id, { y: 0 });
+    frame = await started.session.command({ type: 'set', node: child.id, property: 'Position', value: child.properties.Position });
+    logs.length = 0;
+    const down = { x: 450, y: 105 }, up = { x: 450, y: 85 };
+    await mouse.pointer('down', child.id, down, 0, 0);
+    await mouse.pointer('move', child.id, up, 0, 50);
+    await mouse.pointer('up', child.id, up, 0, 500);
+    assert.deepEqual(findNode(frame.document.root, scroll.id)!.properties.CanvasPosition, { x: 0, y: 20 });
+    assert.ok(!logs.includes('started'));
+    await mouse.pointer('down', child.id, down, 0, 700);
+    await mouse.pointer('move', child.id, up, 0, 1100);
+    assert.deepEqual(findNode(frame.document.root, scroll.id)!.properties.CanvasPosition, { x: 0, y: 20 });
+    assert.deepEqual(findNode(frame.document.root, child.id)!.properties.Position, { x: { scale: 0, offset: 0 }, y: { scale: 0, offset: -20 } });
+    frame = await started.session.command({ type: 'set', node: detector.id, property: 'Enabled', value: false });
+    assert.equal(mouse.observeFrame(), true);
+    await mouse.cancelInvalidDetector();
+    await mouse.pointer('up', child.id, up, 0, 1200);
+    assert.deepEqual(logs.filter(log => ['started', 'cancelled', 'dropped'].includes(log)), ['started', 'cancelled']);
+  } finally { await started.session.stop(); }
+});
+
+test('repeated hit queries on a 200-slot bag share the command budget', async () => {
+  const { document, button } = mouseFixture();
+  for (let i = 0; i < 200; i++) {
+    const slot = robloxStrategy.createNode('Frame');
+    slot.name = `Slot${i}`;
+    document.root.children.push(slot);
+  }
+  document.scripts.source = document.scripts.source.replace('    local b = root.Button', `    local b = root.Button
+    self:TrackConnection(b.Activated:Connect(function()
+        for i = 1, 10 do
+            b.Visible = i % 2 == 0
+            local hits = root.Parent:GetGuiObjectsAtPosition(90, 70)
+            assert((table.find(hits, b) ~= nil) == b.Visible)
+        end
+        local copy = b:Clone()
+        copy.Parent = root
+        assert(table.find(root.Parent:GetGuiObjectsAtPosition(90, 70), copy))
+        copy:Destroy()
+        assert(not table.find(root.Parent:GetGuiObjectsAtPosition(90, 70), copy))
+    end))`);
+  const { session } = await LuauSession.start(resolve('native-bin'), document);
+  try { await session.command({ type: 'event', node: button.id }); }
+  finally { await session.stop(); }
+});
+
+test('DragStart can lift an item from a scaled list into an overlay', async () => {
+  const { document, child, scroll } = mouseFixture();
+  const scale = robloxStrategy.createNode('UIScale');
+  scale.properties.Scale = 2;
+  scroll.children.push(scale);
+  child.children.push(robloxStrategy.createNode('UIDragDetector'));
+  const overlay = robloxStrategy.createNode('Frame');
+  overlay.name = 'Overlay';
+  document.root.children.push(overlay);
+  document.scripts.source = document.scripts.source.replace('    local b = root.Button', `    local b = root.Button
+    local item = root.List.Content
+    self:TrackConnection(item.UIDragDetector.DragStart:Connect(function()
+        item.Parent = root.Overlay
+        item.Position = UDim2.fromOffset(400, 60)
+    end))`);
+  const started = await LuauSession.start(resolve('native-bin'), document);
+  let frame = started.frame;
+  const mouse = new RuntimeMouse(() => frame, async cmd => { frame = await started.session.command(cmd); }, robloxStrategy);
+  try {
+    await mouse.pointer('down', child.id, { x: 420, y: 80 });
+    for (const delta of [20, 35]) {
+      await mouse.pointer('move', null, { x: 420 + delta, y: 80 });
+      assert.deepEqual(findNode(frame.document.root, child.id)!.properties.Position, { x: { scale: 0, offset: 400 + delta }, y: { scale: 0, offset: 60 } });
+    }
+  } finally { await started.session.stop(); }
+});
+
+
+test('a held item keeps the grabbed pixel when its list scrolls', async () => {
+  const { document, child, scroll } = mouseFixture();
+  child.children.push(robloxStrategy.createNode('UIDragDetector'));
+  const started = await LuauSession.start(resolve('native-bin'), document);
+  let frame = started.frame;
+  const mouse = new RuntimeMouse(() => frame, async cmd => { frame = await started.session.command(cmd); }, robloxStrategy);
+  try {
+    const offset = { x: .25, y: .75 };
+    const down = mouse.point(child.id, offset);
+    const moved = { x: down.x + 12, y: down.y };
+    await mouse.pointer('down', child.id, down);
+    await mouse.wheel(child.id, { x: 0, y: 10 });
+    await mouse.pointer('move', child.id, moved);
+    assert.deepEqual(mouse.point(child.id, offset), moved);
+    await mouse.wheel(child.id, { x: 0, y: 30 });
+    assert.equal((findNode(frame.document.root, scroll.id)!.properties.CanvasPosition as { y: number }).y, 40);
+    assert.deepEqual(mouse.point(child.id, offset), moved);
+    const next = { x: moved.x + 1, y: moved.y };
+    await mouse.pointer('move', child.id, next);
+    assert.deepEqual(mouse.point(child.id, offset), next);
+    await mouse.pointer('up', child.id, next);
+  } finally { await started.session.stop(); }
+});
+
+test('dropping over a non-slot walks through PlayerGui to the end of the preview hierarchy', async () => {
+  const { document, child, button } = mouseFixture();
+  child.children.push(robloxStrategy.createNode('UIDragDetector'));
+  document.scripts.source = document.scripts.source.replace('    local b = root.Button', `    local b = root.Button
+    self:TrackConnection(root.List.Content.UIDragDetector.DragEnd:Connect(function(p)
+        local gui = root.Parent
+        assert(gui.Name == "PlayerGui" and gui.ClassName == "PlayerGui" and gui.Parent == nil)
+        assert(gui:IsA("PlayerGui") and gui:IsA("BasePlayerGui") and gui:IsA("Instance") and gui:IsA("Object"))
+        local hit = gui:GetGuiObjectsAtPosition(p.X, p.Y)[1]
+        assert(hit == b)
+        while hit and not hit:IsA("ScrollingFrame") do hit = hit.Parent end
+        assert(hit == nil)
+        b.Text = "outside"
+    end))`);
+  const started = await LuauSession.start(resolve('native-bin'), document);
+  let frame = started.frame;
+  const mouse = new RuntimeMouse(() => frame, async cmd => { frame = await started.session.command(cmd); }, robloxStrategy);
+  try {
+    const drop = mouse.point(button.id);
+    await mouse.pointer('down', child.id, mouse.point(child.id));
+    await mouse.pointer('move', button.id, drop);
+    await mouse.pointer('up', button.id, drop);
+    assert.equal(findNode(frame.document.root, button.id)!.properties.Text, 'outside');
+  } finally { await started.session.stop(); }
+});
+
+for (const scenario of ['no overflow', 'horizontal swipe in vertical list', 'swipe past top edge']) {
+  test(`mobile drags the item when scrolling is unavailable: ${scenario}`, async () => {
+    const { document, scroll, child } = mouseFixture();
+    scroll.properties.ScrollingDirection = 'Y';
+    if (scenario === 'no overflow') scroll.properties.CanvasSize = scroll.properties.Size;
+    child.children.push(robloxStrategy.createNode('UIDragDetector'));
+    const started = await LuauSession.start(resolve('native-bin'), document);
+    let frame = started.frame;
+    const mouse = new RuntimeMouse(() => frame, async cmd => { frame = await started.session.command(cmd); }, robloxStrategy);
+    try {
+      await mouse.setMode('mobile');
+      const down = mouse.point(child.id);
+      const next = scenario === 'horizontal swipe in vertical list' ? { x: down.x + 20, y: down.y } :
+        { x: down.x, y: down.y + (scenario === 'no overflow' ? -20 : 20) };
+      await mouse.pointer('down', child.id, down, 0, 0);
+      await mouse.pointer('move', child.id, next, 0, 40);
+      assert.deepEqual(mouse.point(child.id), next);
+      assert.deepEqual(findNode(frame.document.root, scroll.id)!.properties.CanvasPosition, { x: 0, y: 0 });
+      await mouse.pointer('up', child.id, next, 0, 50);
+    } finally { await started.session.stop(); }
+  });
+}

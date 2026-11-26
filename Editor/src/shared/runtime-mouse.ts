@@ -1,5 +1,5 @@
 export interface Point { x: number; y: number }
-export type MouseAction = { action: 'hover'; id: string | null } | { action: 'scroll'; id: string; to?: Partial<Point>; delta?: Partial<Point> } | { action: 'drag'; id: string; from: Point; to: Point; steps?: number };
+export type MouseAction = { action: 'hover'; id: string | null } | { action: 'scroll'; id: string; to?: Partial<Point>; delta?: Partial<Point> } | { action: 'drag'; id: string; from: Point; to: Point; steps?: number; holdMs?: number };
 export const pointSchema = { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, additionalProperties: false, minProperties: 1 };
 export function validateMouseAction(value: Record<string, unknown>): asserts value is Record<string, unknown> & MouseAction {
   if (!['hover', 'scroll', 'drag'].includes(String(value.action))) throw new Error('不支持的鼠标动作。');
@@ -16,6 +16,7 @@ export function validateMouseAction(value: Record<string, unknown>): asserts val
   }
   if (value.action === 'drag') {
     point(value.from, true); point(value.to, true);
+    if (value.holdMs !== undefined && (typeof value.holdMs !== 'number' || !Number.isSafeInteger(value.holdMs) || value.holdMs < 0)) throw new Error('holdMs 必须为非负安全整数。');
     if (value.steps !== undefined && (typeof value.steps !== 'number' || !Number.isInteger(value.steps) || value.steps < 1 || value.steps > 32)) throw new Error('拖动 steps 必须是 1–32。');
   }
 }

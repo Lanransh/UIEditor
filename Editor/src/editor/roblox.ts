@@ -37,6 +37,7 @@ export const nodeDefinitions: Record<string, NodeDefinition> = {
   CanvasGroup: object({ GroupTransparency: number(0, 0, 1), GroupColor3: color('#ffffff') }),
   TextLabel: object(text), TextButton: object({ ...text, Text: string('按钮') }), TextBox: object({ ...text, PlaceholderText: string('输入文字') }),
   ImageLabel: object(image), ImageButton: object(image),
+  UIDragDetector: component({ Enabled: bool(true) }),
   UICorner: component({ CornerRadius: dimension(8) }),
   UIStroke: component({ Color: color('#263a3a'), Thickness: number(1, 0, 100), Transparency: number(0, 0, 1), Enabled: bool(true) }),
   UIGradient: component({ ColorStart: color('#ffffff'), ColorEnd: color('#168b85'), TransparencyStart: number(0, 0, 1), TransparencyEnd: number(0, 0, 1), Rotation: number(0), Enabled: bool(true) }),

@@ -76,7 +76,7 @@ App 提供 FX.Class、FX.GetClass、Super、New、IsA、GetClassName 的兼容�
 
 ## 节点与支持接口
 
-脚本直接获取节点对象，不需要额外绑定引用名。FX.Loader:Here(root, "父节点.子节点") 按层级查找，只接受点分隔路径；FX.Loader:PlayerGui("界面名.子节点") 从模拟 PlayerGui 查找当前 ScreenGui 或其子节点。生成脚本优先用 PlayerGui 获取界面、Here 获取子节点，不通过 GetRootNode 查找。PlayerGui 仅包含当前文档，空路径和空段明确报错。节点支持 Name/ClassName/Parent、FindFirstChild、WaitForChild、GetChildren、IsA、子节点字段、支持属性的读写，以及按钮 Activated:Connect。支持通过 Clone 克隆已有模板子树、修改 Name、设置 Parent 和 Destroy；不支持 Instance.new。节点路径不存在、同级重名导致歧义或属性不支持时明确报错；修改节点名称或层级后需同步脚本路径。
+脚本直接获取节点对象，不需要额外绑定引用名。FX.Loader:Here(root, "父节点.子节点") 按层级查找，只接受点分隔路径；FX.Loader:PlayerGui("界面名.子节点") 从模拟 PlayerGui 查找当前 ScreenGui 或其子节点。生成脚本优先用 PlayerGui 获取界面、Here 获取子节点，不通过 GetRootNode 查找。预览中 ScreenGui.Parent 是 PlayerGui，提供 Name、ClassName 和 IsA，继续读取 Parent 得到 nil。PlayerGui 仅包含当前文档，空路径和空段明确报错。节点支持 Name/ClassName/Parent、FindFirstChild、WaitForChild、GetChildren、IsA、子节点字段、支持属性的读写，以及按钮 Activated:Connect。支持通过 Clone 克隆已有模板子树、修改 Name、设置 Parent 和 Destroy；不支持 Instance.new。节点路径不存在、同级重名导致歧义或属性不支持时明确报错；修改节点名称或层级后需同步脚本路径。
 
 常用交互代码以 App 预览和 Roblox 游戏复用为目标，节点方法使用 Roblox 的调用写法与主要生命周期语义。App 执行真实 Luau，但节点、布局与事件由宿主模拟，只覆盖公开支持的接口；不是 Roblox 引擎。WaitForChild 找不到时立即报错，不等待引擎对象出现。Roblox 导入保留交互源码，Clone/Parent/Destroy 在游戏中直接使用原生 Instance 接口。
 
@@ -109,6 +109,10 @@ Parent = nil 将子树移出预览，保留对象、属性和连接，后续可�
 运行时固定使用 1280×720 逻辑画布，持续等比适应可用窗口区域并居中；窗口、面板尺寸变化自动重新适应。运行中禁用手动缩放、滚轮平移/缩放、空格和中键平移，停止后恢复运行前的编辑视图。TextBox 仍只显示文本，不接收键盘或文本输入。
 
 人工鼠标和 MCP 共用鼠标处理层，支持 MouseEnter、MouseLeave、MouseMoved、MouseWheelForward/Backward、InputBegan/Changed/Ended；按钮激活继续使用 Activated。Input 回调提供 Position/Delta 的 X/Y/Z 字段、UserInputType 和 UserInputState，位置使用逻辑画布像素；运行工具栏提供 PC / 移动端切换，默认 PC。PC 使用鼠标输入；移动端用左键模拟单指触摸，Input 回调的 UserInputType 为 Enum.UserInputType.Touch，不产生鼠标悬停、移动和滚轮事件。切换先取消当前输入并清除悬停，保留运行实例、模拟数据和滚动位置；重置保留所选输入模式。本实现不提供完整 InputObject 或引擎输入服务。拖动捕获起始节点，释放后结束，窗口失焦会取消并清理悬停；停止或重置清除鼠标状态，旧请求不能进入新会话。普通拖动不自动改变节点位置，也不触发按钮 Activated，脚本通过输入事件更新支持属性。
+
+在道具的 GuiObject 下添加启用的 `UIDragDetector`，运行预览即可用左键或单指拖动。当前预览支持默认二维平移，保留按下时的抓取偏移，更新父对象 Position 的 Offset。DragStart 回调可将道具移入浮层并重新定位，后续移动使用回调结束后的父级坐标和位置。拖动期间用滚轮滚动列表，图标上的抓取点仍跟随指针。移动端沿列表可继续滚动的方向轻划会滚动列表。垂直列表内横划、沿已到达的边界向外划，或列表没有滚动范围时，轻划会拖动道具。按住至少 350 毫秒再移动可直接拖动道具。两种输入模式都以 3 个逻辑画布像素区分点击和拖动。UIGridLayout 控制格子的位置，检测器应挂在格子里面的道具图标下。跨格移动时保持格子 Visible，并让道具及其祖先处于可见绘制层级。
+
+检测器的 DragStart、DragContinue、DragEnd 均传入一个 Vector2。交互脚本可用 `self:GetRootNode().Parent:GetGuiObjectsAtPosition(p.X, p.Y)` 查询当前画布，按从前到后的显示顺序寻找目标格。预览在查询时使用当前已挂载节点的布局，只同步上次查询后发生变化的节点，同一回调内的隐藏、移动和换父级立即生效，并考虑父级旋转、缩放、裁剪和滚动。检测器在拖动中失效或输入取消时，用画布外位置结束，命中列表为空。放置、恢复原位或发送背包动作由交互脚本处理。导入保留原生检测器和交互脚本；游戏内由 Roblox 分发事件和执行命中查询。
 
 PC 模式下 ScrollingFrame 默认处理滚轮和滚动条拖动，不通过拖动内容滚动；移动端忽略滚轮，支持从内容及其子节点开始单指拖动，按容器的旋转和缩放换算位移，遵循 ScrollingDirection，不把拖动识别为按钮点按。两种模式都将裁剪到范围内的 CanvasPosition 写入运行副本，不要求绑定脚本。滚轮在子节点上输入时通知该节点，并由最近的 ScrollingFrame 处理；达到边界时不继续滚动外层容器。滚动条范围与绘制使用相同布局计算。GetPropertyChangedSignal(property) 支持已注册属性，只有值实际变化才通知，回调不带参数；连接沿用 TrackConnection 和 Destroy/停止时的清理规则。
 

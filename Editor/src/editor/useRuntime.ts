@@ -37,7 +37,12 @@ export function useRuntime(document: UIDocument) {
     inputQueue.current = result;
     return result;
   }
-  function frameChanged(value: RuntimeFrame | null) { current.current.frame = value; ++current.current.sequence; setFrame(value); }
+  function frameChanged(value: RuntimeFrame | null) {
+    current.current.frame = value;
+    if (value && mouse.current?.observeFrame()) void enqueue(() => mouse.current!.cancelInvalidDetector());
+    ++current.current.sequence;
+    setFrame(value);
+  }
   function append(entries: RuntimeLog[]) { current.current.logs = [...current.current.logs, ...entries.map(log => ({ ...log, cursor: ++current.current.cursor }))].slice(-500); setLogs(current.current.logs); }
   async function stop() {
     wheelBuffer.current.seal();
@@ -107,7 +112,7 @@ export function useRuntime(document: UIDocument) {
     const result = await mouse.current!.perform(input);
     append([{ kind: 'input', message: JSON.stringify({ ...input, ...result }) }]);
     return result;
-  }), pointer: (action: 'down' | 'move' | 'up' | 'cancel', id: string | null, point: Point, button = 0) => enqueue(async () => { await mouse.current!.pointer(action, id, point, button); }),
+  }), pointer: (action: 'down' | 'move' | 'up' | 'cancel', id: string | null, point: Point, button = 0, time = performance.now(), scrollbarCaptured = false) => enqueue(async () => { await mouse.current!.pointer(action, id, point, button, time, scrollbarCaptured); }),
   wheel: (id: string, delta: Point) => wheelBuffer.current.push(id, delta, mouse.current!.canMergeWheel(id), enqueue, async total => { await mouse.current!.wheel(id, total); }),
   cancelMouse: () => enqueue(async () => { await mouse.current!.cancel(); }),
   inspect: () => ({ ...current.current, sessionId: session.current, interaction: mouse.current!.inspect() }) };

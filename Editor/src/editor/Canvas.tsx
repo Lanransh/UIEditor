@@ -1,4 +1,4 @@
-import { runtimeGeometry, localMousePoint } from './runtimeMouse';
+import { runtimeGeometry, localMousePoint, movedPointer } from './runtimeMouse';
 import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import { findParent, updateNode, type UIDocument, type UDim, type UDim2, type UINode, type Vector2 } from '../shared/uiDocument';
 import type { DocumentEditor } from './useDocumentEditor';
@@ -30,7 +30,7 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
   const [capturing, setCapturing] = useState(false);
   const runtimeRef = useRef(editor.runtime); runtimeRef.current = editor.runtime;
   const editView = useRef<{ zoom: number; pan: { x: number; y: number } } | null>(null);
-  const mouseGesture = useRef<{ pointerId: number; buttonId: string | null; button: number; startX: number; startY: number; moved: boolean; scroll?: { id: string; axis: 'x' | 'y'; position: number; ratio: number; start: number; matrix: NonNullable<ReturnType<typeof runtimeGeometry>>['matrix'] } } | null>(null);
+  const mouseGesture = useRef<{ pointerId: number; buttonId: string | null; button: number; start: { x: number; y: number }; moved: boolean; scroll?: { id: string; axis: 'x' | 'y'; position: number; ratio: number; start: number; matrix: NonNullable<ReturnType<typeof runtimeGeometry>>['matrix'] } } | null>(null);
   const suppressClick = useRef(false);
   useEffect(() => {
     const active = mouseGesture.current;
@@ -94,7 +94,7 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
     event.preventDefault();
     const id = nodeId(event.target), bar = (event.target as HTMLElement).closest<HTMLElement>('[data-scroll-axis]');
     suppressClick.current = false;
-    const active: NonNullable<(typeof mouseGesture)['current']> = { pointerId: event.pointerId, buttonId: (event.target as HTMLElement).closest<HTMLElement>('[data-class-name="TextButton"], [data-class-name="ImageButton"]')?.dataset.nodeId ?? null, button: event.button, startX: event.clientX, startY: event.clientY, moved: false };
+    const active: NonNullable<(typeof mouseGesture)['current']> = { pointerId: event.pointerId, buttonId: (event.target as HTMLElement).closest<HTMLElement>('[data-class-name="TextButton"], [data-class-name="ImageButton"]')?.dataset.nodeId ?? null, button: event.button, start: point(event), moved: false };
     if (bar && id && event.button === 0 && editor.runtime.inputMode === 'pc') {
       const axis = bar.dataset.scrollAxis as 'x' | 'y';
       const { matrix } = runtimeGeometry(editor.runtime.frame!, editor.strategy, id)!;
@@ -102,26 +102,26 @@ export function DocumentCanvas({ editor, visible = true }: { editor: DocumentEdi
     }
     mouseGesture.current = active;
     viewport.current!.setPointerCapture(event.pointerId);
-    void editor.runtime.pointer('down', id, point(event), event.button);
+    void editor.runtime.pointer('down', id, point(event), event.button, event.timeStamp, !!active.scroll);
   }
   function runtimeMove(event: PointerEvent) {
     const active = mouseGesture.current;
     if (active && active.pointerId !== event.pointerId) return;
     if (active) {
-      active.moved ||= Math.hypot(event.clientX-active.startX, event.clientY-active.startY) > 3;
+      active.moved ||= movedPointer(active.start, point(event));
       suppressClick.current = active.moved;
       if (active.scroll) {
         const { id, axis, position, ratio, matrix, start } = active.scroll;
         void editor.runtime.mouse({ action: 'scroll', id, to: { [axis]: position + ((localMousePoint(matrix, point(event))[axis] - start) * ratio) } });
       }
     }
-    void editor.runtime.pointer('move', nodeId(event.target), point(event), event.button);
+    void editor.runtime.pointer('move', nodeId(event.target), point(event), event.button, event.timeStamp);
   }
   function runtimeUp(event: PointerEvent, cancel = false) {
     const active = mouseGesture.current;
     if (!active || active.pointerId !== event.pointerId) return;
     mouseGesture.current = null;
-    void editor.runtime.pointer(cancel ? 'cancel' : 'up', nodeId(event.target), point(event), event.button);
+    void editor.runtime.pointer(cancel ? 'cancel' : 'up', nodeId(event.target), point(event), event.button, event.timeStamp);
     if (viewport.current?.hasPointerCapture(event.pointerId)) viewport.current.releasePointerCapture(event.pointerId);
     const releasedButton = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-class-name="TextButton"], [data-class-name="ImageButton"]')?.dataset.nodeId;
     if (!cancel && !active.moved && !active.scroll && active.button === 0 && active.buttonId && active.buttonId === releasedButton) void editor.runtime.activate(active.buttonId);

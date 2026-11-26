@@ -100,7 +100,7 @@ nodes.get/find、scripts.get 和 debug.screenshot 共用可选 target：`{projec
 | --- | --- | --- |
 | uie.runtime.hover | `{id}`，id 可为 null | 悬停节点或移出；重复悬停同一节点不重复进入 |
 | uie.runtime.scroll | `{id,to:{x?,y?}}` 或 `{id,delta:{x?,y?}}` | 目标必须是 ScrollingFrame；二选一，逻辑内容像素；缺省轴保留；返回实际 position 和 range |
-| uie.runtime.drag | `{id,from:{x,y},to:{x,y},steps?}` | 局部归一化坐标 0–1，steps 默认 8、范围 1–32；按下、固定次数移动、释放；不激活按钮 |
+| uie.runtime.drag | `{id,from:{x,y},to:{x,y},steps?,holdMs?}` | 局部归一化坐标 0–1，steps 默认 8、范围 1–32；holdMs 为首次移动前的模拟按住毫秒数，默认 0，移动端列表长按拖动可用 350；不激活按钮 |
 
 scroll 的 delta 分发滚轮事件并执行默认滚动，to 定位滚动且只产生属性变化通知，不伪造滚轮。MouseMoved 与 InputChanged 描述拖动路径；普通节点的位移由脚本决定。隐藏或禁用目标返回 dispatched=false 和 reason，不绕过状态；非法类型/参数报错。所有步骤串行等待运行帧更新，返回运行身份、帧序号和 interaction（hoveredId/pressedId）。不提供键盘、焦点或文本输入工具。
 

@@ -9,7 +9,8 @@ type RuntimeResult<T> = Result<T> & { logs?: RuntimeLog[] };
 export const mouseEvents = ['MouseEnter', 'MouseLeave', 'MouseMoved', 'MouseWheelForward', 'MouseWheelBackward', 'InputBegan', 'InputChanged', 'InputEnded'] as const;
 export type MouseEventName = typeof mouseEvents[number];
 export type RuntimeInputMode = 'pc' | 'mobile';
-export type RuntimeCommand = { type: 'mouse'; node: string; event: MouseEventName; x: number; y: number; dx: number; dy: number; button: number; wheel?: boolean; cancelled?: boolean; touch?: boolean } | { type: 'event'; node: string } | { type: 'show' | 'hide' } | { type: 'set'; node: string; property: string; value: PropertyValue };
+export const dragEvents = ['DragStart', 'DragContinue', 'DragEnd'] as const;
+export type RuntimeCommand = { type: 'drag'; node: string; event: typeof dragEvents[number]; x: number; y: number } | { type: 'mouse'; node: string; event: MouseEventName; x: number; y: number; dx: number; dy: number; button: number; wheel?: boolean; cancelled?: boolean; touch?: boolean } | { type: 'event'; node: string } | { type: 'show' | 'hide' } | { type: 'set'; node: string; property: string; value: PropertyValue };
 export interface RuntimeAPI {
   start(document: UIDocument): Promise<RuntimeResult<{ session: string; frame: RuntimeFrame }>>;
   command(session: string, command: RuntimeCommand): Promise<RuntimeResult<RuntimeUpdate>>;
